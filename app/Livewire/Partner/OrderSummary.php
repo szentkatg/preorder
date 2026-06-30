@@ -1,0 +1,453 @@
+<?php
+
+namespace App\Livewire\Partner;
+
+use App\Models\Brand;
+use App\Models\Catalog;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderSheetType;
+use App\Models\PriceListItem;
+use App\Models\Product;
+use App\Models\Season;
+use Livewire\Component;
+use App\Exports\PartnerOrderSummaryMatrixExport;
+use Maatwebsite\Excel\Facades\Excel;
+
+
+class OrderSummary extends Component
+{
+    public Season $season;
+
+    public Brand $brand;
+
+    public OrderSheetType $orderSheetType;
+
+    public $orders;
+
+    public string $catalogGroupName = '';
+
+    public array $matrixGroups = [];
+
+    public array $pieceQuantities = [];
+
+    public array $assortmentQuantities = [];
+
+    public bool $allowAssortmentOrdering = true;
+
+    public bool $showAllCatalogGroups = true;
+
+    public ?int $priceListId = null;
+
+    public ?int $retailPriceListId = null;
+
+    public bool $showImageModal = false;
+
+    public ?string $imageModalTitle = null;
+
+    public array $imageModalImages = [];
+
+    public function mount(
+        Season $season,
+        Brand $brand,
+        OrderSheetType $orderSheetType
+    ): void {
+        $this->season = $season;
+        $this->brand = $brand;
+        $this->orderSheetType = $orderSheetType;
+
+        $partnerUser = auth('partner')->user();
+
+        $partnerIds = $partnerUser->partners()
+            ->pluck('partners.id');
+
+        if ($partnerIds->isEmpty() && $partnerUser->partner_id) {
+            $partnerIds = collect([$partnerUser->partner_id]);
+        }
+
+        $this->orders = Order::query()
+            ->whereIn('partner_id', $partnerIds)
+            ->where('season_id', $this->season->id)
+            ->where('brand_id', $this->brand->id)
+            ->where('order_sheet_type_id', $this->orderSheetType->id)
+            ->with([
+                'partner',
+                'partnerAddress.language',
+                'priceList.currency',
+                'items.sku.assortmentComponents',
+                'items.sku.product',
+                'items.sku.size',
+                'items.sku.color',
+            ])
+            ->get();
+
+        $firstOrder = $this->orders->first();
+
+        $this->priceListId = $firstOrder?->price_list_id;
+        $this->retailPriceListId = $firstOrder?->priceList?->retail_price_list_id;
+        $this->setPartnerLocale();
+        $this->loadExistingQuantities();
+        $this->allowAssortmentOrdering = collect($this->assortmentQuantities)
+                ->sum() > 0;
+        $this->buildMatrixGroups();
+    }
+
+    protected function setPartnerLocale(): void
+    {
+        $firstOrder = $this->orders?->first();
+
+        $languageCode = strtolower(
+            $firstOrder?->partnerAddress?->language?->code ?? 'hu'
+        );
+
+        app()->setLocale($languageCode);
+    }
+
+    protected function catalogGroupNameColumn(): string
+    {
+        return app()->getLocale() === 'en'
+            ? 'catalog_group_name_en'
+            : 'catalog_group_name_hu';
+    }
+
+    protected function localizedValue(object $model, string $baseName): string
+    {
+        $locale = app()->getLocale() === 'en' ? 'en' : 'hu';
+        $fallback = $locale === 'en' ? 'hu' : 'en';
+
+        return (string) (
+            $model->{$baseName . '_' . $locale}
+            ?? $model->{$baseName . '_' . $fallback}
+            ?? ''
+        );
+    }
+
+    protected function loadExistingQuantities(): void
+    {
+        foreach ($this->orders as $order) {
+            foreach ($order->items as $item) {
+                if ($item->sku?->assortmentComponents?->isNotEmpty()) {
+                    $this->assortmentQuantities[$item->sku_id] =
+                        ($this->assortmentQuantities[$item->sku_id] ?? 0)
+                        + (int) $item->quantity;
+                } else {
+                    $this->pieceQuantities[$item->sku_id] =
+                        ($this->pieceQuantities[$item->sku_id] ?? 0)
+                        + (int) $item->quantity;
+                }
+            }
+        }
+    }
+
+    protected function buildMatrixGroups(): void
+    {
+        $catalogGroupColumn = $this->catalogGroupNameColumn();
+
+        $products = Product::query()
+            ->with([
+                'sizeRange.items.size',
+                'colors.skus.size',
+                'colors.itemAssortments.assortmentSku',
+                'colors.itemAssortments.componentSku.size',
+            ])
+            ->where('season_id', $this->season->id)
+            ->where('brand_id', $this->brand->id)
+            ->where('order_sheet_type_id', $this->orderSheetType->id)
+            ->where('active', true)
+            ->whereNotNull($catalogGroupColumn)
+            ->where($catalogGroupColumn, '!=', '')
+            ->orderBy('catalog_group_sort')
+            ->orderBy('catalog_sort')
+            ->orderBy('model_code')
+            ->get();
+
+        $groups = collect();
+
+        foreach ($products->groupBy(fn (Product $product) => $product->{$catalogGroupColumn} ?: 'EGYEB') as $catalogGroupName => $catalogProducts) {
+            foreach ($catalogProducts->groupBy(fn (Product $product) => $product->sizeRange?->matrix_group ?: 'EGYEB') as $matrixGroup => $matrixProducts) {
+    
+                $sizes = $matrixProducts
+                    ->pluck('sizeRange')
+                    ->filter()
+                    ->flatMap(fn ($sizeRange) => $sizeRange->items)
+                    ->filter(fn ($item) => $item->size)
+                    ->map(fn ($item) => [
+                        'id' => (int) $item->size->id,
+                        'code' => (string) $item->size->code,
+    
+                        /*
+                         * Elsődlegesen a sizes tábla order mezőjét használjuk.
+                         * Ha nálad mégis sort_order a mező neve a sizes táblában,
+                         * akkor az alábbi sorban az order maradhat fallback előtt.
+                         */
+                        'sort_order' => (int) (
+                            $item->size->order
+                            ?? $item->size->sort_order
+                            ?? $item->sort_order
+                            ?? 0
+                        ),
+                    ])
+                    ->unique('id')
+                    ->sortBy([
+                        fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
+                        fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
+                    ])
+                    ->values()
+                    ->all();
+    
+                $groups->push([
+                    'catalog_group' => $catalogGroupName,
+                    'matrix_group' => $this->showAllCatalogGroups
+                        ? $catalogGroupName . ' / ' . $matrixGroup
+                        : $matrixGroup,
+                    'raw_matrix_group' => $matrixGroup,
+                    'sizes' => $sizes,
+                    'products' => $matrixProducts
+                        ->map(fn (Product $product) => $this->formatProduct($product))
+                        ->values()
+                        ->all(),
+                ]);
+            }
+        }
+
+        $this->matrixGroups = $groups->values()->all();
+    }
+
+    protected function formatProduct(Product $product): array
+    {
+        $wholesalePrice = $this->getProductPrice($product->id, $this->priceListId);
+
+        $retailPrice = $this->retailPriceListId
+            ? $this->getProductPrice($product->id, $this->retailPriceListId)
+            : 0;
+
+        return [
+            'id' => $product->id,
+            'model_code' => $product->model_code,
+            'catalog_page' => $product->catalog_page ?? null,
+            'name' => $this->localizedValue($product, 'name'),
+            'price' => $wholesalePrice,
+            'retail_price' => $retailPrice,
+            'colors' => $product->colors
+                ->where('active', true)
+                ->sortBy('sort_order')
+                ->map(fn ($color) => [
+                    'id' => $color->id,
+                    'code' => $color->code,
+                    'name' => $this->localizedValue($color, 'name'),
+                    'sku_map' => $color->skus
+                        ->where('active', true)
+                        ->mapWithKeys(fn ($sku) => [
+                            $sku->size_id => [
+                                'id' => $sku->id,
+                                'code' => $sku->sku_code,
+                            ],
+                        ])
+                        ->all(),
+                    'assortments' => $this->formatAssortments($color),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    protected function formatAssortments($color): array
+    {
+        return $color->itemAssortments
+            ->groupBy('assortment_sku_id')
+            ->map(function ($items, int $assortmentSkuId) {
+                $assortmentSku = $items->first()->assortmentSku;
+
+                return [
+                    'sku_id' => $assortmentSkuId,
+                    'code' => $assortmentSku?->sku_code,
+                    'content' => $items
+                        ->mapWithKeys(fn ($item) => [
+                            $item->component_sku_id => (int) $item->quantity,
+                        ])
+                        ->all(),
+                    'content_by_size' => $items
+                        ->mapWithKeys(fn ($item) => [
+                            $item->componentSku?->size_id => (int) $item->quantity,
+                        ])
+                        ->all(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    protected function getProductPrice(int $productId, ?int $priceListId): float
+    {
+        if (! $priceListId) {
+            return 0;
+        }
+
+        return (float) (
+            PriceListItem::query()
+                ->where('price_list_id', $priceListId)
+                ->where('product_id', $productId)
+                ->where('season_id', $this->season->id)
+                ->value('net_price') ?? 0
+        );
+    }
+    
+    public function getTotalForSku(int $skuId): int
+    {
+        $total = (int) ($this->pieceQuantities[$skuId] ?? 0);
+
+        foreach ($this->matrixGroups as $matrixGroup) {
+            foreach ($matrixGroup['products'] as $product) {
+                foreach ($product['colors'] as $color) {
+                    foreach ($color['assortments'] as $assortment) {
+                        $assortmentQty = (int) ($this->assortmentQuantities[$assortment['sku_id']] ?? 0);
+                        $componentQty = (int) ($assortment['content'][$skuId] ?? 0);
+
+                        $total += $assortmentQty * $componentQty;
+                    }
+                }
+            }
+        }
+
+        return $total;
+    }
+
+    public function getRowTotal(array $color): int
+    {
+        $total = 0;
+
+        foreach ($color['sku_map'] as $sku) {
+            $total += $this->getTotalForSku($sku['id']);
+        }
+
+        return $total;
+    }
+
+    public function getRowWholesaleValue(array $product, array $color): float
+    {
+        return $this->getRowTotal($color) * (float) ($product['price'] ?? 0);
+    }
+
+    public function getRowRetailValue(array $product, array $color): float
+    {
+        return $this->getRowTotal($color) * (float) ($product['retail_price'] ?? 0);
+    }
+
+    public function getCurrentGroupSummary(): array
+    {
+        $quantity = 0;
+        $wholesaleValue = 0;
+        $retailValue = 0;
+
+        foreach ($this->matrixGroups as $matrixGroup) {
+            foreach ($matrixGroup['products'] as $product) {
+                foreach ($product['colors'] as $color) {
+                    $rowQty = $this->getRowTotal($color);
+
+                    $quantity += $rowQty;
+                    $wholesaleValue += $rowQty * (float) ($product['price'] ?? 0);
+                    $retailValue += $rowQty * (float) ($product['retail_price'] ?? 0);
+                }
+            }
+        }
+
+        return [
+            'quantity' => $quantity,
+            'wholesale_value' => $wholesaleValue,
+            'retail_value' => $retailValue,
+        ];
+    }
+
+    public function getCurrencySymbol(): string
+    {
+        return $this->orders->first()?->priceList?->currency?->symbol ?? '';
+    }
+
+    public function openProductImages(int $productId): void
+    {
+        $product = Product::query()
+            ->with([
+                'colorImages.color',
+            ])
+            ->find($productId);
+
+        if (! $product) {
+            return;
+        }
+
+        $this->imageModalTitle = $product->model_code . ' - ' . $this->localizedValue($product, 'name');
+
+        $images = collect();
+
+        $catalog = Catalog::query()
+            ->where('season_id', $this->season->id)
+            ->where('brand_id', $this->brand->id)
+            ->where('order_sheet_type_id', $this->orderSheetType->id)
+            ->where('active', true)
+            ->first();
+
+        if ($catalog && $product->catalog_page) {
+            $pageNumber = (int) $product->catalog_page + (int) $catalog->page_offset;
+
+            if ($pageNumber > 0) {
+                $images->push([
+                    'url' => asset(
+                        'catalog-pages/' .
+                        trim($catalog->image_folder, '/') .
+                        '/page-' .
+                        str_pad($pageNumber, 3, '0', STR_PAD_LEFT) .
+                        '.jpg'
+                    ),
+                    'color_name' => __('partner.catalog_page') . ': ' . $product->catalog_page,
+                    'type' => 'catalog',
+                ]);
+            }
+        }
+
+        $product->colorImages
+            ->where('active', true)
+            ->sortBy('sort_order')
+            ->each(function ($image) use ($images, $product) {
+                $images->push([
+                    'url' => str_starts_with($image->image_url, 'http')
+                        ? $image->image_url
+                        : asset(ltrim($image->image_url, '/')),
+                    'color_name' => $image->color
+                        ? $this->localizedValue($image->color, 'name')
+                        : $this->localizedValue($product, 'name'),
+                    'type' => 'product',
+                ]);
+            });
+
+        $this->imageModalImages = $images
+            ->values()
+            ->all();
+
+        $this->showImageModal = true;
+    }
+
+    public function closeImageModal(): void
+    {
+        $this->showImageModal = false;
+        $this->imageModalTitle = null;
+        $this->imageModalImages = [];
+    }
+
+    public function exportExcel()
+    {
+        $export = new PartnerOrderSummaryMatrixExport($this->orders);
+    
+        return Excel::download(
+            $export,
+            $export->filename()
+        );
+    }
+
+    public function render()
+    {
+        $this->setPartnerLocale();
+
+        return view('livewire.partner.order-summary')
+            ->layout('components.layouts.app');
+    }
+}

@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Filament\Resources\Orders\Schemas;
+
+use App\Models\Brand;
+use App\Models\OrderSheetType;
+use App\Models\PartnerAddress;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+
+class OrderForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Select::make('season_id')
+                    ->label('Szezon')
+                    ->relationship('season', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('partner_id')
+                    ->label('Partner')
+                    ->relationship('partner', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->live()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted())
+                    ->afterStateUpdated(function (Set $set) {
+                        $set('partner_address_id', null);
+                        $set('price_list_id', null);
+                        $set('currency_id', null);
+                        $set('language_id', null);
+                        $set('brand_id', null);
+                        $set('order_sheet_type_id', null);
+                    }),
+
+                Select::make('partner_address_id')
+                    ->label('Partner cím')
+                    ->options(function (Get $get) {
+                        $partnerId = $get('partner_id');
+
+                        if (! $partnerId) {
+                            return [];
+                        }
+
+                        return PartnerAddress::query()
+                            ->where('partner_id', $partnerId)
+                            ->where('active', true)
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
+                    ->live()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted())
+                    ->afterStateUpdated(function (Set $set, ?int $state) {
+                        $address = PartnerAddress::find($state);
+
+                        $set('price_list_id', $address?->price_list_id);
+                        $set('currency_id', $address?->currency_id);
+                        $set('language_id', $address?->language_id);
+
+                        $set('brand_id', null);
+                        $set('order_sheet_type_id', null);
+                    }),
+
+                Select::make('brand_id')
+                    ->label('Márka')
+                    ->options(function (Get $get) {
+                        $addressId = $get('partner_address_id');
+
+                        if (! $addressId) {
+                            return [];
+                        }
+
+                        return Brand::query()
+                            ->whereHas('partnerAddresses', fn ($query) =>
+                                $query->where('partner_addresses.id', $addressId)
+                            )
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
+                    ->live()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted())
+                    ->afterStateUpdated(fn (Set $set) => $set('order_sheet_type_id', null)),
+
+                Select::make('order_sheet_type_id')
+                    ->label('Rendelőlap')
+                    ->options(function (Get $get) {
+                        $addressId = $get('partner_address_id');
+
+                        if (! $addressId) {
+                            return [];
+                        }
+
+                        return OrderSheetType::query()
+                            ->whereHas('partnerAddresses', fn ($query) =>
+                                $query->where('partner_addresses.id', $addressId)
+                            )
+                            ->orderBy('name_hu')
+                            ->pluck('name_hu', 'id');
+                    })
+                    ->searchable()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('price_list_id')
+                    ->label('Árlista')
+                    ->relationship('priceList', 'code')
+                    ->disabled()
+                    ->dehydrated()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('currency_id')
+                    ->label('Pénznem')
+                    ->relationship('currency', 'code')
+                    ->disabled()
+                    ->dehydrated()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('language_id')
+                    ->label('Nyelv')
+                    ->relationship('language', 'code')
+                    ->disabled()
+                    ->dehydrated()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('status')
+                    ->label('Státusz')
+                    ->options([
+                        'editing' => 'Kitöltés alatt',
+                        'draft' => 'Piszkozat',
+                        'submitted' => 'Beküldve',
+                    ])
+                    ->default('editing')
+                    ->required(),
+
+                Textarea::make('notes')
+                    ->label('Megjegyzés'),
+            ]);
+    }
+}

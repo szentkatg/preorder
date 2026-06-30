@@ -1,0 +1,40 @@
+[90m= [39m[
+    {#9007
+      +"[1mTable[22m": [32m"[39m[32morders[39m[32m"[39m,
+      +"[1mCreate Table[22m": <<<[32mEOS[39m
+        [32mCREATE TABLE `orders` ([39m
+        [32m  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,[39m
+        [32m  `season_id` bigint(20) unsigned NOT NULL,[39m
+        [32m  `partner_id` bigint(20) unsigned NOT NULL,[39m
+        [32m  `partner_address_id` bigint(20) unsigned NOT NULL,[39m
+        [32m  `brand_id` bigint(20) unsigned NOT NULL,[39m
+        [32m  `order_sheet_type_id` bigint(20) unsigned NOT NULL,[39m
+        [32m  `price_list_id` bigint(20) unsigned DEFAULT NULL,[39m
+        [32m  `currency_id` bigint(20) unsigned DEFAULT NULL,[39m
+        [32m  `language_id` bigint(20) unsigned DEFAULT NULL,[39m
+        [32m  `status` varchar(255) NOT NULL DEFAULT 'editing',[39m
+        [32m  `notes` text DEFAULT NULL,[39m
+        [32m  `submitted_at` timestamp NULL DEFAULT NULL,[39m
+        [32m  `created_at` timestamp NULL DEFAULT NULL,[39m
+        [32m  `updated_at` timestamp NULL DEFAULT NULL,[39m
+        [32m  PRIMARY KEY (`id`),[39m
+        [32m  KEY `orders_partner_id_foreign` (`partner_id`),[39m
+        [32m  KEY `orders_partner_address_id_foreign` (`partner_address_id`),[39m
+        [32m  KEY `orders_brand_id_foreign` (`brand_id`),[39m
+        [32m  KEY `orders_order_sheet_type_id_foreign` (`order_sheet_type_id`),[39m
+        [32m  KEY `orders_price_list_id_foreign` (`price_list_id`),[39m
+        [32m  KEY `orders_currency_id_foreign` (`currency_id`),[39m
+        [32m  KEY `orders_language_id_foreign` (`language_id`),[39m
+        [32m  KEY `orders_context_index` (`season_id`,`partner_address_id`,`brand_id`,`order_sheet_type_id`),[39m
+        [32m  CONSTRAINT `orders_brand_id_foreign` FOREIGN KEY (`brand_id`) REFERENCES `brands` (`id`),[39m
+        [32m  CONSTRAINT `orders_currency_id_foreign` FOREIGN KEY (`currency_id`) REFERENCES `currencies` (`id`) ON DELETE SET NULL,[39m
+        [32m  CONSTRAINT `orders_language_id_foreign` FOREIGN KEY (`language_id`) REFERENCES `languages` (`id`) ON DELETE SET NULL,[39m
+        [32m  CONSTRAINT `orders_order_sheet_type_id_foreign` FOREIGN KEY (`order_sheet_type_id`) REFERENCES `order_sheet_types` (`id`),[39m
+        [32m  CONSTRAINT `orders_partner_address_id_foreign` FOREIGN KEY (`partner_address_id`) REFERENCES `partner_addresses` (`id`) ON DELETE CASCADE,[39m
+        [32m  CONSTRAINT `orders_partner_id_foreign` FOREIGN KEY (`partner_id`) REFERENCES `partners` (`id`) ON DELETE CASCADE,[39m
+        [32m  CONSTRAINT `orders_price_list_id_foreign` FOREIGN KEY (`price_list_id`) REFERENCES `price_lists` (`id`) ON DELETE SET NULL,[39m
+        [32m  CONSTRAINT `orders_season_id_foreign` FOREIGN KEY (`season_id`) REFERENCES `seasons` (`id`) ON DELETE CASCADE[39m
+        [32m) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci[39m
+        [32mEOS[39m,
+    },
+  ]

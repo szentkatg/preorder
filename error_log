@@ -1,0 +1,1 @@
+[13-Jun-2026 21:22:27 UTC] PHP Fatal error:  Type of App\Filament\Resources\PriceListItems\PriceListItemResource::$navigationGroup must be UnitEnum|string|null (as in class Filament\Resources\Resource) in /home/szeganet/elorendeles/app/Filament/Resources/PriceListItems/PriceListItemResource.php on line 17
