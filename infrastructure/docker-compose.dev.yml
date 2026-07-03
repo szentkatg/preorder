@@ -1,21 +1,21 @@
 services:
   nginx:
     image: nginx:alpine
-    container_name: preorder-dev-nginx
+    container_name: preorder-v2-dev-nginx
     ports:
-      - "8081:80"
+      - "8089:80"
     volumes:
       - ../:/var/www/html
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - app
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
   app:
     build:
       context: ./docker/php
-    container_name: preorder-dev-app
+    container_name: preorder-v2-dev-app
     working_dir: /var/www/html
     volumes:
       - ../:/var/www/html
@@ -23,56 +23,56 @@ services:
       - mysql
       - redis
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
   mysql:
     image: mariadb:11
-    container_name: preorder-dev-mysql
+    container_name: preorder-v2-dev-mysql
     restart: unless-stopped
     ports:
-      - "3307:3306"
+      - "3308:3306"
     environment:
       MYSQL_DATABASE: preorder_dev
       MYSQL_USER: preorder
       MYSQL_PASSWORD: preorder_dev_password
       MYSQL_ROOT_PASSWORD: root_dev_password
     volumes:
-      - preorder-dev-mysql-data:/var/lib/mysql
+      - preorder-v2-dev-mysql-data:/var/lib/mysql
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
   redis:
     image: redis:alpine
-    container_name: preorder-dev-redis
+    container_name: preorder-v2-dev-redis
     restart: unless-stopped
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
   mailpit:
     image: axllent/mailpit
-    container_name: preorder-dev-mailpit
+    container_name: preorder-v2-dev-mailpit
     ports:
-      - "8025:8025"
-      - "1025:1025"
+      - "8026:8025"
+      - "1026:1025"
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
-    container_name: preorder-dev-phpmyadmin
+    container_name: preorder-v2-dev-phpmyadmin
     ports:
-      - "8082:80"
+      - "8083:80"
     environment:
       PMA_HOST: mysql
       PMA_PORT: 3306
     depends_on:
       - mysql
     networks:
-      - preorder-dev
+      - preorder-v2-dev
 
 networks:
-  preorder-dev:
+  preorder-v2-dev:
     driver: bridge
 
 volumes:
-  preorder-dev-mysql-data:
+  preorder-v2-dev-mysql-data:
