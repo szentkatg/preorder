@@ -41,7 +41,7 @@
                     {{ __('partner.partner_code') }}:
                 </span>
         
-                {{ $orders->first()?->partner?->erp_partner_code }}
+                TOTAL
             </div>
         
             <div>
@@ -49,7 +49,7 @@
                     {{ __('partner.partner_name') }}:
                 </span>
         
-                {{ $orders->first()?->partner?->name }}
+                TOTAL
             </div>
         
             <div>

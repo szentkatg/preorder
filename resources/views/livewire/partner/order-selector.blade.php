@@ -205,16 +205,19 @@
 
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($this->filteredSalesRepOrderSummaries as $summary)
-                            <tr
-                                wire:click="openSummaryOrder({{ $summary['order_id'] }})"
-                                class="cursor-pointer hover:bg-gray-50"
-                            >
+                                <tr
+                                    wire:key="summary-order-row-{{ $summary['order_id'] }}"
+                                    wire:click="openSummaryOrder({{ $summary['order_id'] }})"
+                                    class="cursor-pointer hover:bg-gray-50"
+                                >
                                 <td class="px-3 py-2 text-center" wire:click.stop>
-                                    <input
-                                        type="checkbox"
-                                        value="{{ $summary['order_id'] }}"
-                                        wire:model.live="selectedSummaryOrderIds"
-                                    >
+                                  <input
+                                    type="checkbox"
+                                    value="{{ (string) $summary['order_id'] }}"
+                                    wire:model.live="selectedSummaryOrderIds"
+                                    wire:key="summary-order-checkbox-{{ $summary['order_id'] }}"
+                                    wire:click.stop
+                                >
                                 </td>
 
                                 <td class="px-3 py-2 font-medium">

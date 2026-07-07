@@ -1,3 +1,6 @@
+
+text/x-generic OrderSummary.php ( PHP script, UTF-8 Unicode text )
+
 <?php
 
 namespace App\Livewire\Partner;
@@ -65,11 +68,22 @@ class OrderSummary extends Component
             $partnerIds = collect([$partnerUser->partner_id]);
         }
 
-        $this->orders = Order::query()
+        $selectedOrderIds = collect(explode(',', (string) request('orders')))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        
+        $query = Order::query()
             ->whereIn('partner_id', $partnerIds)
             ->where('season_id', $this->season->id)
             ->where('brand_id', $this->brand->id)
-            ->where('order_sheet_type_id', $this->orderSheetType->id)
+            ->where('order_sheet_type_id', $this->orderSheetType->id);
+        
+        if ($selectedOrderIds->isNotEmpty()) {
+            $query->whereIn('id', $selectedOrderIds);
+        }
+        
+        $this->orders = $query
             ->with([
                 'partner',
                 'partnerAddress.language',
@@ -451,3 +465,4 @@ class OrderSummary extends Component
             ->layout('components.layouts.app');
     }
 }
+

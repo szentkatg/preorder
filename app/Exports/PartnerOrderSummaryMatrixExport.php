@@ -1,931 +1,438 @@
-<?php
-
-namespace App\Exports;
-
-use App\Models\Order;
-use App\Models\PriceListItem;
-use App\Models\Product;
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
-use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Style\Protection;
-
-class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements FromArray, WithEvents, ShouldAutoSize, WithCustomValueBinder
-{
-    protected array $unavailableCells = [];
-    protected array $editableCells = [];
-    protected array $headerRows = [];
-    protected array $groupTitleRows = [];
-    protected array $blockRanges = [];
-    protected array $totalQuantityCells = [];
-    protected array $wholesaleValueCells = [];
-    protected array $retailValueCells = [];
-    protected array $headerRanges = [];
-    protected array $blockLabelRanges = [];
-    protected array $mergedBlockLabelRanges = [];
-    protected array $hiddenColumnRanges = [];
-    protected array $integerQuantityRanges = [];
-    protected array $blockBoundaryRanges = [];
-    protected array $sizeHeaderRanges = [];
-
-    protected $orders;
-
-    protected Order $order;
-
-    public function __construct($orders)
-    {
-        $this->orders = $orders->values();
-        $this->order = $this->orders->first();
-    }
-
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        // Csak a méretfejléceket kötjük explicit szövegként.
-        // A mennyiségeknek és képleteknek numerikusnak kell maradniuk,
-        // különben az Excel összesítések nem számolnak.
-        if ($this->isSizeHeaderCell($cell) && ! str_starts_with((string) $value, '=')) {
-            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-
-            return true;
+<div class="space-y-8 pl-4">
+    <style>
+        .matrix-scroll::-webkit-scrollbar {
+            height: 16px;
         }
 
-        return parent::bindValue($cell, $value);
-    }
-
-    protected function isSizeHeaderCell(Cell $cell): bool
-    {
-        $coordinate = $cell->getCoordinate();
-        $column = preg_replace('/\d+/', '', $coordinate);
-        $row = (int) preg_replace('/\D+/', '', $coordinate);
-
-        if (! $column || ! $row) {
-            return false;
+        .matrix-scroll::-webkit-scrollbar-track {
+            background: #ddd;
         }
 
-        $columnIndex = Coordinate::columnIndexFromString($column);
-
-        foreach ($this->sizeHeaderRanges as $range) {
-            if ((int) $range['row'] !== $row) {
-                continue;
-            }
-
-            $startIndex = Coordinate::columnIndexFromString($range['start_column']);
-            $endIndex = Coordinate::columnIndexFromString($range['end_column']);
-
-            if ($columnIndex >= $startIndex && $columnIndex <= $endIndex) {
-                return true;
-            }
+        .matrix-scroll::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 8px;
         }
-
-        return false;
-    }
-
-    public function array(): array
-    {
-        $this->unavailableCells = [];
-        $this->editableCells = [];
-        $this->headerRows = [];
-        $this->groupTitleRows = [];
-        $this->blockRanges = [];
-        $this->totalQuantityCells = [];
-        $this->wholesaleValueCells = [];
-        $this->retailValueCells = [];
-        $this->headerRanges = [];
-        $this->blockLabelRanges = [];
-        $this->mergedBlockLabelRanges = [];
-        $this->hiddenColumnRanges = [];
-        $this->integerQuantityRanges = [];
-        $this->blockBoundaryRanges = [];
-        $this->sizeHeaderRanges = [];
-        
-        $rows = [];
-
-        $this->orders = $this->orders->load([
-            'partner',
-            'partnerAddress.language',
-            'season',
-            'brand',
-            'orderSheetType',
-            'priceList.currency',
-            'items',
-        ]);
-
-        $order = $this->orders->first();
-
-        if (! $order) {
-            return [];
-        }
-
-        app()->setLocale(strtolower($order->partnerAddress?->language?->code ?? 'hu'));
-
-        $partnerCode = $this->getPartnerCode($order->partner);
-        $partnerName = $order->partner?->name ?? '';
-        $addressCode = '';
-        $addressName = __('partner.all_addresses');
-        $fullAddress = __('partner.summary_all_partner_addresses');
-
-        $retailPriceListId = $order->priceList?->retail_price_list_id;
-        $allowAssortmentOrder = false;
-
-        $orderItems = $this->orders
-            ->flatMap(fn (Order $order) => $order->items)
-            ->groupBy('sku_id')
-            ->map(fn ($items) => (int) $items->sum('quantity'))
-            ->toArray();
-        
-        $allowAssortmentOrder = $this->orders
-            ->flatMap(fn (Order $order) => $order->items)
-            ->contains(fn ($item): bool => $item->sku?->assortmentComponents?->isNotEmpty());
-
-        $rows[] = ['', __('partner.partner_code'), $partnerCode];
-        $rows[] = ['', __('partner.partner_name'), $partnerName];
-        $rows[] = ['', __('partner.address_code'), $addressCode, $addressName];
-        $rows[] = ['', __('partner.address'), $fullAddress];
-        $rows[] = ['', __('partner.season'), $order->season?->name];
-        $rows[] = ['', __('partner.brand'), $order->brand?->name];
-        $rows[] = ['', __('partner.order_sheet_type'), $order->orderSheetType?->name_hu];
-        $rows[] = [
-            '',
-            __('partner.price_list'),
-            $order->priceList?->name_hu,
-            __('partner.currency'),
-            $order->priceList?->currency?->code,
-        ];
-        $rows[] = ['', __('partner.full_order')];
-        $rows[] = ['', __('partner.total_quantity'), ''];
-        $rows[] = ['', __('partner.wholesale_value'), ''];
-        $rows[] = ['', __('partner.retail_value'), ''];
-
-        $products = Product::query()
-            ->with([
-                'sizeRange.items.size',
-                'colors.skus.size',
-                'colors.itemAssortments.assortmentSku',
-                'colors.itemAssortments.componentSku.size',
-            ])
-            ->where('season_id', $order->season_id)
-            ->where('brand_id', $order->brand_id)
-            ->where('order_sheet_type_id', $order->order_sheet_type_id)
-            ->where('active', true)
-            ->orderBy('catalog_group_sort')
-            ->orderBy('catalog_sort')
-            ->orderBy('model_code')
-            ->get();
-
-        $catalogGroups = $products->groupBy('catalog_group_name_hu');
-
-        foreach ($catalogGroups as $catalogGroupName => $catalogProducts) {
-            $matrixGroups = $catalogProducts
-                ->groupBy(fn (Product $product) => $product->sizeRange?->matrix_group ?: 'EGYEB');
-
-            foreach ($matrixGroups as $matrixGroupName => $matrixProducts) {
-                $groupTitleRow = count($rows) + 1;
-
-                $rows[] = [
-                    '',
-                    __('partner.catalog_group'),
-                    $catalogGroupName,
-                ];
-
-                $this->groupTitleRows[] = $groupTitleRow;
-
-            $sizes = $matrixProducts
-                ->pluck('sizeRange')
-                ->filter()
-                ->flatMap(fn ($sizeRange) => $sizeRange->items)
-                ->filter(fn ($item) => $item->size)
-                ->map(fn ($item) => [
-                    'id' => (int) $item->size->id,
-                    'code' => (string) $item->size->code,
-                    'sort_order' => (int) (
-                        $item->size->order
-                        ?? $item->size->sort_order
-                        ?? $item->sort_order
-                        ?? 0
-                    ),
-                ])
-                ->unique('id')
-                ->sortBy([
-                    fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
-                    fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
-                ])
-                ->values();
-
-                $fixedHeaderColumns = [
-                    'import_meta_json',
-                    __('partner.catalog_group'),
-                    __('partner.model'),
-                    __('partner.name'),
-                    __('partner.color'),
-                    __('partner.page'),
-                    __('partner.wholesale_price'),
-                    __('partner.retail_price'),
-                ];
-
-                if ($allowAssortmentOrder) {
-                    $fixedHeaderColumns[] = __('partner.assortment_order');
-                }
-
-                $fixedHeaderColumns[] = __('partner.total_quantity');
-                $fixedHeaderColumns[] = __('partner.wholesale_value');
-                $fixedHeaderColumns[] = __('partner.retail_value');
-
-                $blockLabelRow = array_fill(0, count($fixedHeaderColumns), '');
-                $headerRow = $fixedHeaderColumns;
-
-                $manualStartColumn = count($headerRow) + 1;
-                foreach ($sizes as $size) {
-                    $blockLabelRow[] = '';
-                    $headerRow[] = $this->formatSizeCode($size['code']);
-                }
-                $manualEndColumn = count($headerRow);
-
-
-                $assortmentStartColumn = null;
-                $assortmentEndColumn = null;
-
-                if ($allowAssortmentOrder && $sizes->count() > 0) {
-                    $assortmentStartColumn = count($headerRow) + 1;
-                    foreach ($sizes as $size) {
-                        $blockLabelRow[] = '';
-                        $headerRow[] = $this->formatSizeCode($size['code']);
-                    }
-                    $assortmentEndColumn = count($headerRow);
-                }
-
-                $totalStartColumn = null;
-                $totalEndColumn = null;
-
-                if ($allowAssortmentOrder && $sizes->count() > 0) {
-                    $totalStartColumn = count($headerRow) + 1;
-                    foreach ($sizes as $size) {
-                        $blockLabelRow[] = '';
-                        $headerRow[] = $this->formatSizeCode($size['code']);
-                    }
-                    $totalEndColumn = count($headerRow);
-                }
-
-                $assortmentContentStartColumn = null;
-                $assortmentContentEndColumn = null;
-
-                if ($allowAssortmentOrder && $sizes->count() > 0) {
-                    $assortmentContentStartColumn = count($headerRow) + 1;
-
-                    foreach ($sizes as $size) {
-                        $blockLabelRow[] = '';
-                        $headerRow[] = $this->formatSizeCode($size['code']);
-                    }
-
-                    $assortmentContentEndColumn = count($headerRow);
-                }
-
-                if ($allowAssortmentOrder) {
-                    $blockLabelRowNumber = count($rows) + 1;
-
-                    if ($sizes->count() > 0) {
-                        $blockLabelRow[$manualStartColumn - 1] = __('partner.piece_order');
-                        $this->mergedBlockLabelRanges[] = [
-                            'row' => $blockLabelRowNumber,
-                            'start_column' => Coordinate::stringFromColumnIndex($manualStartColumn),
-                            'end_column' => Coordinate::stringFromColumnIndex($manualEndColumn),
-                        ];
-
-                        if ($assortmentStartColumn && $assortmentEndColumn) {
-                            $blockLabelRow[$assortmentStartColumn - 1] = __('partner.assortment_order');
-                            $this->mergedBlockLabelRanges[] = [
-                                'row' => $blockLabelRowNumber,
-                                'start_column' => Coordinate::stringFromColumnIndex($assortmentStartColumn),
-                                'end_column' => Coordinate::stringFromColumnIndex($assortmentEndColumn),
-                            ];
-                        }
-
-                        if ($totalStartColumn && $totalEndColumn) {
-                            $blockLabelRow[$totalStartColumn - 1] = __('partner.total_size_quantity');
-                            $this->mergedBlockLabelRanges[] = [
-                                'row' => $blockLabelRowNumber,
-                                'start_column' => Coordinate::stringFromColumnIndex($totalStartColumn),
-                                'end_column' => Coordinate::stringFromColumnIndex($totalEndColumn),
-                            ];
-                        }
-
-                        if ($assortmentContentStartColumn && $assortmentContentEndColumn) {
-                            $blockLabelRow[$assortmentContentStartColumn - 1] = __('partner.assortment_content');
-                            $this->mergedBlockLabelRanges[] = [
-                                'row' => $blockLabelRowNumber,
-                                'start_column' => Coordinate::stringFromColumnIndex($assortmentContentStartColumn),
-                                'end_column' => Coordinate::stringFromColumnIndex($assortmentContentEndColumn),
-                            ];
-                        }
-                    }
-
-                    $rows[] = $blockLabelRow;
-
-                    $this->blockLabelRanges[] = [
-                        'row' => $blockLabelRowNumber,
-                        'end_column' => Coordinate::stringFromColumnIndex(count($headerRow)),
-                    ];
-
-                    foreach (array_filter([$manualEndColumn, $assortmentEndColumn, $totalEndColumn]) as $boundaryColumn) {
-                        $this->blockBoundaryRanges[] = [
-                            'column' => Coordinate::stringFromColumnIndex($boundaryColumn),
-                            'start_row' => $blockLabelRowNumber,
-                            'end_row' => null,
-                        ];
-                    }
-                }
-
-                $headerRowNumber = count($rows) + 1;
-                $endColumn = Coordinate::stringFromColumnIndex(count($headerRow));
-
-                $this->headerRanges[] = [
-                    'row' => $headerRowNumber,
-                    'end_column' => $endColumn,
-                ];
-
-                foreach ([
-                    [$manualStartColumn, $manualEndColumn],
-                    [$assortmentStartColumn, $assortmentEndColumn],
-                    [$totalStartColumn, $totalEndColumn],
-                    [$assortmentContentStartColumn, $assortmentContentEndColumn],
-                ] as [$sizeStartColumn, $sizeEndColumn]) {
-                    if ($sizeStartColumn && $sizeEndColumn) {
-                        $this->sizeHeaderRanges[] = [
-                            'row' => $headerRowNumber,
-                            'start_column' => Coordinate::stringFromColumnIndex($sizeStartColumn),
-                            'end_column' => Coordinate::stringFromColumnIndex($sizeEndColumn),
-                        ];
-                    }
-                }
-
-                if ($assortmentContentStartColumn && $assortmentContentEndColumn) {
-                    $this->hiddenColumnRanges[] = [
-                        'start' => Coordinate::stringFromColumnIndex($assortmentContentStartColumn),
-                        'end' => Coordinate::stringFromColumnIndex($assortmentContentEndColumn),
-                    ];
-                }
-
-                $rows[] = $headerRow;
-
-                $blockStartRow = $allowAssortmentOrder ? $blockLabelRowNumber : $headerRowNumber;
-
-                foreach ($matrixProducts as $product) {
-                    $wholesalePrice = $this->getProductPrice(
-                        $product->id,
-                        $order->price_list_id,
-                        $order->season_id
-                    );
-                
-                    $retailPrice = $retailPriceListId
-                        ? $this->getProductPrice(
-                            $product->id,
-                            $retailPriceListId,
-                            $order->season_id
-                        )
-                        : 0;
-
-                    foreach ($product->colors->where('active', true)->sortBy('sort_order') as $color) {
-                        $rowNumber = count($rows) + 1;
-
-                        $skuMap = $color->skus
-                            ->where('active', true)
-                            ->keyBy('size_id');
-
-                        $assortmentSkuId = $color->itemAssortments
-                            ->pluck('assortment_sku_id')
-                            ->filter()
-                            ->first();
-
-                        $importMeta = [
-                            'version' => 1,
-                            'skus' => [],
-                        ];
-
-                        $row = [
-                            '',
-                            $catalogGroupName,
-                            $product->model_code,
-                            $product->name_hu,
-                            $color->name_hu,
-                            $product->catalog_page ?? '',
-                            $wholesalePrice,
-                            $retailPrice,
-                        ];
-
-                        $assortmentColumnLetter = null;
-
-                        if ($allowAssortmentOrder) {
-                            $assortmentColumn = count($row) + 1;
-                            $assortmentColumnLetter = Coordinate::stringFromColumnIndex($assortmentColumn);
-
-                            $row[] = $assortmentSkuId
-                                ? ($orderItems[$assortmentSkuId] ?? null)
-                                : null;
-
-                            if ($assortmentSkuId) {
-                                $this->editableCells[] = "{$assortmentColumnLetter}{$rowNumber}";
-                                $importMeta['skus'][(string) $assortmentColumn] = (int) $assortmentSkuId;
-                            } else {
-                                $this->unavailableCells[] = "{$assortmentColumnLetter}{$rowNumber}";
-                            }
-                        }
-
-                        $totalQuantityColumn = count($row) + 1;
-                        $totalQuantityColumnLetter = Coordinate::stringFromColumnIndex($totalQuantityColumn);
-
-                        $wholesaleValueColumn = count($row) + 2;
-                        $wholesaleValueColumnLetter = Coordinate::stringFromColumnIndex($wholesaleValueColumn);
-
-                        $retailValueColumn = count($row) + 3;
-                        $retailValueColumnLetter = Coordinate::stringFromColumnIndex($retailValueColumn);
-
-                        $row[] = null;
-                        $row[] = null;
-                        $row[] = null;
-
-                        $manualSizeStartColumn = count($row) + 1;
-                        $manualSizeCells = [];
-                        $assortmentSizeCells = [];
-                        $totalSizeCells = [];
-                        $assortmentContentCells = [];
-
-                        foreach ($sizes as $size) {
-                            $columnIndex = count($row) + 1;
-                            $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-
-                            $sku = $skuMap->get($size['id']);
-
-                            if ($sku) {
-                                $row[] = $orderItems[$sku->id] ?? null;
-                                $this->editableCells[] = "{$columnLetter}{$rowNumber}";
-                                $manualSizeCells[$size['id']] = "{$columnLetter}{$rowNumber}";
-                                $importMeta['skus'][(string) $columnIndex] = (int) $sku->id;
-                            } else {
-                                $row[] = '-';
-                                $this->unavailableCells[] = "{$columnLetter}{$rowNumber}";
-                                $manualSizeCells[$size['id']] = null;
-                            }
-                        }
-
-                        if ($allowAssortmentOrder) {
-                            foreach ($sizes as $sizeIndex => $size) {
-                                $columnIndex = count($row) + 1;
-                                $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-                                $assortmentSizeCells[$size['id']] = "{$columnLetter}{$rowNumber}";
-
-                                if ($assortmentSkuId && $assortmentColumnLetter && $assortmentContentStartColumn) {
-                                    $contentColumnLetter = Coordinate::stringFromColumnIndex($assortmentContentStartColumn + $sizeIndex);
-                                    $row[] = '=IF(' . $assortmentColumnLetter . $rowNumber . '="-",0,' . $assortmentColumnLetter . $rowNumber . ')*' . $contentColumnLetter . $rowNumber;
-                                } else {
-                                    $row[] = 0;
-                                }
-                            }
-                        }
-
-                        if ($allowAssortmentOrder) {
-                            foreach ($sizes as $size) {
-                                $columnIndex = count($row) + 1;
-                                $columnLetter = Coordinate::stringFromColumnIndex($columnIndex);
-                                $totalSizeCells[$size['id']] = "{$columnLetter}{$rowNumber}";
-
-                                $manualCell = $manualSizeCells[$size['id']] ?? null;
-                                $assortmentCell = $assortmentSizeCells[$size['id']] ?? null;
-
-                                if ($manualCell && $assortmentCell) {
-                                    $row[] = '=IF(' . $manualCell . '="-",0,' . $manualCell . ')+' . $assortmentCell;
-                                } elseif ($manualCell) {
-                                    $row[] = '=IF(' . $manualCell . '="-",0,' . $manualCell . ')';
-                                } else {
-                                    $row[] = 0;
-                                }
-                            }
-                        } else {
-                            $totalSizeCells = array_filter($manualSizeCells);
-                        }
-
-                        if ($allowAssortmentOrder) {
-                            foreach ($sizes as $size) {
-                                $sku = $skuMap->get($size['id']);
-                                $row[] = $this->getAssortmentSizeQuantity(
-                                    $color->itemAssortments,
-                                    $assortmentSkuId,
-                                    $sku?->id,
-                                    (int) $size['id']
-                                );
-                            }
-                        }
-
-                        $totalFormula = $totalSizeCells
-                            ? '=SUM(' . implode(',', $totalSizeCells) . ')'
-                            : 0;
-
-                        $row[$totalQuantityColumn - 1] = $totalFormula;
-                        $wholesalePriceColumnLetter = Coordinate::stringFromColumnIndex(7);
-                        $retailPriceColumnLetter = Coordinate::stringFromColumnIndex(8);
-
-                        $row[$wholesaleValueColumn - 1] = "={$totalQuantityColumnLetter}{$rowNumber}*{$wholesalePriceColumnLetter}{$rowNumber}";
-                        $row[$retailValueColumn - 1] = "={$totalQuantityColumnLetter}{$rowNumber}*{$retailPriceColumnLetter}{$rowNumber}";
-
-                        $this->totalQuantityCells[] = "{$totalQuantityColumnLetter}{$rowNumber}";
-                        $this->wholesaleValueCells[] = "{$wholesaleValueColumnLetter}{$rowNumber}";
-                        $this->retailValueCells[] = "{$retailValueColumnLetter}{$rowNumber}";
-
-                        $row[0] = json_encode($importMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-                        $rows[] = $row;
-                    }
-                }
-
-                $blockEndRow = count($rows);
-                $blockEndColumn = Coordinate::stringFromColumnIndex(count($headerRow));
-
-                if ($blockEndRow >= $headerRowNumber + 1) {
-                    if ($allowAssortmentOrder) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex(9) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex(9) . $blockEndRow;
-                    }
-
-                    $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($manualSizeStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($manualEndColumn) . $blockEndRow;
-
-                    if ($assortmentStartColumn && $assortmentEndColumn) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($assortmentStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($assortmentEndColumn) . $blockEndRow;
-                    }
-
-                    if ($totalStartColumn && $totalEndColumn) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($totalStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($totalEndColumn) . $blockEndRow;
-                    }
-                }
-
-                foreach ($this->blockBoundaryRanges as $index => $boundaryRange) {
-                    if ($boundaryRange['end_row'] === null && $boundaryRange['start_row'] === $blockStartRow) {
-                        $this->blockBoundaryRanges[$index]['end_row'] = $blockEndRow;
-                    }
-                }
-
-                $this->blockRanges[] = [
-                    'start' => $blockStartRow,
-                    'end' => $blockEndRow,
-                    'end_column' => $blockEndColumn,
-                ];
-            }
-        }
-
-        $rows[9][2] = $this->totalQuantityCells
-            ? '=' . implode('+', $this->totalQuantityCells)
-            : 0;
-
-        $rows[10][2] = $this->wholesaleValueCells
-            ? '=' . implode('+', $this->wholesaleValueCells)
-            : 0;
-
-        $rows[11][2] = $this->retailValueCells
-            ? '=' . implode('+', $this->retailValueCells)
-            : 0;
-
-        return $rows;
-    }
-
-    protected function formatSizeCode(mixed $code): string
-    {
-        $code = trim((string) $code);
-
-        if (is_numeric($code) && (float) $code == (int) $code) {
-            return (string) (int) $code;
-        }
-
-        return $code;
-    }
-
-    protected function allowsAssortmentOrder($partnerAddress): bool
-    {
-        return (bool) (
-            $partnerAddress?->allow_assortment_ordering
-            ?? $partnerAddress?->assortment_ordering_enabled
-            ?? $partnerAddress?->can_order_assortments
-            ?? false
-        );
-    }
-
-    protected function getAssortmentSizeQuantity($itemAssortments, ?int $assortmentSkuId, ?int $skuId, int $sizeId): int
-    {
-        if (! $assortmentSkuId) {
-            return 0;
-        }
-
-        return (int) $itemAssortments
-            ->where('assortment_sku_id', $assortmentSkuId)
-            ->filter(function ($item) use ($skuId, $sizeId) {
-                $itemSkuId = (int) (
-                    data_get($item, 'component_sku_id')
-                    ?? data_get($item, 'sku_id')
-                    ?? data_get($item, 'item_sku_id')
-                    ?? data_get($item, 'content_sku_id')
-                    ?? data_get($item, 'product_sku_id')
-                    ?? data_get($item, 'componentSku.id')
-                    ?? data_get($item, 'sku.id')
-                    ?? data_get($item, 'itemSku.id')
-                    ?? data_get($item, 'contentSku.id')
-                    ?? 0
-                );
-
-                if ($skuId && $itemSkuId === (int) $skuId) {
-                    return true;
-                }
-
-                $itemSizeId = (int) (
-                    data_get($item, 'size_id')
-                    ?? data_get($item, 'componentSku.size_id')
-                    ?? data_get($item, 'sku.size_id')
-                    ?? data_get($item, 'itemSku.size_id')
-                    ?? data_get($item, 'contentSku.size_id')
-                    ?? 0
-                );
-
-                return $itemSizeId === $sizeId;
-            })
-            ->sum('quantity');
-    }
-
-    protected function getProductPrice(int $productId, ?int $priceListId, ?int $seasonId): float
-    {
-        if (! $priceListId || ! $seasonId) {
-            return 0;
-        }
+    </style>
+
+    @if (session('success'))
+        <div class="rounded bg-green-100 p-3 text-green-800">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <div class="flex items-center gap-6 text-sm">
+        <a
+            href="{{ route('partner.orders.select') }}"
+            class="font-semibold text-blue-600 hover:underline"
+        >
+            ← {{ __('partner.catalog_groups') }}
+        </a>
+    </div>
+
+    <div class="mb-4 rounded-lg border bg-white p-4 text-sm shadow-sm">
+        <div class="text-xl font-bold">
+            {{ __('partner.summary_order_sheet') }}
+        </div>
     
-        return (float) (
-            PriceListItem::query()
-                ->where('price_list_id', $priceListId)
-                ->where('season_id', $seasonId)
-                ->where('product_id', $productId)
-                ->value('net_price') ?? 0
-        );
-    }
+        <div class="mt-3 space-y-2 text-sm">
+        
+            <div>
+                <span class="font-semibold">
+                    {{ __('partner.partner_code') }}:
+                </span>
+        
+                TOTAL
+            </div>
+        
+            <div>
+                <span class="font-semibold">
+                    {{ __('partner.partner_name') }}:
+                </span>
+        
+                TOTAL
+            </div>
+        
+            <div>
+                <span class="font-semibold">
+                    {{ __('partner.season') }}:
+                </span>
+        
+                {{ $season->name }}
+            </div>
+        
+            <div>
+                <span class="font-semibold">
+                    {{ __('partner.brand') }}:
+                </span>
+        
+                {{ $brand->name }}
+            </div>
+        
+            <div>
+                <span class="font-semibold">
+                    {{ __('partner.order_sheet_type') }}:
+                </span>
+        
+                {{ app()->getLocale() === 'en'
+                    ? ($orderSheetType->name_en ?? $orderSheetType->name_hu)
+                    : ($orderSheetType->name_hu ?? $orderSheetType->name_en)
+                }}
+            </div>
+        
+        </div>
 
-    protected function getPartnerCode($partner): ?string
-    {
-        return $partner?->code
-            ?? $partner?->erp_partner_code
-            ?? $partner?->partner_code
-            ?? null;
-    }
+        <div class="mt-2 text-gray-600">
+            {{ __('partner.summary_description') }}
+        </div>
 
-    protected function getAddressCode($address): ?string
-    {
-        return $address?->code
-            ?? $address?->addrid
-            ?? $address?->address_code
-            ?? null;
-    }
+        <div class="mt-4">
+            <button
+                type="button"
+                wire:click="exportExcel"
+                wire:loading.attr="disabled"
+                wire:target="exportExcel"
+                class="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+                {{ __('partner.excel_export') }}
+            </button>
+        </div>
+    </div>
 
-    protected function getFullAddress($address): string
-    {
-        $country = $address?->country ?? '';
-        $zip = $address?->zip ?? $address?->postal_code ?? '';
-        $city = $address?->city ?? '';
-        $street = $address?->street ?? $address?->address ?? '';
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-2xl font-bold">
+            {{ __('partner.all_catalog_groups') }}
+        </h1>
 
-        return trim($country . '-' . $zip . ' ' . $city . ', ' . $street, " -,");
-    }
+    </div>
 
-    public function filename(): string
-    {
-        $order = $this->order->load(['partner', 'brand', 'orderSheetType']);
+    @if ($this->showAllCatalogGroups)
+        <div class="rounded-lg border bg-gray-50 p-3">
+            <div class="mb-2 text-sm font-semibold text-gray-700">
+                {{ __('partner.catalog_group_navigation') }}
+            </div>
 
-        $brandName = $this->sanitizeFilenamePart(
-            $order->brand?->name ?? 'marka'
-        );
+            <div class="flex flex-wrap gap-2">
+                @foreach (collect($matrixGroups)->pluck('catalog_group')->filter()->unique()->values() as $catalogGroup)
+                    <a
+                        href="#catalog-group-{{ \Illuminate\Support\Str::slug($catalogGroup) }}"
+                        class="rounded bg-white px-3 py-1 text-sm text-blue-700 ring-1 ring-gray-200 hover:bg-blue-50"
+                    >
+                        {{ $catalogGroup }}
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
-        $orderSheetTypeName = $this->sanitizeFilenamePart(
-            $order->orderSheetType?->name_hu ?? 'rendelolap'
-        );
+    @php
+        $summary = $this->getCurrentGroupSummary();
+    @endphp
 
-        $partnerCode = $this->sanitizeFilenamePart(
-            $this->getPartnerCode($order->partner) ?? 'partner'
-        );
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="rounded border bg-blue-50 p-4">
+            <div class="font-bold mb-2">
+                {{ __('partner.total_quantity') }}
+            </div>
 
-        $partnerName = $this->sanitizeFilenamePart(
-            $order->partner?->name ?? 'nev'
-        );
+            <div class="text-2xl font-bold">
+                {{ number_format($summary['quantity'], 0, ',', ' ') }}
+            </div>
+        </div>
 
-        return "{$brandName}_{$orderSheetTypeName}_{$partnerCode}_{$partnerName}_OSSZESITO.xlsx";
-    }
+        <div class="rounded border bg-green-50 p-4">
+            <div class="font-bold mb-2">
+                {{ __('partner.wholesale_value') }}
+            </div>
 
-    protected function sanitizeFilenamePart(string $value): string
-    {
-        $value = trim($value);
-        $value = preg_replace('#[\\/:*?"<>|]+#u', '', $value);
-        $value = preg_replace('/\s+/', ' ', $value);
-        $value = str_replace(' ', '_', trim($value));
-        $value = trim($value, '_');
+            <div class="text-2xl font-bold">
+                {{ number_format($summary['wholesale_value'], 2, ',', ' ') }}
+                {{ $this->getCurrencySymbol() }}
+            </div>
+        </div>
 
-        return $value ?: 'adat';
-    }
+        <div class="rounded border bg-yellow-50 p-4">
+            <div class="font-bold mb-2">
+                {{ __('partner.retail_value') }}
+            </div>
 
-    public function registerEvents(): array
-    {
-        return [
-            AfterSheet::class => function (AfterSheet $event) {
-                $sheet = $event->sheet->getDelegate();
-                $sheet->setShowGridlines(false);
+            <div class="text-2xl font-bold">
+                {{ number_format($summary['retail_value'], 2, ',', ' ') }}
+                {{ $this->getCurrencySymbol() }}
+            </div>
+        </div>
+    </div>
 
-                foreach (['B1:C4'] as $range) {
-                    $sheet->getStyle($range)->getFont()->setBold(true);
-                }
+    @php
+        $printedCatalogGroupAnchors = [];
+    @endphp
 
-                $sheet->getStyle('B10:C12')
-                    ->getBorders()
-                    ->getAllBorders()
-                    ->setBorderStyle(Border::BORDER_THIN);
+    @foreach ($matrixGroups as $matrixGroup)
+        @php
+            $catalogGroupAnchor = $matrixGroup['catalog_group'] ?? $matrixGroup['matrix_group'];
 
-                $sheet->getStyle('C10:C12')
-                    ->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()
-                    ->setARGB('FFFFFFCC');
+            $shouldPrintCatalogGroupAnchor = $this->showAllCatalogGroups
+                && $catalogGroupAnchor
+                && ! in_array($catalogGroupAnchor, $printedCatalogGroupAnchors, true);
 
-                $sheet->getStyle('C10')
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0');
+            if ($shouldPrintCatalogGroupAnchor) {
+                $printedCatalogGroupAnchors[] = $catalogGroupAnchor;
+            }
+        @endphp
 
-                $sheet->getStyle('C11:C12')
-                    ->getNumberFormat()
-                    ->setFormatCode('#,##0.00');
+        <div
+            @if ($shouldPrintCatalogGroupAnchor)
+                id="catalog-group-{{ \Illuminate\Support\Str::slug($catalogGroupAnchor) }}"
+            @endif
+            class="space-y-3 scroll-mt-4"
+        >
+            <h2 class="text-xl font-semibold">
+                {{ $matrixGroup['matrix_group'] }}
+            </h2>
 
-                foreach ($this->groupTitleRows as $row) {
-                    $sheet->getStyle("B{$row}:C{$row}")
-                        ->getFont()
-                        ->setBold(true);
+            <div
+                class="matrix-scroll overflow-x-auto"
+                style="scrollbar-width: auto; scrollbar-color: #888 #ddd;"
+            >
+                <table class="border-collapse border text-sm">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="sticky left-0 z-30 border border-gray-400 bg-gray-100 p-3 text-center w-20 min-w-20">
+                                {{ __('partner.model') }}
+                            </th>
 
-                    $sheet->getStyle("B{$row}:C{$row}")
-                        ->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()
-                        ->setARGB('FFD9EAF7');
-                }
+                            <th class="sticky left-20 z-30 border border-gray-400 bg-gray-100 p-3 text-center w-24 min-w-24">
+                                {{ __('partner.name') }}
+                            </th>
 
-                foreach ($this->blockLabelRanges as $range) {
-                    $row = $range['row'];
-                    $endColumn = $range['end_column'];
+                            <th class="sticky left-44 z-30 border border-gray-400 bg-gray-100 p-3 text-center w-24 min-w-24">
+                                {{ __('partner.color') }}
+                            </th>
 
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getFont()
-                        ->setBold(true);
+                            <th class="border border-gray-400 bg-gray-100 p-3 text-center w-14 min-w-14">
+                                {{ __('partner.page') }}
+                            </th>
 
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()
-                        ->setARGB('FFD9EAF7');
+                            <th class="border border-gray-400 bg-gray-100 p-3 text-center w-25 min-w-25">
+                                {{ __('partner.wholesale_price') }}
+                            </th>
 
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getAlignment()
-                        ->setWrapText(true)
-                        ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-                }
+                            <th class="border border-gray-400 bg-gray-100 p-3 text-center w-25 min-w-25">
+                                {{ __('partner.retail_price') }}
+                            </th>
 
-                foreach ($this->mergedBlockLabelRanges as $range) {
-                    $sheet->mergeCells("{$range['start_column']}{$range['row']}:{$range['end_column']}{$range['row']}");
-                    $sheet->getStyle("{$range['start_column']}{$range['row']}:{$range['end_column']}{$range['row']}")
-                        ->getAlignment()
-                        ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
-                        ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
-                }
+                            @foreach ($matrixGroup['sizes'] as $size)
+                                <th class="border border-gray-400 p-2 text-center w-12 min-w-12">
+                                    {{ $size['code'] }}
+                                </th>
+                            @endforeach
 
-                foreach ($this->headerRanges as $range) {
-                    $row = $range['row'];
-                    $endColumn = $range['end_column'];
-                
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getFont()
-                        ->setBold(true);
-                
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()
-                        ->setARGB('FFE5E7EB');
+                            @if ($allowAssortmentOrdering)
+                                <th class="border border-gray-400 p-2 text-center w-20 min-w-20 bg-yellow-200 font-bold">
+                                    {{ __('partner.assortment_order') }}
+                                </th>
 
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getAlignment()
-                        ->setWrapText(true)
-                        ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                                @foreach ($matrixGroup['sizes'] as $size)
+                                    <th class="border border-gray-400 p-2 text-center w-12 min-w-12">
+                                        {{ $size['code'] }}
+                                    </th>
+                                @endforeach
+                            @endif
 
-                    $sheet->getRowDimension($row)->setRowHeight(30);
+                            <th class="border border-gray-400 p-2 text-center w-24 min-w-24 bg-gray-200 font-bold">
+                                {{ __('partner.total_quantity') }}
+                            </th>
 
-                    $sheet->getStyle("A{$row}:{$endColumn}{$row}")
-                        ->getNumberFormat()
-                        ->setFormatCode(NumberFormat::FORMAT_GENERAL);
-                }
+                            <th class="border border-gray-400 p-2 text-center w-28 min-w-28 bg-gray-200 font-bold">
+                                {{ __('partner.wholesale_value') }}
+                            </th>
 
-                foreach ($this->blockRanges as $range) {
-                    $sheet->getStyle("A{$range['start']}:{$range['end_column']}{$range['end']}")
-                        ->getBorders()
-                        ->getAllBorders()
-                        ->setBorderStyle(Border::BORDER_THIN);
+                            <th class="border border-gray-400 p-2 text-center w-28 min-w-28 bg-gray-200 font-bold">
+                                {{ __('partner.retail_value') }}
+                            </th>
+                        </tr>
+                    </thead>
 
-                    $sheet->getStyle("K{$range['start']}:M{$range['end']}")
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0.00');
+                    <tbody>
+                        @foreach ($matrixGroup['products'] as $product)
+                            @foreach ($product['colors'] as $color)
+                                <tr>
+                                    <td class="sticky left-0 z-20 border border-gray-400 bg-white p-3 font-semibold w-20 min-w-20">
+                                        {{ $product['model_code'] }}
+                                    </td>
 
-                    $sheet->getStyle("J{$range['start']}:J{$range['end']}")
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0');
+                                    <td class="sticky left-20 z-20 border border-gray-400 bg-white p-3 font-semibold w-24 min-w-24">
+                                        <button
+                                            type="button"
+                                            wire:click="openProductImages({{ $product['id'] }})"
+                                            class="text-blue-700 underline hover:text-blue-900"
+                                        >
+                                            {{ $product['name'] }}
+                                        </button>
+                                    </td>
 
-                    $sheet->getStyle("G{$range['start']}:H{$range['end']}")
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0.00');
-                }
+                                    <td class="sticky left-44 z-20 border border-gray-400 bg-white p-3 font-semibold w-24 min-w-24">
+                                        {{ $color['name'] }}
+                                    </td>
 
-                foreach ($this->integerQuantityRanges as $range) {
-                    $sheet->getStyle($range)
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0');
-                }
+                                    <td class="border border-gray-400 bg-white p-3 text-center w-14 min-w-14">
+                                        {{ $product['catalog_page'] ?? '' }}
+                                    </td>
 
-                // A méretfejléceket a legvégén állítjuk szöveg formátumra,
-                // mert a blokk szintű számformátumok különben felülírhatják.
-                foreach ($this->sizeHeaderRanges as $range) {
-                    $sheet->getStyle("{$range['start_column']}{$range['row']}:{$range['end_column']}{$range['row']}")
-                        ->getNumberFormat()
-                        ->setFormatCode(NumberFormat::FORMAT_TEXT);
-                }
+                                    <td class="border border-gray-400 bg-white p-3 text-right w-25 min-w-25 whitespace-nowrap">
+                                        {{ number_format($product['price'], 2, ',', ' ') }}
+                                        {{ $this->getCurrencySymbol() }}
+                                    </td>
 
-                foreach ($this->totalQuantityCells as $cell) {
-                    $sheet->getStyle($cell)
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0');
-                }
+                                    <td class="border border-gray-400 bg-white p-3 text-right w-25 min-w-25 whitespace-nowrap">
+                                        {{ number_format($product['retail_price'], 2, ',', ' ') }}
+                                        {{ $this->getCurrencySymbol() }}
+                                    </td>
 
-                foreach (array_merge($this->wholesaleValueCells, $this->retailValueCells) as $cell) {
-                    $sheet->getStyle($cell)
-                        ->getNumberFormat()
-                        ->setFormatCode('#,##0.00');
-                }
+                                    @foreach ($matrixGroup['sizes'] as $size)
+                                        @php
+                                            $sku = $color['sku_map'][$size['id']] ?? null;
+                                        @endphp
 
-                foreach ($this->blockBoundaryRanges as $range) {
-                    if (! $range['end_row']) {
-                        continue;
-                    }
+                                        <td class="border border-gray-400 bg-gray-50 p-1 text-center w-12 min-w-12">
+                                            @if ($sku)
+                                                {{ (int) ($pieceQuantities[$sku['id']] ?? 0) }}
+                                            @else
+                                                <span class="text-gray-400">-</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
 
-                    $rightBorder = $sheet->getStyle("{$range['column']}{$range['start_row']}:{$range['column']}{$range['end_row']}")
-                        ->getBorders()
-                        ->getRight();
+                                    @if ($allowAssortmentOrdering)
+                                        <td class="border border-gray-400 p-1 text-center w-20 min-w-20 bg-yellow-100">
+                                            @foreach ($color['assortments'] as $assortment)
+                                                <div class="font-semibold">
+                                                    {{ (int) ($assortmentQuantities[$assortment['sku_id']] ?? 0) }}
+                                                </div>
+                                            @endforeach
+                                        </td>
 
-                    $rightBorder->setBorderStyle(Border::BORDER_THICK);
-                    $rightBorder->getColor()->setARGB('FF000000');
-                }
+                                        @foreach ($matrixGroup['sizes'] as $size)
+                                            @php
+                                                $sku = $color['sku_map'][$size['id']] ?? null;
+                                            @endphp
 
-                foreach ($this->unavailableCells as $cell) {
-                    $sheet->getStyle($cell)
-                        ->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()
-                        ->setARGB('FFD9D9D9');
-                }
+                                            <td class="border border-gray-400 bg-gray-50 p-1 text-center w-12 min-w-12">
+                                                @if ($sku)
+                                                    {{ $this->getTotalForSku($sku['id']) }}
+                                                @else
+                                                    <span class="text-gray-400">-</span>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                    @endif
 
-                $sheet->getProtection()->setSheet(true);
+                                    <td class="border border-gray-400 bg-gray-200 p-1 text-center font-semibold w-24 min-w-24">
+                                        {{ $this->getRowTotal($color) }}
+                                    </td>
 
-                foreach ($this->editableCells as $cell) {
-                    $sheet->getStyle($cell)
-                        ->getProtection()
-                        ->setLocked(Protection::PROTECTION_UNPROTECTED);
-                }
+                                    <td class="border border-gray-400 bg-gray-200 p-1 text-right font-semibold w-28 min-w-28 whitespace-nowrap">
+                                        {{ number_format($this->getRowWholesaleValue($product, $color), 2, ',', ' ') }}
+                                        {{ $this->getCurrencySymbol() }}
+                                    </td>
 
-                foreach ($this->hiddenColumnRanges as $range) {
-                    for (
-                        $column = Coordinate::columnIndexFromString($range['start']);
-                        $column <= Coordinate::columnIndexFromString($range['end']);
-                        $column++
-                    ) {
-                        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setVisible(true);
-                    }
-                }
-                $sheet->getStyle('C1:C3')->getProtection()->setLocked(\PhpOffice\PhpSpreadsheet\Style\Protection::PROTECTION_UNPROTECTED);
-                $sheet->getColumnDimension('A')->setVisible(false);
-                $sheet->getColumnDimension('A')->setWidth(12);
-                $sheet->getColumnDimension('B')->setWidth(20);
-                $sheet->getColumnDimension('C')->setWidth(3);
-                $sheet->getColumnDimension('D')->setWidth(16);
-                $sheet->getColumnDimension('E')->setWidth(30);
-                $sheet->getColumnDimension('F')->setWidth(18);
-                $sheet->getColumnDimension('G')->setWidth(10);
-                $sheet->getColumnDimension('H')->setWidth(14);
-                $sheet->getColumnDimension('I')->setWidth(14);
-                $sheet->getColumnDimension('J')->setWidth(12);
-                $sheet->getColumnDimension('K')->setWidth(12);
-                $sheet->getColumnDimension('L')->setWidth(16);
-                $sheet->getColumnDimension('M')->setWidth(16);
-                $sheet->freezePane('F13');
-                $sheet->setSelectedCell('F13');
-                
-            },
-        ];
-    }
-}
+                                    <td class="border border-gray-400 bg-gray-200 p-1 text-right font-semibold w-28 min-w-28 whitespace-nowrap">
+                                        {{ number_format($this->getRowRetailValue($product, $color), 2, ',', ' ') }}
+                                        {{ $this->getCurrencySymbol() }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endforeach
+
+    @if ($showImageModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+            <div class="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded bg-white p-6 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-xl font-bold">
+                        {{ $imageModalTitle }}
+                    </h2>
+
+                    <button
+                        type="button"
+                        wire:click="closeImageModal"
+                        class="rounded bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                @if (count($imageModalImages))
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        @foreach ($imageModalImages as $image)
+                            <div class="rounded border p-3">
+                                <a href="{{ $image['url'] }}" target="_blank">
+                                    <img
+                                        src="{{ $image['url'] }}"
+                                        alt="{{ $image['color_name'] }}"
+                                        class="
+                                            mb-2
+                                            w-full
+                                            object-contain
+                                            cursor-zoom-in
+                                            hover:opacity-90
+                                            {{ ($image['type'] ?? '') === 'catalog' ? 'h-96' : 'h-56' }}
+                                        "
+                                    >
+                                </a>
+
+                                <div class="text-center text-sm font-semibold">
+                                    {{ $image['color_name'] }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="rounded bg-gray-100 p-4 text-gray-700">
+                        {{ __('partner.no_images_uploaded') }}
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+    
+    <div
+        wire:loading.flex
+        wire:target="exportExcel"
+        class="fixed inset-0 z-[9999] items-center justify-center bg-black/50"
+    >
+        <div class="rounded-lg bg-white px-8 py-6 shadow-xl">
+            <div class="flex items-center gap-4">
+                <svg
+                    class="h-6 w-6 animate-spin text-blue-600"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                >
+                    <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                    ></circle>
+    
+                    <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                    ></path>
+                </svg>
+    
+                <div>
+                    {{ __('partner.export_in_progress') }}
+                </div>
+            </div>
+        </div>
+    </div>    
+    
+</div>

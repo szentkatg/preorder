@@ -913,7 +913,7 @@ class OrderSelector extends Component
     public function updatedSelectedSummaryOrderIds(): void
     {
         $this->selectedSummaryOrderIds = collect($this->selectedSummaryOrderIds)
-            ->map(fn ($id) => (int) $id)
+            ->map(fn ($id) => (string) $id)
             ->filter()
             ->unique()
             ->values()
