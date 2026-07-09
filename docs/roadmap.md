@@ -1,85 +1,47 @@
 # Roadmap
 
-## Phase 1
+## Completed
 
-Fejlesztői környezet
-
-### Feladatok
-
-- GitHub
-- Docker
-- NAS fejlesztői rendszer
-- Dokumentáció
+- Docker Development Environment
+- GitHub Integration
+- NAS Development Environment
 
 ---
 
-## Phase 2
+## In Progress
 
-Architektúra
-
-### Feladatok
-
-- Jogosultságok újratervezése
-- Translation rendszer
-- Adatmodell felülvizsgálata
+- Development scripts
 
 ---
 
-## Phase 3
+## Planned
 
-Teljesítmény
+- RBAC Permissions
+- Translation System
+- Catalog Performance
+- Admin Improvements
+- Deployment Automation
 
-### Feladatok
+Phase 1
+✔ Development Environment
 
-- CatalogGroupOrder optimalizálása
-- Livewire állapot csökkentése
-- Lekérdezések optimalizálása
+Phase 2
+✔ Git Workflow
 
----
+Phase 3
+🔄 RBAC Permission System
 
-## Phase 4
+Phase 4
+🔄 Translation Engine
 
-Felhasználói élmény
+Phase 5
+🔄 Catalog Performance
 
-### Feladatok
+Phase 6
+🔄 Admin Modernization
 
-- Navigáció
-- Keresés
-- Többnyelvű felület
-- Mobil optimalizálás
+Phase 7
+🔄 API
 
----
-
-## Phase 5
-
-Integrációk
-
-### Feladatok
-
-- API
-- ERP kapcsolatok
-- Import folyamatok
-
----
-
-## Phase 6
-
-Tesztelés
-
-### Feladatok
-
-- Docker Test környezet
-- Funkcionális tesztek
-- Terheléses tesztek
-
----
-
-## Phase 7
-
-Release
-
-### Feladatok
-
-- Verzió kiadás
-- Deployment
-- Dokumentáció frissítése
+Phase 8
+🔄 Deployment Automation

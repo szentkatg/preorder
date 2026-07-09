@@ -688,6 +688,7 @@
                                                 class="w-16 rounded border-gray-300 text-right disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                                 value="{{ $pieceQuantities[$sku['id']] ?? '' }}"
                                                 wire:blur="savePieceQuantity({{ $sku['id'] }}, $event.target.value)"
+                                                wire:change="savePieceQuantity({{ $sku['id'] }}, $event.target.value)"
                                                 onblur="recalculateOrderRow(this)"
                                                 data-piece-input
                                                 data-size-id="{{ $size['id'] }}"
@@ -714,6 +715,7 @@
                                                         class="w-12 rounded border border-blue-300 bg-white p-1 text-center font-semibold"
                                                         value="{{ $assortmentQuantities[$assortment['sku_id']] ?? '' }}"
                                                         wire:blur="saveAssortmentQuantity({{ $assortment['sku_id'] }}, $event.target.value)"
+                                                        wire:change="saveAssortmentQuantity({{ $assortment['sku_id'] }}, $event.target.value)"
                                                         onblur="recalculateOrderRow(this)"
                                                         data-assortment-input
                                                         data-content-by-size='@json($assortment['content_by_size'] ?? [])' 

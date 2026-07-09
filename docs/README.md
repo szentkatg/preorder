@@ -1,70 +1,28 @@
-# Előrendelés B2B rendszer
+PreOrder 2.0
 
-## Leírás
+Laravel 12 + Filament 4 B2B preorder platform
 
-Laravel 12 + Filament alapú B2B előrendelési rendszer ruházati és lábbeli nagykereskedelem számára.
+Documentation
 
-A rendszer célja, hogy a partnerek online adhassák le szezonális előrendeléseiket méret-, szín- és modellbontásban, Excel import/export támogatással.
-
----
-
-## Fő funkciók
-
-- Partner portál
-- Admin felület
-- Előrendelések kezelése
-- Katalógus alapú rendelés
-- Mátrixos méretbevitel
-- Excel export
-- Excel import
-- Több partner kezelése
-- Több pénznem
-- Több szezon
-
----
-
-## Technológia
-
-- Laravel 12
-- PHP 8.3
-- Filament 4
-- Livewire 3
-- MariaDB
-- Docker (fejlesztői környezet)
-- GitHub
-
----
-
-## Repository felépítése
-
-```
-app/
-bootstrap/
-config/
-database/
-docker/
 docs/
-public/
-resources/
-routes/
-scripts/
-storage/
-```
+    01_ARCHITECTURE.md
+    02_PERMISSION_MODEL.md
+    03_TRANSLATION_MODEL.md
+    04_DATABASE.md
+    05_DEVELOPMENT_ENVIRONMENT.md
 
----
+Architecture Decisions
 
-## Dokumentáció
+docs/adr/
 
-| Dokumentum | Leírás |
-|------------|--------|
-| architecture.md | Rendszer architektúra |
-| roadmap.md | Fejlesztési ütemterv |
+Development
 
----
+GitHub
 
-## Fejlesztési alapelvek
+Docker
 
-- GitHub az elsődleges forráskód tár.
-- Az éles rendszer csak tesztelt verziót kap.
-- Minden nagyobb fejlesztés külön feature branch-en készül.
-- A fejlesztés elsődleges környezete a Synology NAS Docker.
+Synology NAS
+
+License
+
+Private project

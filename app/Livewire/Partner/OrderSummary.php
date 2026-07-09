@@ -1,6 +1,3 @@
-
-text/x-generic OrderSummary.php ( PHP script, UTF-8 Unicode text )
-
 <?php
 
 namespace App\Livewire\Partner;
@@ -465,4 +462,3 @@ class OrderSummary extends Component
             ->layout('components.layouts.app');
     }
 }
-
