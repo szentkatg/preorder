@@ -34,3 +34,5 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
+
+RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory-limit.ini
