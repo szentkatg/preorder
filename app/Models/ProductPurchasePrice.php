@@ -42,21 +42,37 @@ class ProductPurchasePrice extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(
+            Product::class,
+            'product_id',
+            'product_id'
+        );
     }
 
     public function color(): BelongsTo
     {
-        return $this->belongsTo(Color::class);
+        return $this->belongsTo(
+            Color::class,
+            'color_id',
+            'color_id'
+        );
     }
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class);
+        return $this->belongsTo(
+            Supplier::class,
+            'supplier_id',
+            'supplier_id'
+        );
     }
 
     public function currency(): BelongsTo
     {
-        return $this->belongsTo(Currency::class);
+        return $this->belongsTo(
+            Currency::class,
+            'currency_id',
+            'currency_id'
+        );
     }
 }
