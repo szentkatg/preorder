@@ -36,8 +36,7 @@ return new class extends Migration
 
             $table->boolean('active')->default(true);
 
-            $table->unsignedBigInteger('color_key')
-                ->storedAs('COALESCE(color_id, 0)');
+			$table->unsignedBigInteger('color_key')->default(0);			
 
             $table->timestamps();
 

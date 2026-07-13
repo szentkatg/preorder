@@ -24,6 +24,15 @@ class ProductPurchasePrice extends Model
         ];
     }
 
+	protected static function booted(): void
+	{
+		static::saving(function (ProductPurchasePrice $price): void {
+			$price->color_key = $price->color_id
+				? (int) $price->color_id
+				: 0;
+		});
+	}
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
