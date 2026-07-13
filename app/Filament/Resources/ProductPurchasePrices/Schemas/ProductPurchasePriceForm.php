@@ -26,8 +26,8 @@ class ProductPurchasePriceForm
                         fn (Product $record): string => trim(
                             collect([
                                 $record->model_code,
-                                $record->model_name_hu
-                                    ?? $record->model_name_en,
+                                $record->name_hu
+                                    ?? $record->name_en,
                             ])
                                 ->filter()
                                 ->implode(' | ')
