@@ -61,7 +61,7 @@ class ProductPurchasePriceForm
                     })
                     ->disabled(fn (Get $get): bool => blank($get('product_id')))
                     ->required()
-                    ->native(false);
+                    ->native(false),
 
                 Select::make('supplier_id')
                     ->label('Beszállító')
