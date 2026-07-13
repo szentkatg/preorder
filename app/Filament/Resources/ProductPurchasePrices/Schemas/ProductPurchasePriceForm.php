@@ -35,8 +35,8 @@ class ProductPurchasePriceForm
                     )
                     ->searchable([
                         'model_code',
-                        'model_name_hu',
-                        'model_name_en',
+                        'name_hu',
+                        'name_en',
                     ])
                     ->required(),
 
