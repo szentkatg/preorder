@@ -92,7 +92,8 @@ class ProductPurchasePriceForm
                         name: 'currency',
                         titleAttribute: 'code',
                     )
-                    ->searchable()
+                    ->preload()
+                    ->native(false)
                     ->required(),
 
                 TextInput::make('purchase_price')
