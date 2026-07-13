@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
 {
+
+    protected $primaryKey = 'supplier_id';
+
     protected $fillable = [
         'erp_partner_code',
         'name',

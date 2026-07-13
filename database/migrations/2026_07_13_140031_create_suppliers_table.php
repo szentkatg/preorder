@@ -9,11 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('suppliers', function (Blueprint $table) {
-            $table->id();
+            $table->id('supplier_id');
 
             $table->string('erp_partner_code', 50)->unique();
             $table->string('name');
-
             $table->boolean('active')->default(true);
 
             $table->timestamps();

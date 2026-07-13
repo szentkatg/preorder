@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('product_purchase_prices', function (Blueprint $table) {
-            $table->id();
+            $table->id('product_purchase_price_id');
 
             $table->foreignId('product_id')
                 ->constrained()
@@ -22,8 +22,11 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
-            $table->foreignId('supplier_id')
-                ->constrained()
+            $table->unsignedBigInteger('supplier_id');
+
+            $table->foreign('supplier_id')
+                ->references('supplier_id')
+                ->on('suppliers')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
@@ -33,10 +36,9 @@ return new class extends Migration
                 ->restrictOnDelete();
 
             $table->decimal('purchase_price', 15, 4);
-
             $table->boolean('active')->default(true);
 
-			$table->unsignedBigInteger('color_key')->default(0);			
+            $table->unsignedBigInteger('color_key')->default(0);
 
             $table->timestamps();
 
