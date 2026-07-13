@@ -37,7 +37,7 @@ class ProductPurchasePriceForm
                     ->afterStateUpdated(
                         fn (Set $set) => $set('color_id', null)
                     )
-                    ->required();
+                    ->required(),
 
                 Select::make('color_id')
                     ->label('Szín')
