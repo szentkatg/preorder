@@ -10,6 +10,7 @@ class Supplier extends Model
     protected $fillable = [
         'erp_partner_code',
         'name',
+        'short_name',
         'active',
     ];
 
