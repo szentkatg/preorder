@@ -9,6 +9,9 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use App\Models\Color;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 
 class ProductPurchasePriceForm
 {
@@ -23,47 +26,42 @@ class ProductPurchasePriceForm
                         titleAttribute: 'model_code',
                     )
                     ->getOptionLabelFromRecordUsing(
-                        fn (Product $record): string => trim(
-                            collect([
-                                $record->model_code,
-                                $record->name_hu
-                                    ?? $record->name_en,
-                            ])
-                                ->filter()
-                                ->implode(' | ')
-                        )
+                        fn ($record): string => "{$record->model_code} - {$record->name_hu}"
                     )
                     ->searchable([
                         'model_code',
                         'name_hu',
                         'name_en',
                     ])
-                    ->required(),
+                    ->live()
+                    ->afterStateUpdated(
+                        fn (Set $set) => $set('color_id', null)
+                    )
+                    ->required();
 
                 Select::make('color_id')
                     ->label('Szín')
-                    ->relationship(
-                        name: 'color',
-                        titleAttribute: 'code',
-                    )
-                    ->getOptionLabelFromRecordUsing(
-                        fn (Color $record): string => trim(
-                            collect([
-                                $record->code,
-                                $record->name_hu
-                                    ?? $record->name_en,
+                    ->options(function (Get $get): array {
+                        $productId = $get('product_id');
+
+                        if (! $productId) {
+                            return [];
+                        }
+
+                        return Color::query()
+                            ->whereHas('skus', function ($query) use ($productId) {
+                                $query->where('product_id', $productId);
+                            })
+                            ->orderBy('code')
+                            ->get()
+                            ->mapWithKeys(fn (Color $color): array => [
+                                $color->id => "{$color->code} - {$color->name_hu}",
                             ])
-                                ->filter()
-                                ->implode(' | ')
-                        )
-                    )
-                    ->searchable([
-                        'code',
-                        'name_hu',
-                        'name_en',
-                    ])
-                    ->placeholder('Általános ár – minden színre')
-                    ->nullable(),
+                            ->all();
+                    })
+                    ->disabled(fn (Get $get): bool => blank($get('product_id')))
+                    ->required()
+                    ->native(false);
 
                 Select::make('supplier_id')
                     ->label('Beszállító')
