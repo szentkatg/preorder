@@ -29,7 +29,7 @@ class ProductPurchasePricesTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('product.model_name_hu')
+                TextColumn::make('product.name_hu')
                     ->label('Modellnév')
                     ->searchable()
                     ->sortable(),

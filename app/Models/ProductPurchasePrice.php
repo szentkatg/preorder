@@ -16,6 +16,13 @@ class ProductPurchasePrice extends Model
         'active',
     ];
 
+
+    protected $primaryKey = 'product_purchase_price_id';
+
+    public $incrementing = true;
+
+    protected $keyType = 'int';
+
     protected function casts(): array
     {
         return [
