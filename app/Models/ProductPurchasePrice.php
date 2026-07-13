@@ -44,7 +44,7 @@ class ProductPurchasePrice extends Model
     {
         return $this->belongsTo(
             Product::class,
-            'id',
+            'product_id',
             'id'
         );
     }
@@ -53,7 +53,7 @@ class ProductPurchasePrice extends Model
     {
         return $this->belongsTo(
             Color::class,
-            'id',
+            'color_id',
             'id'
         );
     }
@@ -71,7 +71,7 @@ class ProductPurchasePrice extends Model
     {
         return $this->belongsTo(
             Currency::class,
-            'id',
+            'currency_id',
             'id'
         );
     }
