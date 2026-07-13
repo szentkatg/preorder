@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Color extends Model
 {
@@ -14,6 +15,11 @@ class Color extends Model
         'sort_order',
         'active',
     ];
+
+	public function purchasePrices(): HasMany
+	{
+		return $this->hasMany(ProductPurchasePrice::class);
+	}
 
     public function product()
     {

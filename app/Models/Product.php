@@ -7,6 +7,7 @@ use App\Models\SizeRange;
 use App\Models\Color;
 use App\Models\Sku;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -31,7 +32,12 @@ class Product extends Model
     {
         return $this->belongsTo(Season::class);
     }
-    
+
+	public function purchasePrices(): HasMany
+	{
+		return $this->hasMany(ProductPurchasePrice::class);
+	}
+
     public function itemMainGroup()
     {
         return $this->belongsTo(ItemMainGroup::class);

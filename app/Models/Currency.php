@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Currency extends Model
 {
@@ -13,6 +14,11 @@ class Currency extends Model
         'symbol',
         'active',
     ];
+
+	public function productPurchasePrices(): HasMany
+	{
+		return $this->hasMany(ProductPurchasePrice::class);
+	}
 
     public function priceLists()
     {
