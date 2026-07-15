@@ -290,9 +290,9 @@ class StockOrderProportioningService
          */
         $existingPrices = $stockOrder->items
             ->keyBy('sku_id')
-            ->map(fn (OrderItem $item): float => (
-                float
-            ) $item->unit_price);
+            ->map(
+                fn (OrderItem $item): float => (float) $item->unit_price
+            );
 
         DB::transaction(function () use (
             $stockOrder,
