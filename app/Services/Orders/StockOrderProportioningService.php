@@ -4,7 +4,6 @@ namespace App\Services\Orders;
 
 use App\Models\Order;
 use App\Models\OrderItem;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -36,7 +35,7 @@ class StockOrderProportioningService
          * nem szűrünk: minden, azonos szezonhoz, márkához és
          * rendelőlap-típushoz tartozó rendelés bekerül.
          */
-        $partnerOrders = Order::query()
+        $partnerOrderIds = Order::query()
             ->where('season_id', $stockOrder->season_id)
             ->where('brand_id', $stockOrder->brand_id)
             ->where(
@@ -47,20 +46,24 @@ class StockOrderProportioningService
                 $ratioOrder->id,
                 $stockOrder->id,
             ])
-            ->with($this->orderItemRelations())
-            ->get();
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
 
-        $partnerQuantities = $this->expandOrdersToSizeSkus(
-            $partnerOrders
-        );
+        $partnerQuantities =
+            $this->aggregateExpandedQuantitiesForOrderIds(
+                $partnerOrderIds
+            );
 
-        $ratioQuantities = $this->expandOrdersToSizeSkus(
-            collect([$ratioOrder])
-        );
+        $ratioQuantities =
+            $this->aggregateExpandedQuantitiesForOrderIds([
+                $ratioOrder->id,
+            ]);
 
-        $stockPlanQuantities = $this->expandOrdersToSizeSkus(
-            collect([$stockOrder])
-        );
+        $stockPlanQuantities =
+            $this->aggregateExpandedQuantitiesForOrderIds([
+                $stockOrder->id,
+            ]);
 
         $skuMetadata = $this->collectSkuMetadata(
             $partnerQuantities,
@@ -225,7 +228,7 @@ class StockOrderProportioningService
                     (int) $stockOrder->order_sheet_type_id,
                 'ratio_order_id' => $ratioOrder->id,
                 'stock_order_id' => $stockOrder->id,
-                'partner_order_count' => $partnerOrders->count(),
+                'partner_order_count' => count($partnerOrderIds),
             ],
             'summary' => [
                 'group_count' => count($resultGroups),
@@ -260,7 +263,6 @@ class StockOrderProportioningService
                 ),
             ],
             'groups' => $resultGroups,
-            'items' => $resultItems,
         ];
     }
 
@@ -304,30 +306,28 @@ class StockOrderProportioningService
             $now = now();
             $rows = [];
 
-            foreach ($preview['items'] as $item) {
-                $quantity = (int) $item['new_stock_quantity'];
+            foreach ($preview['groups'] as $group) {
+                foreach ($group['items'] as $item) {
+                    $quantity = (int) $item['new_stock_quantity'];
 
-                /*
-                 * Nulla mennyiséghez nem készítünk order_items rekordot.
-                 * A negatív mennyiségeket változtatás nélkül elmentjük.
-                 */
-                if ($quantity === 0) {
-                    continue;
+                    if ($quantity === 0) {
+                        continue;
+                    }
+
+                    $unitPrice = (float) (
+                        $existingPrices[$item['sku_id']] ?? 0
+                    );
+
+                    $rows[] = [
+                        'order_id' => $stockOrder->id,
+                        'sku_id' => $item['sku_id'],
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'line_total' => $quantity * $unitPrice,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
                 }
-
-                $unitPrice = (float) (
-                    $existingPrices[$item['sku_id']] ?? 0
-                );
-
-                $rows[] = [
-                    'order_id' => $stockOrder->id,
-                    'sku_id' => $item['sku_id'],
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'line_total' => $quantity * $unitPrice,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
             }
 
             foreach (array_chunk($rows, 500) as $chunk) {
@@ -404,45 +404,73 @@ class StockOrderProportioningService
      *
      * @return array<int, int> [sku_id => quantity]
      */
-    protected function expandOrdersToSizeSkus(
-        Collection $orders
+/**
+ * A megadott rendelések tételeit méret-SKU szintre összesíti.
+ *
+ * A normál SKU-k közvetlenül kerülnek az eredménybe.
+ * A gyűjtő SKU-kat az item_assortments összetétele bontja fel.
+ *
+ * @param array<int, int> $orderIds
+ *
+ * @return array<int, int> [sku_id => quantity]
+ */
+    protected function aggregateExpandedQuantitiesForOrderIds(
+        array $orderIds
     ): array {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        /*
+        * Normál SKU-k: csak azok, amelyekhez nincs gyűjtőösszetétel.
+        */
+        $directQuantities = DB::table('order_items')
+            ->whereIn('order_items.order_id', $orderIds)
+            ->whereNotExists(function ($query): void {
+                $query
+                    ->selectRaw('1')
+                    ->from('item_assortments')
+                    ->whereColumn(
+                        'item_assortments.assortment_sku_id',
+                        'order_items.sku_id'
+                    );
+            })
+            ->groupBy('order_items.sku_id')
+            ->selectRaw(
+                'order_items.sku_id, SUM(order_items.quantity) AS quantity'
+            )
+            ->pluck('quantity', 'sku_id');
+
+        /*
+        * Gyűjtő SKU-k: a rendelt gyűjtőmennyiség szorozva az egyes
+        * komponensek gyűjtőn belüli mennyiségével.
+        */
+        $assortmentQuantities = DB::table('order_items')
+            ->join(
+                'item_assortments',
+                'item_assortments.assortment_sku_id',
+                '=',
+                'order_items.sku_id'
+            )
+            ->whereIn('order_items.order_id', $orderIds)
+            ->groupBy('item_assortments.component_sku_id')
+            ->selectRaw(
+                'item_assortments.component_sku_id AS sku_id, '
+                . 'SUM(order_items.quantity * item_assortments.quantity) '
+                . 'AS quantity'
+            )
+            ->pluck('quantity', 'sku_id');
+
         $result = [];
 
-        foreach ($orders as $order) {
-            foreach ($order->items as $orderItem) {
-                $sku = $orderItem->sku;
+        foreach ($directQuantities as $skuId => $quantity) {
+            $result[(int) $skuId] =
+                ($result[(int) $skuId] ?? 0) + (int) $quantity;
+        }
 
-                if (! $sku) {
-                    continue;
-                }
-
-                $components = $sku->assortmentComponents;
-
-                if ($components->isNotEmpty()) {
-                    foreach ($components as $component) {
-                        $componentSkuId = (int) (
-                            $component->component_sku_id
-                        );
-
-                        $componentQuantity =
-                            (int) $orderItem->quantity
-                            * (int) $component->quantity;
-
-                        $result[$componentSkuId] =
-                            ($result[$componentSkuId] ?? 0)
-                            + $componentQuantity;
-                    }
-
-                    continue;
-                }
-
-                $skuId = (int) $sku->id;
-
-                $result[$skuId] =
-                    ($result[$skuId] ?? 0)
-                    + (int) $orderItem->quantity;
-            }
+        foreach ($assortmentQuantities as $skuId => $quantity) {
+            $result[(int) $skuId] =
+                ($result[(int) $skuId] ?? 0) + (int) $quantity;
         }
 
         return $result;
