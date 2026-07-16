@@ -796,24 +796,20 @@ class CatalogGroupOrder extends Component
         }
     }
 
-    public function navigateToCatalogGroup(string $catalogGroupName)
-    {
-        if (! $this->order->isSubmitted()) {
-            $this->save();
-        }
-
-        return redirect()->route('partner.catalog-group-order', [
-            'order' => $this->order->id,
-            'catalogGroupName' => $catalogGroupName,
-        ]);
+    public function navigateToCatalogGroup(
+        string $catalogGroupName
+    ) {
+        return redirect()->route(
+            'partner.catalog-group-order',
+            [
+                'order' => $this->order->id,
+                'catalogGroupName' => $catalogGroupName,
+            ]
+        );
     }
 
     public function backToCatalogGroups()
     {
-        if (! $this->order->isSubmitted()) {
-            $this->save();
-        }
-
         return redirect()->route('partner.orders.select');
     }
 
