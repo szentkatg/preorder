@@ -15,9 +15,9 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Throwable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Throwable;
 
 class StockOrderProportioning extends Page implements
     Forms\Contracts\HasForms
@@ -43,8 +43,14 @@ class StockOrderProportioning extends Page implements
 
     public ?array $data = [];
 
+    /**
+     * Csak a rövid összesítés kerül a Livewire állapotába.
+     */
     public array $preview = [];
 
+    /**
+     * Az előnézeti és mentési cache-adatok közös azonosítója.
+     */
     public ?string $previewToken = null;
 
     public int $previewPage = 1;
@@ -68,26 +74,31 @@ class StockOrderProportioning extends Page implements
                         Season::query()
                             ->orderByDesc('id')
                             ->get()
-                            ->mapWithKeys(fn (Season $season): array => [
-                                $season->id => trim(
-                                    collect([
-                                        $season->code,
-                                        $season->name,
-                                    ])
-                                        ->filter()
-                                        ->implode(' | ')
-                                ),
-                            ])
+                            ->mapWithKeys(
+                                fn (Season $season): array => [
+                                    $season->id => trim(
+                                        collect([
+                                            $season->code,
+                                            $season->name,
+                                        ])
+                                            ->filter()
+                                            ->implode(' | ')
+                                    ),
+                                ]
+                            )
                             ->all()
                     )
                     ->searchable()
                     ->preload()
                     ->live()
-                    ->afterStateUpdated(function (Set $set): void {
-                        $set('ratio_order_id', null);
-                        $set('stock_order_id', null);
-                        $this->resetPreview();
-                    })
+                    ->afterStateUpdated(
+                        function (Set $set): void {
+                            $set('ratio_order_id', null);
+                            $set('stock_order_id', null);
+
+                            $this->resetPreview();
+                        }
+                    )
                     ->required(),
 
                 Forms\Components\Select::make('brand_id')
@@ -101,21 +112,28 @@ class StockOrderProportioning extends Page implements
                     ->searchable()
                     ->preload()
                     ->live()
-                    ->afterStateUpdated(function (Set $set): void {
-                        $set('ratio_order_id', null);
-                        $set('stock_order_id', null);
-                        $this->resetPreview();
-                    })
+                    ->afterStateUpdated(
+                        function (Set $set): void {
+                            $set('ratio_order_id', null);
+                            $set('stock_order_id', null);
+
+                            $this->resetPreview();
+                        }
+                    )
                     ->required(),
 
-                Forms\Components\Select::make('order_sheet_type_id')
+                Forms\Components\Select::make(
+                    'order_sheet_type_id'
+                )
                     ->label('Rendelőlap típusa')
                     ->options(
                         OrderSheetType::query()
                             ->orderBy('code')
                             ->get()
                             ->mapWithKeys(
-                                fn (OrderSheetType $type): array => [
+                                fn (
+                                    OrderSheetType $type
+                                ): array => [
                                     $type->id => trim(
                                         collect([
                                             $type->code,
@@ -131,71 +149,88 @@ class StockOrderProportioning extends Page implements
                     ->searchable()
                     ->preload()
                     ->live()
-                    ->afterStateUpdated(function (Set $set): void {
-                        $set('ratio_order_id', null);
-                        $set('stock_order_id', null);
-                        $this->resetPreview();
-                    })
+                    ->afterStateUpdated(
+                        function (Set $set): void {
+                            $set('ratio_order_id', null);
+                            $set('stock_order_id', null);
+
+                            $this->resetPreview();
+                        }
+                    )
                     ->required(),
 
                 Forms\Components\Select::make('ratio_order_id')
                     ->label('Arányrendelés')
                     ->helperText(
-                        'A méretenként megadott mennyiségek elosztási '
-                        . 'arányként lesznek használva.'
+                        'A méretenként megadott mennyiségek '
+                        . 'elosztási arányként lesznek használva.'
                     )
                     ->searchable()
                     ->live()
                     ->getSearchResultsUsing(
-                        fn (string $search, Get $get): array =>
-                            $this->searchOrders(
-                                $search,
-                                $get('season_id'),
-                                $get('brand_id'),
-                                $get('order_sheet_type_id')
-                            )
+                        fn (
+                            string $search,
+                            Get $get
+                        ): array => $this->searchOrders(
+                            $search,
+                            $get('season_id'),
+                            $get('brand_id'),
+                            $get('order_sheet_type_id')
+                        )
                     )
                     ->getOptionLabelUsing(
                         fn ($value): ?string =>
-                            $this->getOrderLabel((int) $value)
+                            $this->getOrderLabel(
+                                (int) $value
+                            )
                     )
                     ->disabled(
                         fn (Get $get): bool =>
                             ! $this->scopeIsSelected($get)
                     )
-                    ->afterStateUpdated(function (): void {
-                        $this->resetPreview();
-                    })
+                    ->afterStateUpdated(
+                        function (): void {
+                            $this->resetPreview();
+                        }
+                    )
                     ->required(),
 
                 Forms\Components\Select::make('stock_order_id')
                     ->label('Készletrendelés')
                     ->helperText(
-                        'A rendelés jelenlegi összmennyisége lesz a '
-                        . 'tervezett készlet, majd a tételei felülíródnak.'
+                        'A rendelés jelenlegi összmennyisége lesz '
+                        . 'a tervezett készlet. Felülíráskor a '
+                        . 'számított korrekciós mennyiségek kerülnek '
+                        . 'a rendelésbe.'
                     )
                     ->searchable()
                     ->live()
                     ->getSearchResultsUsing(
-                        fn (string $search, Get $get): array =>
-                            $this->searchOrders(
-                                $search,
-                                $get('season_id'),
-                                $get('brand_id'),
-                                $get('order_sheet_type_id')
-                            )
+                        fn (
+                            string $search,
+                            Get $get
+                        ): array => $this->searchOrders(
+                            $search,
+                            $get('season_id'),
+                            $get('brand_id'),
+                            $get('order_sheet_type_id')
+                        )
                     )
                     ->getOptionLabelUsing(
                         fn ($value): ?string =>
-                            $this->getOrderLabel((int) $value)
+                            $this->getOrderLabel(
+                                (int) $value
+                            )
                     )
                     ->disabled(
                         fn (Get $get): bool =>
                             ! $this->scopeIsSelected($get)
                     )
-                    ->afterStateUpdated(function (): void {
-                        $this->resetPreview();
-                    })
+                    ->afterStateUpdated(
+                        function (): void {
+                            $this->resetPreview();
+                        }
+                    )
                     ->required(),
             ])
             ->columns(3)
@@ -214,16 +249,31 @@ class StockOrderProportioning extends Page implements
                 ->label('Készletrendelés felülírása')
                 ->icon('heroicon-o-arrow-path')
                 ->color('danger')
-                ->visible(fn (): bool => ! empty($this->preview))
+                ->visible(
+                    fn (): bool =>
+                        ! empty($this->preview)
+                        && ! (
+                            $this->preview['applied']
+                            ?? false
+                        )
+                        && filled($this->previewToken)
+                )
                 ->requiresConfirmation()
-                ->modalHeading('Készletrendelés felülírása')
+                ->modalHeading(
+                    'Készletrendelés felülírása'
+                )
                 ->modalDescription(
-                    'A kiválasztott készletrendelés jelenlegi tételei '
-                    . 'törlődnek, és a frissen számított korrekciós '
-                    . 'mennyiségek kerülnek a helyükre. A negatív '
-                    . 'mennyiségek is mentésre kerülnek.'
+                    'A kiválasztott készletrendelés jelenlegi '
+                    . 'tételei törlődnek, és pontosan az előnézet '
+                    . 'alapján elkészített korrekciós mennyiségek '
+                    . 'kerülnek a helyükre. A negatív mennyiségek '
+                    . 'is mentésre kerülnek.'
                 )
                 ->modalSubmitActionLabel('Felülírás')
+                ->extraAttributes([
+                    'wire:loading.attr' => 'disabled',
+                    'wire:target' => 'applyCalculation',
+                ])
                 ->action('applyCalculation'),
         ];
     }
@@ -249,39 +299,77 @@ class StockOrderProportioning extends Page implements
                 $stockOrderId
             );
 
-            $this->previewToken = (string) Str::uuid();
+            $groups = $result['groups'] ?? [];
+            $writePayload =
+                $result['write_payload'] ?? null;
+
+            if (! is_array($writePayload)) {
+                throw new \RuntimeException(
+                    'A számítás nem készített mentési csomagot.'
+                );
+            }
+
+            $this->previewToken =
+                (string) Str::uuid();
+
             $this->previewPage = 1;
 
+            /*
+             * A részletes, megjelenítésre szolgáló előnézet külön
+             * cache-be kerül. Ebből egyszerre csak egy lapot olvasunk.
+             */
             Cache::put(
-                $this->previewCacheKey($this->previewToken),
-                $result,
+                $this->previewGroupsCacheKey(
+                    $this->previewToken
+                ),
+                $groups,
                 now()->addMinutes(30)
             );
 
             /*
-            * A Livewire publikus állapotában csak a rövid összesítés marad.
-            * A teljes groups tömb a szerveroldali cache-be kerül.
-            */
-            $this->preview = [
-                'scope' => $result['scope'] ?? [],
-                'summary' => $result['summary'] ?? [],
-                'total_group_count' => count(
-                    $result['groups'] ?? []
+             * A mentéshez szükséges tömör csomagot külön tároljuk.
+             * Ebben csak scope, summary, sku_id és quantity van.
+             */
+            Cache::put(
+                $this->previewWriteCacheKey(
+                    $this->previewToken
                 ),
+                $writePayload,
+                now()->addMinutes(30)
+            );
+
+            /*
+             * A publikus Livewire állapotban kizárólag a rövid
+             * összesítés és a lapozási információ marad.
+             */
+            $this->preview = [
+                'scope' =>
+                    $result['scope'] ?? [],
+                'summary' =>
+                    $result['summary'] ?? [],
+                'total_group_count' =>
+                    count($groups),
                 'applied' => false,
             ];
 
             Notification::make()
                 ->title('A számítás elkészült')
                 ->body(
-                    ($this->preview['total_group_count'] ?? 0)
-                    . ' termék–szín kombináció került feldolgozásra.'
+                    (
+                        $this->preview[
+                            'total_group_count'
+                        ] ?? 0
+                    )
+                    . ' termék–szín kombináció került '
+                    . 'feldolgozásra.'
                 )
                 ->success()
                 ->send();
         } catch (Throwable $e) {
             $this->resetPreview();
-            $this->errorMessage = $e->getMessage();
+
+            $this->errorMessage =
+                $e->getMessage();
 
             Notification::make()
                 ->title('A számítás sikertelen')
@@ -314,71 +402,73 @@ class StockOrderProportioning extends Page implements
                 );
             }
 
-            $cacheKey = $this->previewCacheKey(
-                $this->previewToken
-            );
+            $token = $this->previewToken;
+
+            $writeCacheKey =
+                $this->previewWriteCacheKey($token);
+
+            $groupsCacheKey =
+                $this->previewGroupsCacheKey($token);
 
             /*
-            * Egy előnézetet egyszerre csak egy kérés használhat mentésre.
-            */
-            $lock = Cache::lock(
-                $cacheKey . ':apply-lock',
-                120
+             * Az aktuális Livewire példányban azonnal érvénytelenítjük
+             * a tokent, hogy a gomb ne maradjon használható.
+             */
+            $this->previewToken = null;
+
+            /*
+             * A mentési csomagot egyszer használjuk fel.
+             * A következő kérés már nem találja meg ugyanazt a tokent.
+             */
+            $writePayload =
+                Cache::pull($writeCacheKey);
+
+            if (! is_array($writePayload)) {
+                throw new \RuntimeException(
+                    'Az előnézet már felhasználásra került, '
+                    . 'lejárt vagy nem található. '
+                    . 'Futtasd le újra a számítást.'
+                );
+            }
+
+            /*
+             * A megjelenítési cache-re mentés után már nincs szükség.
+             */
+            Cache::forget($groupsCacheKey);
+
+            $this->preview = [];
+            $this->previewPage = 1;
+
+            /*
+             * A service nem számol újra.
+             * Csak a tömör, korábban elkészített mentési csomagot
+             * írja vissza a készletrendelésbe.
+             */
+            $result = $service->apply(
+                $writePayload,
+                $ratioOrderId,
+                $stockOrderId
             );
 
-            if (! $lock->get()) {
-                throw new \RuntimeException(
-                    'Ehhez az előnézethez már fut egy felülírás. '
-                    . 'Várd meg a művelet végét.'
-                );
-            }
-
-            try {
-                $cachedPreview = Cache::get($cacheKey);
-
-                if (! is_array($cachedPreview)) {
-                    throw new \RuntimeException(
-                        'Az előnézet lejárt vagy nem található. '
-                        . 'Futtasd le újra a számítást.'
-                    );
-                }
-
-                /*
-                * A service nem számol újra: közvetlenül a cache-ben
-                * tárolt, megjelenített eredményt menti.
-                */
-                $result = $service->apply(
-                    $cachedPreview,
-                    $ratioOrderId,
-                    $stockOrderId
-                );
-
-                /*
-                * Csak sikeres mentés után tesszük egyszer használatúvá
-                * az előnézetet.
-                */
-                Cache::forget($cacheKey);
-                $this->previewToken = null;
-
-                $this->preview = [
-                    'scope' => $result['scope'] ?? [],
-                    'summary' => $result['summary'] ?? [],
-                    'total_group_count' => 0,
-                    'applied' => true,
-                ];
-
-                $this->previewPage = 1;
-            } finally {
-                $lock->release();
-            }
+            $this->preview = [
+                'scope' =>
+                    $result['scope'] ?? [],
+                'summary' =>
+                    $result['summary'] ?? [],
+                'total_group_count' => 0,
+                'applied' => true,
+            ];
 
             Notification::make()
-                ->title('A készletrendelés felülírása megtörtént')
+                ->title(
+                    'A készletrendelés felülírása megtörtént'
+                )
                 ->body(
                     'Új készletkorrekció összesen: '
                     . (
                         $this->preview['summary']
-                            ['new_stock_quantity'] ?? 0
+                            ['new_stock_quantity']
+                        ?? 0
                     )
                     . ' db.'
                 )
@@ -386,10 +476,15 @@ class StockOrderProportioning extends Page implements
                 ->send();
         } catch (Throwable $e) {
             /*
-            * Hiba esetén nem töröljük automatikusan az előnézetet.
-            * Így egy átmeneti hiba után még ellenőrizhető marad.
-            */
-            $this->errorMessage = $e->getMessage();
+             * A korábban felhasznált tokent hiba esetén sem
+             * állítjuk vissza. Új előnézetet kell készíteni.
+             */
+            $this->previewToken = null;
+            $this->preview = [];
+            $this->previewPage = 1;
+
+            $this->errorMessage =
+                $e->getMessage();
 
             Notification::make()
                 ->title('A felülírás sikertelen')
@@ -420,45 +515,57 @@ class StockOrderProportioning extends Page implements
                 'order_sheet_type_id',
                 $orderSheetTypeId
             )
-            ->where(function (Builder $query) use ($search): void {
-                $query
-                    ->where('id', 'like', "%{$search}%")
-                    ->orWhereHas(
-                        'partner',
-                        fn (Builder $partnerQuery): Builder =>
-                            $partnerQuery
-                                ->where(
-                                    'erp_partner_code',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'name',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                    )
-                    ->orWhereHas(
-                        'partnerAddress',
-                        fn (Builder $addressQuery): Builder =>
-                            $addressQuery
-                                ->where(
-                                    'addrid',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'name',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                                ->orWhere(
-                                    'city',
-                                    'like',
-                                    "%{$search}%"
-                                )
-                    );
-            })
+            ->where(
+                function (
+                    Builder $query
+                ) use ($search): void {
+                    $query
+                        ->where(
+                            'id',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhereHas(
+                            'partner',
+                            fn (
+                                Builder $partnerQuery
+                            ): Builder =>
+                                $partnerQuery
+                                    ->where(
+                                        'erp_partner_code',
+                                        'like',
+                                        "%{$search}%"
+                                    )
+                                    ->orWhere(
+                                        'name',
+                                        'like',
+                                        "%{$search}%"
+                                    )
+                        )
+                        ->orWhereHas(
+                            'partnerAddress',
+                            fn (
+                                Builder $addressQuery
+                            ): Builder =>
+                                $addressQuery
+                                    ->where(
+                                        'addrid',
+                                        'like',
+                                        "%{$search}%"
+                                    )
+                                    ->orWhere(
+                                        'name',
+                                        'like',
+                                        "%{$search}%"
+                                    )
+                                    ->orWhere(
+                                        'city',
+                                        'like',
+                                        "%{$search}%"
+                                    )
+                        );
+                }
+            )
             ->with([
                 'partner:id,erp_partner_code,name',
                 'partnerAddress:id,addrid,name,city',
@@ -466,14 +573,18 @@ class StockOrderProportioning extends Page implements
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->mapWithKeys(fn (Order $order): array => [
-                $order->id => $this->formatOrderLabel($order),
-            ])
+            ->mapWithKeys(
+                fn (Order $order): array => [
+                    $order->id =>
+                        $this->formatOrderLabel($order),
+                ]
+            )
             ->all();
     }
 
-    protected function getOrderLabel(int $orderId): ?string
-    {
+    protected function getOrderLabel(
+        int $orderId
+    ): ?string {
         if ($orderId <= 0) {
             return null;
         }
@@ -490,8 +601,9 @@ class StockOrderProportioning extends Page implements
             : null;
     }
 
-    protected function formatOrderLabel(Order $order): string
-    {
+    protected function formatOrderLabel(
+        Order $order
+    ): string {
         return collect([
             "#{$order->id}",
             $order->partner?->erp_partner_code,
@@ -503,16 +615,20 @@ class StockOrderProportioning extends Page implements
         ])
             ->filter(
                 fn (mixed $value): bool =>
-                    $value !== null && $value !== ''
+                    $value !== null
+                    && $value !== ''
             )
             ->implode(' | ');
     }
 
-    protected function scopeIsSelected(Get $get): bool
-    {
+    protected function scopeIsSelected(
+        Get $get
+    ): bool {
         return filled($get('season_id'))
             && filled($get('brand_id'))
-            && filled($get('order_sheet_type_id'));
+            && filled(
+                $get('order_sheet_type_id')
+            );
     }
 
     public function getDisplayedPreviewGroups(): array
@@ -521,17 +637,18 @@ class StockOrderProportioning extends Page implements
             return [];
         }
 
-        $result = Cache::get(
-            $this->previewCacheKey($this->previewToken)
+        $groups = Cache::get(
+            $this->previewGroupsCacheKey(
+                $this->previewToken
+            )
         );
 
-        if (! is_array($result)) {
+        if (! is_array($groups)) {
             return [];
         }
 
-        $groups = $result['groups'] ?? [];
-
-        $offset = ($this->previewPage - 1)
+        $offset =
+            ($this->previewPage - 1)
             * $this->previewPageSize;
 
         return array_slice(
@@ -544,7 +661,9 @@ class StockOrderProportioning extends Page implements
     public function getPreviewTotalPages(): int
     {
         $groupCount = (int) (
-            $this->preview['total_group_count'] ?? 0
+            $this->preview[
+                'total_group_count'
+            ] ?? 0
         );
 
         if ($groupCount === 0) {
@@ -552,32 +671,40 @@ class StockOrderProportioning extends Page implements
         }
 
         return (int) ceil(
-            $groupCount / $this->previewPageSize
+            $groupCount
+            / $this->previewPageSize
         );
     }
 
     public function getPreviewFirstDisplayedNumber(): int
     {
         $groupCount = (int) (
-            $this->preview['total_group_count'] ?? 0
+            $this->preview[
+                'total_group_count'
+            ] ?? 0
         );
 
         if ($groupCount === 0) {
             return 0;
         }
 
-        return (($this->previewPage - 1)
-            * $this->previewPageSize) + 1;
+        return (
+            ($this->previewPage - 1)
+            * $this->previewPageSize
+        ) + 1;
     }
 
     public function getPreviewLastDisplayedNumber(): int
     {
         $groupCount = (int) (
-            $this->preview['total_group_count'] ?? 0
+            $this->preview[
+                'total_group_count'
+            ] ?? 0
         );
 
         return min(
-            $this->previewPage * $this->previewPageSize,
+            $this->previewPage
+                * $this->previewPageSize,
             $groupCount
         );
     }
@@ -599,9 +726,25 @@ class StockOrderProportioning extends Page implements
         }
     }
 
-    protected function previewCacheKey(string $token): string
-    {
-        return 'stock-order-proportioning:' . $token;
+    protected function previewCachePrefix(
+        string $token
+    ): string {
+        return 'stock-order-proportioning:'
+            . $token;
+    }
+
+    protected function previewGroupsCacheKey(
+        string $token
+    ): string {
+        return $this->previewCachePrefix($token)
+            . ':groups';
+    }
+
+    protected function previewWriteCacheKey(
+        string $token
+    ): string {
+        return $this->previewCachePrefix($token)
+            . ':write';
     }
 
     protected function forgetPreviewCache(): void
@@ -611,7 +754,15 @@ class StockOrderProportioning extends Page implements
         }
 
         Cache::forget(
-            $this->previewCacheKey($this->previewToken)
+            $this->previewGroupsCacheKey(
+                $this->previewToken
+            )
+        );
+
+        Cache::forget(
+            $this->previewWriteCacheKey(
+                $this->previewToken
+            )
         );
 
         $this->previewToken = null;
@@ -625,5 +776,4 @@ class StockOrderProportioning extends Page implements
         $this->previewPage = 1;
         $this->errorMessage = null;
     }
-
 }
