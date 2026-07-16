@@ -16,6 +16,8 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Throwable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class StockOrderProportioning extends Page implements
     Forms\Contracts\HasForms
@@ -43,7 +45,13 @@ class StockOrderProportioning extends Page implements
 
     public array $preview = [];
 
+    public ?string $previewToken = null;
+
+    public int $previewPage = 1;
+
     public ?string $errorMessage = null;
+
+    protected int $previewPageSize = 20;
 
     public function mount(): void
     {
@@ -236,20 +244,43 @@ class StockOrderProportioning extends Page implements
                 $this->data['stock_order_id'] ?? 0
             );
 
-            $this->preview = $service->preview(
+            $result = $service->preview(
                 $ratioOrderId,
                 $stockOrderId
             );
 
+            $this->previewToken = (string) Str::uuid();
+            $this->previewPage = 1;
+
+            Cache::put(
+                $this->previewCacheKey($this->previewToken),
+                $result,
+                now()->addMinutes(30)
+            );
+
+            /*
+            * A Livewire publikus állapotában csak a rövid összesítés marad.
+            * A teljes groups tömb a szerveroldali cache-be kerül.
+            */
+            $this->preview = [
+                'scope' => $result['scope'] ?? [],
+                'summary' => $result['summary'] ?? [],
+                'total_group_count' => count(
+                    $result['groups'] ?? []
+                ),
+                'applied' => false,
+            ];
+
             Notification::make()
                 ->title('A számítás elkészült')
                 ->body(
-                    ($this->preview['summary']['group_count'] ?? 0)
-                    . ' termék-szín kombináció került feldolgozásra.'
+                    ($this->preview['total_group_count'] ?? 0)
+                    . ' termék–szín kombináció került feldolgozásra.'
                 )
                 ->success()
                 ->send();
         } catch (Throwable $e) {
+            $this->resetPreview();
             $this->errorMessage = $e->getMessage();
 
             Notification::make()
@@ -276,16 +307,30 @@ class StockOrderProportioning extends Page implements
                 $this->data['stock_order_id'] ?? 0
             );
 
-            $this->preview = $service->apply(
+            /*
+            * A korábbi előnézetet eltávolítjuk a cache-ből.
+            * A service a mentés előtt friss adatokból újraszámol mindent.
+            */
+            $this->forgetPreviewCache();
+
+            $this->preview = [];
+            $this->previewPage = 1;
+
+            $result = $service->apply(
                 $ratioOrderId,
                 $stockOrderId
             );
 
             /*
-             * A visszaadott előnézet még a mentés alapjául szolgáló
-             * számítást mutatja. Megjelöljük, hogy a mentés megtörtént.
-             */
-            $this->preview['applied'] = true;
+            * A service visszaadhatja a teljes számítást is, de abból
+            * kizárólag a rövid összesítést tesszük Livewire állapotba.
+            */
+            $this->preview = [
+                'scope' => $result['scope'] ?? [],
+                'summary' => $result['summary'] ?? [],
+                'total_group_count' => 0,
+                'applied' => true,
+            ];
 
             Notification::make()
                 ->title('A készletrendelés felülírása megtörtént')
@@ -300,6 +345,7 @@ class StockOrderProportioning extends Page implements
                 ->success()
                 ->send();
         } catch (Throwable $e) {
+            $this->preview = [];
             $this->errorMessage = $e->getMessage();
 
             Notification::make()
@@ -431,4 +477,115 @@ class StockOrderProportioning extends Page implements
         $this->preview = [];
         $this->errorMessage = null;
     }
+    public function getDisplayedPreviewGroups(): array
+    {
+        if (! $this->previewToken) {
+            return [];
+        }
+
+        $result = Cache::get(
+            $this->previewCacheKey($this->previewToken)
+        );
+
+        if (! is_array($result)) {
+            return [];
+        }
+
+        $groups = $result['groups'] ?? [];
+
+        $offset = ($this->previewPage - 1)
+            * $this->previewPageSize;
+
+        return array_slice(
+            $groups,
+            $offset,
+            $this->previewPageSize
+        );
+    }
+
+    public function getPreviewTotalPages(): int
+    {
+        $groupCount = (int) (
+            $this->preview['total_group_count'] ?? 0
+        );
+
+        if ($groupCount === 0) {
+            return 1;
+        }
+
+        return (int) ceil(
+            $groupCount / $this->previewPageSize
+        );
+    }
+
+    public function getPreviewFirstDisplayedNumber(): int
+    {
+        $groupCount = (int) (
+            $this->preview['total_group_count'] ?? 0
+        );
+
+        if ($groupCount === 0) {
+            return 0;
+        }
+
+        return (($this->previewPage - 1)
+            * $this->previewPageSize) + 1;
+    }
+
+    public function getPreviewLastDisplayedNumber(): int
+    {
+        $groupCount = (int) (
+            $this->preview['total_group_count'] ?? 0
+        );
+
+        return min(
+            $this->previewPage * $this->previewPageSize,
+            $groupCount
+        );
+    }
+
+    public function previousPreviewPage(): void
+    {
+        if ($this->previewPage > 1) {
+            $this->previewPage--;
+        }
+    }
+
+    public function nextPreviewPage(): void
+    {
+        if (
+            $this->previewPage
+            < $this->getPreviewTotalPages()
+        ) {
+            $this->previewPage++;
+        }
+    }
+
+    protected function previewCacheKey(string $token): string
+    {
+        return 'stock-order-proportioning:' . $token;
+    }
+
+    protected function forgetPreviewCache(): void
+    {
+        if (! $this->previewToken) {
+            return;
+        }
+
+        Cache::forget(
+            $this->previewCacheKey($this->previewToken)
+        );
+
+        $this->previewToken = null;
+    }
+
+    protected function resetPreview(): void
+    {
+        $this->forgetPreviewCache();
+
+        $this->preview = [];
+        $this->previewPage = 1;
+        $this->errorMessage = null;
+    }
+
 }

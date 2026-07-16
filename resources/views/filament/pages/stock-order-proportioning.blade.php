@@ -7,7 +7,8 @@
 
             <x-slot name="description">
                 Válaszd ki az azonos szezonhoz, márkához és
-                rendelőlap-típushoz tartozó arány- és készletrendelést.
+                rendelőlap-típushoz tartozó arányrendelést és
+                készletrendelést.
             </x-slot>
 
             {{ $this->form }}
@@ -81,7 +82,17 @@
                             Új készletkorrekció
                         </div>
 
-                        <div class="text-2xl font-semibold">
+                        <div
+                            class="text-2xl font-semibold
+                                {{
+                                    (
+                                        $preview['summary']
+                                            ['new_stock_quantity'] ?? 0
+                                    ) < 0
+                                        ? 'text-danger-600'
+                                        : ''
+                                }}"
+                        >
                             {{ number_format(
                                 $preview['summary']
                                     ['new_stock_quantity'] ?? 0,
@@ -135,157 +146,370 @@
                 </div>
             </x-filament::section>
 
-            <x-filament::section>
-                <x-slot name="heading">
-                    Számítási előnézet
-                </x-slot>
+            @if (! ($preview['applied'] ?? false) && $previewToken)
+                @php
+                    $displayedGroups =
+                        $this->getDisplayedPreviewGroups();
 
-                <div class="overflow-x-auto">
-                    <table
-                        class="w-full min-w-[1000px] border-collapse
-                            text-sm"
+                    $totalPages =
+                        $this->getPreviewTotalPages();
+                @endphp
+
+                <x-filament::section>
+                    <x-slot name="heading">
+                        Számítási előnézet
+                    </x-slot>
+
+                    <div
+                        class="mb-4 flex flex-wrap items-center
+                            justify-between gap-3"
                     >
-                        <thead>
-                            <tr class="border-b bg-gray-50 text-left">
-                                <th class="px-3 py-2">Modell</th>
-                                <th class="px-3 py-2">Szín</th>
-                                <th class="px-3 py-2 text-right">
-                                    Partner
-                                </th>
-                                <th class="px-3 py-2 text-right">
-                                    Készletterv
-                                </th>
-                                <th class="px-3 py-2 text-right">
-                                    Arányösszeg
-                                </th>
-                                <th class="px-3 py-2 text-right">
-                                    Új készlet
-                                </th>
-                                <th class="px-3 py-2 text-right">
-                                    Végösszesen
-                                </th>
-                            </tr>
-                        </thead>
+                        <div class="text-sm text-gray-600">
+                            Megjelenítve:
 
-                        <tbody>
-                            @foreach ($preview['groups'] ?? [] as $group)
-                                <tr class="border-b bg-gray-100 font-semibold">
-                                    <td class="px-3 py-2">
-                                        {{ $group['model_code'] }}
+                            <strong>
+                                {{
+                                    $this
+                                        ->getPreviewFirstDisplayedNumber()
+                                }}
+                                –
+                                {{
+                                    $this
+                                        ->getPreviewLastDisplayedNumber()
+                                }}
+                            </strong>
 
-                                        @if ($group['product_name'])
-                                            <div
-                                                class="text-xs font-normal
-                                                    text-gray-500"
-                                            >
-                                                {{ $group['product_name'] }}
-                                            </div>
-                                        @endif
-                                    </td>
+                            /
+                            {{
+                                $preview['total_group_count'] ?? 0
+                            }}
+                            termék–szín kombináció
+                        </div>
 
-                                    <td class="px-3 py-2">
-                                        {{ $group['color_code'] }}
+                        @if ($totalPages > 1)
+                            <div class="flex items-center gap-2">
+                                <x-filament::button
+                                    size="sm"
+                                    color="gray"
+                                    wire:click="previousPreviewPage"
+                                    :disabled="$previewPage <= 1"
+                                >
+                                    Előző
+                                </x-filament::button>
 
-                                        @if ($group['color_name'])
-                                            <div
-                                                class="text-xs font-normal
-                                                    text-gray-500"
-                                            >
-                                                {{ $group['color_name'] }}
-                                            </div>
-                                        @endif
-                                    </td>
+                                <span class="text-sm">
+                                    {{ $previewPage }}
+                                    /
+                                    {{ $totalPages }}
+                                    oldal
+                                </span>
 
-                                    <td class="px-3 py-2 text-right">
-                                        {{ $group['partner_quantity'] }}
-                                    </td>
+                                <x-filament::button
+                                    size="sm"
+                                    color="gray"
+                                    wire:click="nextPreviewPage"
+                                    :disabled="
+                                        $previewPage >= $totalPages
+                                    "
+                                >
+                                    Következő
+                                </x-filament::button>
+                            </div>
+                        @endif
+                    </div>
 
-                                    <td class="px-3 py-2 text-right">
-                                        {{ $group['planned_stock_total'] }}
-                                    </td>
-
-                                    <td class="px-3 py-2 text-right">
-                                        {{ $group['ratio_sum'] }}
-                                    </td>
-
-                                    <td
-                                        class="px-3 py-2 text-right
-                                            {{
-                                                $group['new_stock_quantity'] < 0
-                                                    ? 'text-danger-600'
-                                                    : ''
-                                            }}"
+                    @if (empty($displayedGroups))
+                        <div class="text-sm text-gray-500">
+                            Nincs megjeleníthető előnézeti adat.
+                        </div>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table
+                                class="w-full min-w-[1000px]
+                                    border-collapse text-sm"
+                            >
+                                <thead>
+                                    <tr
+                                        class="border-b bg-gray-50
+                                            text-left"
                                     >
-                                        {{ $group['new_stock_quantity'] }}
-                                    </td>
+                                        <th class="px-3 py-2">
+                                            Modell
+                                        </th>
 
-                                    <td class="px-3 py-2 text-right">
-                                        {{ $group['final_quantity'] }}
-                                    </td>
-                                </tr>
+                                        <th class="px-3 py-2">
+                                            Szín
+                                        </th>
 
-                                @foreach ($group['items'] as $item)
-                                    <tr class="border-b">
-                                        <td
-                                            class="px-3 py-1.5 pl-8
-                                                text-gray-500"
-                                            colspan="2"
+                                        <th
+                                            class="px-3 py-2
+                                                text-right"
                                         >
-                                            Méret:
-                                            <strong>
-                                                {{ $item['size_code'] }}
-                                            </strong>
+                                            Partner
+                                        </th>
 
-                                            <span class="ml-3 text-xs">
-                                                {{ $item['sku_code'] }}
-                                            </span>
-                                        </td>
-
-                                        <td class="px-3 py-1.5 text-right">
-                                            {{ $item['partner_quantity'] }}
-                                        </td>
-
-                                        <td class="px-3 py-1.5 text-right">
-                                            {{
-                                                number_format(
-                                                    $item[
-                                                        'raw_allocated_stock'
-                                                    ],
-                                                    4,
-                                                    ',',
-                                                    ' '
-                                                )
-                                            }}
-                                        </td>
-
-                                        <td class="px-3 py-1.5 text-right">
-                                            {{ $item['ratio'] }}
-                                        </td>
-
-                                        <td
-                                            class="px-3 py-1.5 text-right
-                                                {{
-                                                    $item[
-                                                        'new_stock_quantity'
-                                                    ] < 0
-                                                        ? 'font-semibold
-                                                            text-danger-600'
-                                                        : ''
-                                                }}"
+                                        <th
+                                            class="px-3 py-2
+                                                text-right"
                                         >
-                                            {{ $item['new_stock_quantity'] }}
-                                        </td>
+                                            Készletterv
+                                        </th>
 
-                                        <td class="px-3 py-1.5 text-right">
-                                            {{ $item['final_quantity'] }}
-                                        </td>
+                                        <th
+                                            class="px-3 py-2
+                                                text-right"
+                                        >
+                                            Arányösszeg
+                                        </th>
+
+                                        <th
+                                            class="px-3 py-2
+                                                text-right"
+                                        >
+                                            Új készlet
+                                        </th>
+
+                                        <th
+                                            class="px-3 py-2
+                                                text-right"
+                                        >
+                                            Végösszesen
+                                        </th>
                                     </tr>
-                                @endforeach
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </x-filament::section>
+                                </thead>
+
+                                <tbody>
+                                    @foreach (
+                                        $displayedGroups
+                                        as $group
+                                    )
+                                        <tr
+                                            class="border-b bg-gray-100
+                                                font-semibold"
+                                        >
+                                            <td class="px-3 py-2">
+                                                {{
+                                                    $group[
+                                                        'model_code'
+                                                    ]
+                                                }}
+
+                                                @if (
+                                                    $group[
+                                                        'product_name'
+                                                    ]
+                                                )
+                                                    <div
+                                                        class="text-xs
+                                                            font-normal
+                                                            text-gray-500"
+                                                    >
+                                                        {{
+                                                            $group[
+                                                                'product_name'
+                                                            ]
+                                                        }}
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            <td class="px-3 py-2">
+                                                {{
+                                                    $group[
+                                                        'color_code'
+                                                    ]
+                                                }}
+
+                                                @if (
+                                                    $group[
+                                                        'color_name'
+                                                    ]
+                                                )
+                                                    <div
+                                                        class="text-xs
+                                                            font-normal
+                                                            text-gray-500"
+                                                    >
+                                                        {{
+                                                            $group[
+                                                                'color_name'
+                                                            ]
+                                                        }}
+                                                    </div>
+                                                @endif
+                                            </td>
+
+                                            <td
+                                                class="px-3 py-2
+                                                    text-right"
+                                            >
+                                                {{
+                                                    $group[
+                                                        'partner_quantity'
+                                                    ]
+                                                }}
+                                            </td>
+
+                                            <td
+                                                class="px-3 py-2
+                                                    text-right"
+                                            >
+                                                {{
+                                                    $group[
+                                                        'planned_stock_total'
+                                                    ]
+                                                }}
+                                            </td>
+
+                                            <td
+                                                class="px-3 py-2
+                                                    text-right"
+                                            >
+                                                {{
+                                                    $group[
+                                                        'ratio_sum'
+                                                    ]
+                                                }}
+                                            </td>
+
+                                            <td
+                                                class="px-3 py-2
+                                                    text-right
+                                                    {{
+                                                        $group[
+                                                            'new_stock_quantity'
+                                                        ] < 0
+                                                            ? 'text-danger-600'
+                                                            : ''
+                                                    }}"
+                                            >
+                                                {{
+                                                    $group[
+                                                        'new_stock_quantity'
+                                                    ]
+                                                }}
+                                            </td>
+
+                                            <td
+                                                class="px-3 py-2
+                                                    text-right"
+                                            >
+                                                {{
+                                                    $group[
+                                                        'final_quantity'
+                                                    ]
+                                                }}
+                                            </td>
+                                        </tr>
+
+                                        @foreach (
+                                            $group['items']
+                                            as $item
+                                        )
+                                            <tr class="border-b">
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        pl-8
+                                                        text-gray-500"
+                                                    colspan="2"
+                                                >
+                                                    Méret:
+
+                                                    <strong>
+                                                        {{
+                                                            $item[
+                                                                'size_code'
+                                                            ]
+                                                        }}
+                                                    </strong>
+
+                                                    <span
+                                                        class="ml-3
+                                                            text-xs"
+                                                    >
+                                                        {{
+                                                            $item[
+                                                                'sku_code'
+                                                            ]
+                                                        }}
+                                                    </span>
+                                                </td>
+
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        text-right"
+                                                >
+                                                    {{
+                                                        $item[
+                                                            'partner_quantity'
+                                                        ]
+                                                    }}
+                                                </td>
+
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        text-right"
+                                                >
+                                                    {{
+                                                        number_format(
+                                                            $item[
+                                                                'raw_allocated_stock'
+                                                            ],
+                                                            4,
+                                                            ',',
+                                                            ' '
+                                                        )
+                                                    }}
+                                                </td>
+
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        text-right"
+                                                >
+                                                    {{
+                                                        $item[
+                                                            'ratio'
+                                                        ]
+                                                    }}
+                                                </td>
+
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        text-right
+                                                        {{
+                                                            $item[
+                                                                'new_stock_quantity'
+                                                            ] < 0
+                                                                ? 'font-semibold text-danger-600'
+                                                                : ''
+                                                        }}"
+                                                >
+                                                    {{
+                                                        $item[
+                                                            'new_stock_quantity'
+                                                        ]
+                                                    }}
+                                                </td>
+
+                                                <td
+                                                    class="px-3 py-1.5
+                                                        text-right"
+                                                >
+                                                    {{
+                                                        $item[
+                                                            'final_quantity'
+                                                        ]
+                                                    }}
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </x-filament::section>
+            @endif
         @endif
     </div>
 </x-filament-panels::page>

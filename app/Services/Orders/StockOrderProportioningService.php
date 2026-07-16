@@ -336,7 +336,12 @@ class StockOrderProportioningService
             }
         });
 
-        return $preview;
+        return [
+            'scope' => $preview['scope'],
+            'summary' => $preview['summary'],
+            'groups' => [],
+            'applied' => true,
+        ];
     }
 
     /**
@@ -359,7 +364,6 @@ class StockOrderProportioningService
                 $ratioOrderId,
                 $stockOrderId,
             ])
-            ->with($this->orderItemRelations())
             ->get()
             ->keyBy('id');
 
@@ -573,15 +577,4 @@ class StockOrderProportioningService
     /**
      * @return array<int, string>
      */
-    protected function orderItemRelations(): array
-    {
-        return [
-            'items.sku.product:id,model_code,name_hu',
-            'items.sku.color:id,code,name_hu',
-            'items.sku.size:id,code,sort_order',
-            'items.sku.assortmentComponents.componentSku.product:id,model_code,name_hu',
-            'items.sku.assortmentComponents.componentSku.color:id,code,name_hu',
-            'items.sku.assortmentComponents.componentSku.size:id,code,sort_order',
-        ];
-    }
 }
