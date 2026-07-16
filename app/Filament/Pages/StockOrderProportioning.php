@@ -472,11 +472,6 @@ class StockOrderProportioning extends Page implements
             && filled($get('order_sheet_type_id'));
     }
 
-    protected function resetPreview(): void
-    {
-        $this->preview = [];
-        $this->errorMessage = null;
-    }
     public function getDisplayedPreviewGroups(): array
     {
         if (! $this->previewToken) {
