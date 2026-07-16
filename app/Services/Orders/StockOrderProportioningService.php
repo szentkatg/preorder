@@ -268,67 +268,137 @@ class StockOrderProportioningService
     }
 
     /**
-     * A készletrendelés tételeinek felülírása.
+     * A cache-ben tárolt, korábban kiszámított előnézet alapján
+     * felülírja a készletrendelés tételeit.
      *
-     * A művelet előtt újra elkészíti az előnézetet, ezért nem egy
-     * korábban kiszámolt, esetleg elavult eredményt ment.
+     * Nem végez újraszámítást, ezért pontosan azok a mennyiségek
+     * kerülnek mentésre, amelyeket a felhasználó az előnézetben látott.
+     *
+     * @param array<string, mixed> $preview
      *
      * @return array<string, mixed>
      */
     public function apply(
+        array $preview,
         int $ratioOrderId,
         int $stockOrderId
     ): array {
-        $preview = $this->preview(
+        $scope = $preview['scope'] ?? [];
+        $groups = $preview['groups'] ?? [];
+
+        if ($groups === []) {
+            throw new InvalidArgumentException(
+                'Az előnézet nem tartalmaz menthető tételeket. '
+                . 'Készíts új számítást.'
+            );
+        }
+
+        if (
+            (int) ($scope['ratio_order_id'] ?? 0) !== $ratioOrderId
+            || (int) ($scope['stock_order_id'] ?? 0) !== $stockOrderId
+        ) {
+            throw new InvalidArgumentException(
+                'Az előnézet nem a jelenleg kiválasztott rendelésekhez '
+                . 'tartozik. Készíts új számítást.'
+            );
+        }
+
+        /*
+        * Ellenőrizzük, hogy a két rendelés továbbra is létezik,
+        * és azonos szezonhoz, márkához és rendelőlap-típushoz tartozik.
+        */
+        [, $stockOrder] = $this->loadAndValidateOrders(
             $ratioOrderId,
             $stockOrderId
         );
 
-        $stockOrder = Order::query()
-            ->with('items')
-            ->findOrFail($stockOrderId);
-
-        /*
-         * A meglévő árakat még a törlés előtt eltesszük.
-         */
-        $existingPrices = $stockOrder->items
-            ->keyBy('sku_id')
-            ->map(
-                fn (OrderItem $item): float => (float) $item->unit_price
+        if (
+            (int) ($scope['season_id'] ?? 0)
+                !== (int) $stockOrder->season_id
+            || (int) ($scope['brand_id'] ?? 0)
+                !== (int) $stockOrder->brand_id
+            || (int) ($scope['order_sheet_type_id'] ?? 0)
+                !== (int) $stockOrder->order_sheet_type_id
+        ) {
+            throw new InvalidArgumentException(
+                'A rendelés adatai megváltoztak az előnézet elkészítése óta. '
+                . 'Készíts új számítást.'
             );
+        }
 
         DB::transaction(function () use (
-            $stockOrder,
-            $preview,
-            $existingPrices
+            $stockOrderId,
+            $groups
         ): void {
-            $stockOrder->items()->delete();
+            /*
+            * A készletrendelést zároljuk a tranzakció végéig.
+            * Így ugyanarra a rendelésre nem futhat egyszerre két felülírás.
+            */
+            $lockedStockOrder = Order::query()
+                ->whereKey($stockOrderId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            /*
+            * A meglévő egységárakat még a törlés előtt eltesszük.
+            */
+            $existingPrices = OrderItem::query()
+                ->where('order_id', $lockedStockOrder->id)
+                ->pluck('unit_price', 'sku_id');
+
+            /*
+            * SKU-nként pontosan egy mentendő sort építünk.
+            */
+            $quantitiesBySku = [];
+
+            foreach ($groups as $group) {
+                foreach ($group['items'] ?? [] as $item) {
+                    $skuId = (int) ($item['sku_id'] ?? 0);
+
+                    if ($skuId <= 0) {
+                        continue;
+                    }
+
+                    $quantity = (int) (
+                        $item['new_stock_quantity'] ?? 0
+                    );
+
+                    /*
+                    * Ugyanaz a SKU normál esetben csak egyszer szerepelhet.
+                    * A hozzárendeléssel azt is biztosítjuk, hogy véletlen
+                    * duplikáció esetén se szúrjuk be többször.
+                    */
+                    $quantitiesBySku[$skuId] = $quantity;
+                }
+            }
+
+            $lockedStockOrder->items()->delete();
 
             $now = now();
             $rows = [];
 
-            foreach ($preview['groups'] as $group) {
-                foreach ($group['items'] as $item) {
-                    $quantity = (int) $item['new_stock_quantity'];
-
-                    if ($quantity === 0) {
-                        continue;
-                    }
-
-                    $unitPrice = (float) (
-                        $existingPrices[$item['sku_id']] ?? 0
-                    );
-
-                    $rows[] = [
-                        'order_id' => $stockOrder->id,
-                        'sku_id' => $item['sku_id'],
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'line_total' => $quantity * $unitPrice,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
+            foreach ($quantitiesBySku as $skuId => $quantity) {
+                /*
+                * Nulla mennyiséghez nem tartunk fenn order_items rekordot.
+                * Negatív érték viszont szabályosan mentésre kerül.
+                */
+                if ($quantity === 0) {
+                    continue;
                 }
+
+                $unitPrice = (float) (
+                    $existingPrices[$skuId] ?? 0
+                );
+
+                $rows[] = [
+                    'order_id' => $lockedStockOrder->id,
+                    'sku_id' => $skuId,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $quantity * $unitPrice,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
 
             foreach (array_chunk($rows, 500) as $chunk) {
@@ -337,8 +407,8 @@ class StockOrderProportioningService
         });
 
         return [
-            'scope' => $preview['scope'],
-            'summary' => $preview['summary'],
+            'scope' => $preview['scope'] ?? [],
+            'summary' => $preview['summary'] ?? [],
             'groups' => [],
             'applied' => true,
         ];

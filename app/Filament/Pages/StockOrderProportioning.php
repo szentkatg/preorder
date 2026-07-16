@@ -307,30 +307,70 @@ class StockOrderProportioning extends Page implements
                 $this->data['stock_order_id'] ?? 0
             );
 
-            /*
-            * A korábbi előnézetet eltávolítjuk a cache-ből.
-            * A service a mentés előtt friss adatokból újraszámol mindent.
-            */
-            $this->forgetPreviewCache();
+            if (! $this->previewToken) {
+                throw new \RuntimeException(
+                    'Nincs érvényes előnézet. '
+                    . 'Először futtasd le a számítást.'
+                );
+            }
 
-            $this->preview = [];
-            $this->previewPage = 1;
-
-            $result = $service->apply(
-                $ratioOrderId,
-                $stockOrderId
+            $cacheKey = $this->previewCacheKey(
+                $this->previewToken
             );
 
             /*
-            * A service visszaadhatja a teljes számítást is, de abból
-            * kizárólag a rövid összesítést tesszük Livewire állapotba.
+            * Egy előnézetet egyszerre csak egy kérés használhat mentésre.
             */
-            $this->preview = [
-                'scope' => $result['scope'] ?? [],
-                'summary' => $result['summary'] ?? [],
-                'total_group_count' => 0,
-                'applied' => true,
-            ];
+            $lock = Cache::lock(
+                $cacheKey . ':apply-lock',
+                120
+            );
+
+            if (! $lock->get()) {
+                throw new \RuntimeException(
+                    'Ehhez az előnézethez már fut egy felülírás. '
+                    . 'Várd meg a művelet végét.'
+                );
+            }
+
+            try {
+                $cachedPreview = Cache::get($cacheKey);
+
+                if (! is_array($cachedPreview)) {
+                    throw new \RuntimeException(
+                        'Az előnézet lejárt vagy nem található. '
+                        . 'Futtasd le újra a számítást.'
+                    );
+                }
+
+                /*
+                * A service nem számol újra: közvetlenül a cache-ben
+                * tárolt, megjelenített eredményt menti.
+                */
+                $result = $service->apply(
+                    $cachedPreview,
+                    $ratioOrderId,
+                    $stockOrderId
+                );
+
+                /*
+                * Csak sikeres mentés után tesszük egyszer használatúvá
+                * az előnézetet.
+                */
+                Cache::forget($cacheKey);
+                $this->previewToken = null;
+
+                $this->preview = [
+                    'scope' => $result['scope'] ?? [],
+                    'summary' => $result['summary'] ?? [],
+                    'total_group_count' => 0,
+                    'applied' => true,
+                ];
+
+                $this->previewPage = 1;
+            } finally {
+                $lock->release();
+            }
 
             Notification::make()
                 ->title('A készletrendelés felülírása megtörtént')
@@ -345,7 +385,10 @@ class StockOrderProportioning extends Page implements
                 ->success()
                 ->send();
         } catch (Throwable $e) {
-            $this->preview = [];
+            /*
+            * Hiba esetén nem töröljük automatikusan az előnézetet.
+            * Így egy átmeneti hiba után még ellenőrizhető marad.
+            */
             $this->errorMessage = $e->getMessage();
 
             Notification::make()
