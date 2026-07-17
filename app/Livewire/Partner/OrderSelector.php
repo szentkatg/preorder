@@ -109,7 +109,7 @@ class OrderSelector extends Component
         }
     }
 
-    getSummaryCurrenciesProperty
+    public function getSummaryCurrenciesProperty(): Collection
         
         public function mount(): void
         {
