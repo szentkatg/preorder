@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
+use App\Models\PriceListItem;
 use App\Models\PartnerUser;
 use App\Models\Product;
 use App\Models\Season;
