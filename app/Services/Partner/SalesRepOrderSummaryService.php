@@ -2,11 +2,9 @@
 
 namespace App\Services\Partner;
 
-use App\Models\ExchangeRate;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\PriceListItem;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SalesRepOrderSummaryService
@@ -14,73 +12,159 @@ class SalesRepOrderSummaryService
     public function build(Collection $orders): Collection
     {
         $buildStartedAt = microtime(true);
+
         if ($orders->isEmpty()) {
             return collect();
         }
 
-        $orderIds = $orders
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->unique()
-            ->values();
+        /*
+         * A rendelésekhez szükséges alapadatokat egyszerű PHP-tömbben
+         * készítjük elő, hogy a rendelési tételek feldolgozásakor
+         * ne kelljen újra és újra Eloquent kapcsolatokat elérni.
+         */
+        $orderContextById = [];
+
+        foreach ($orders as $order) {
+            $orderId = (int) $order->id;
+
+            $orderContextById[$orderId] = [
+                'season_id' => (int) $order->season_id,
+                'price_list_id' => (int) $order->price_list_id,
+                'retail_price_list_id' => $order->priceList?->retail_price_list_id
+                    ? (int) $order->priceList->retail_price_list_id
+                    : null,
+            ];
+        }
+
+        $orderIds = array_keys($orderContextById);
 
         /*
-         * Az összes rendelési tételt egyszerre töltjük be.
+         * Csak a ténylegesen szükséges mezőket kérjük le.
          *
-         * Ez váltja ki a korábbi rendelésenkénti
-         * OrderItem::where('order_id', ...)->get() lekérdezéseket.
+         * Nem készül:
+         * - OrderItem Eloquent modell,
+         * - Sku Eloquent modell,
+         * - assortmentComponents kollekció.
          */
         $startedAt = microtime(true);
-        $itemsByOrderId = OrderItem::query()
-            ->with([
-                'sku.assortmentComponents',
-            ])
-            ->whereIn('order_id', $orderIds)
-            ->get()
-            ->groupBy(fn (OrderItem $item): int => (int) $item->order_id);
-        Log::info('SummaryService: order items', [
-            'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+
+        $orderItemRows = DB::table('order_items')
+            ->join('skus', 'skus.id', '=', 'order_items.sku_id')
+            ->whereIn('order_items.order_id', $orderIds)
+            ->get([
+                'order_items.order_id',
+                'order_items.sku_id',
+                'order_items.quantity',
+                'skus.product_id',
+            ]);
+
+        Log::info('SummaryService: order item rows', [
+            'row_count' => $orderItemRows->count(),
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
         ]);
-        $productIds = $itemsByOrderId
-            ->flatten(1)
-            ->pluck('sku.product_id')
+
+        /*
+         * Az érintett SKU-kat egyszer gyűjtjük ki.
+         */
+        $skuIds = $orderItemRows
+            ->pluck('sku_id')
             ->filter()
             ->map(fn ($id): int => (int) $id)
             ->unique()
-            ->values();
+            ->values()
+            ->all();
+
+        /*
+         * Az assortment SKU-k teljes tartalmát adatbázisban összegezzük.
+         *
+         * Az eredmény például:
+         *
+         * [
+         *     123 => 12,
+         *     456 => 8,
+         * ]
+         *
+         * ahol a kulcs az assortment_sku_id, az érték pedig
+         * a komponensek összes mennyisége.
+         */
+        $startedAt = microtime(true);
+
+        $assortmentMultiplierBySkuId = [];
+
+        if ($skuIds !== []) {
+            $assortmentRows = DB::table('item_assortments')
+                ->whereIn('assortment_sku_id', $skuIds)
+                ->groupBy('assortment_sku_id')
+                ->get([
+                    'assortment_sku_id',
+                    DB::raw('SUM(quantity) AS total_quantity'),
+                ]);
+
+            foreach ($assortmentRows as $row) {
+                $assortmentMultiplierBySkuId[
+                    (int) $row->assortment_sku_id
+                ] = (int) $row->total_quantity;
+            }
+        }
+
+        Log::info('SummaryService: assortment multipliers', [
+            'sku_count' => count($assortmentMultiplierBySkuId),
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+        ]);
+
+        $productIds = $orderItemRows
+            ->pluck('product_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         $seasonIds = $orders
             ->pluck('season_id')
             ->filter()
             ->map(fn ($id): int => (int) $id)
             ->unique()
-            ->values();
+            ->values()
+            ->all();
 
-        $priceListIds = $orders
-            ->flatMap(function (Order $order): array {
-                return [
-                    $order->price_list_id,
-                    $order->priceList?->retail_price_list_id,
-                ];
-            })
-            ->filter()
-            ->map(fn ($id): int => (int) $id)
-            ->unique()
-            ->values();
+        $priceListIds = [];
+
+        foreach ($orders as $order) {
+            if ($order->price_list_id) {
+                $priceListIds[] = (int) $order->price_list_id;
+            }
+
+            if ($order->priceList?->retail_price_list_id) {
+                $priceListIds[] =
+                    (int) $order->priceList->retail_price_list_id;
+            }
+        }
+
+        $priceListIds = array_values(array_unique($priceListIds));
 
         /*
-         * Minden szükséges nagykereskedelmi és kiskereskedelmi árat
-         * egyetlen lekérdezéssel töltünk be.
+         * Az árakat egyszerű PHP-tömbbe töltjük.
+         *
+         * Így a fő ciklusban nincs Collection::get(),
+         * Eloquent modell vagy property-feloldás.
          */
-        $prices = collect();
+        $startedAt = microtime(true);
+
+        $priceByKey = [];
 
         if (
-            $priceListIds->isNotEmpty()
-            && $seasonIds->isNotEmpty()
-            && $productIds->isNotEmpty()
+            $priceListIds !== []
+            && $seasonIds !== []
+            && $productIds !== []
         ) {
-            $startedAt = microtime(true);
-            $prices = PriceListItem::query()
+            $priceRows = DB::table('price_list_items')
                 ->whereIn('price_list_id', $priceListIds)
                 ->whereIn('season_id', $seasonIds)
                 ->whereIn('product_id', $productIds)
@@ -89,32 +173,42 @@ class SalesRepOrderSummaryService
                     'season_id',
                     'product_id',
                     'net_price',
-                ])
-                ->keyBy(fn (PriceListItem $item): string => $this->priceKey(
-                    (int) $item->price_list_id,
-                    (int) $item->season_id,
-                    (int) $item->product_id,
-                ));
-                Log::info('SummaryService: prices', [
-                    'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
                 ]);
+
+            foreach ($priceRows as $row) {
+                $priceByKey[$this->priceKey(
+                    (int) $row->price_list_id,
+                    (int) $row->season_id,
+                    (int) $row->product_id,
+                )] = (float) $row->net_price;
+            }
         }
+
+        Log::info('SummaryService: prices', [
+            'price_count' => count($priceByKey),
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+        ]);
 
         $currencyIds = $orders
             ->pluck('priceList.currency_id')
             ->filter()
             ->map(fn ($id): int => (int) $id)
             ->unique()
-            ->values();
+            ->values()
+            ->all();
 
         /*
-         * Az összes szükséges árfolyamot is egyszerre kérjük le.
+         * Árfolyamok egyszerű PHP-tömbben.
          */
-        $exchangeRates = collect();
+        $startedAt = microtime(true);
 
-        if ($seasonIds->isNotEmpty() && $currencyIds->isNotEmpty()) {
-            $startedAt = microtime(true);
-            $exchangeRates = ExchangeRate::query()
+        $exchangeRateByKey = [];
+
+        if ($seasonIds !== [] && $currencyIds !== []) {
+            $exchangeRateRows = DB::table('exchange_rates')
                 ->whereIn('season_id', $seasonIds)
                 ->whereIn('currency_id', $currencyIds)
                 ->where('active', true)
@@ -122,89 +216,143 @@ class SalesRepOrderSummaryService
                     'season_id',
                     'currency_id',
                     'rate_to_huf',
-                ])
-                ->keyBy(fn (ExchangeRate $rate): string => $this->exchangeRateKey(
-                    (int) $rate->season_id,
-                    (int) $rate->currency_id,
-                ));
-                Log::info('SummaryService: exchange rates', [
-                    'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
                 ]);
+
+            foreach ($exchangeRateRows as $row) {
+                $exchangeRateByKey[$this->exchangeRateKey(
+                    (int) $row->season_id,
+                    (int) $row->currency_id,
+                )] = (float) $row->rate_to_huf;
+            }
         }
 
+        Log::info('SummaryService: exchange rates', [
+            'rate_count' => count($exchangeRateByKey),
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+        ]);
+
+        /*
+         * Rendelésenkénti számszerű összesítések előkészítése.
+         */
+        $totalsByOrderId = [];
+
+        foreach ($orderIds as $orderId) {
+            $totalsByOrderId[$orderId] = [
+                'quantity' => 0,
+                'wholesale_value' => 0.0,
+                'retail_value' => 0.0,
+            ];
+        }
+
+        /*
+         * Egyetlen lineáris ciklus az összes rendelési tételen.
+         *
+         * Nincs rendelésenként külön Collection,
+         * nincs SKU-kapcsolat,
+         * nincs assortment kollekció,
+         * nincs ismételt sum().
+         */
         $startedAt = microtime(true);
+
+        foreach ($orderItemRows as $row) {
+            $orderId = (int) $row->order_id;
+            $skuId = (int) $row->sku_id;
+            $productId = (int) $row->product_id;
+            $quantity = (int) $row->quantity;
+
+            $orderContext = $orderContextById[$orderId] ?? null;
+
+            if (! $orderContext) {
+                continue;
+            }
+
+            $assortmentContent =
+                $assortmentMultiplierBySkuId[$skuId] ?? 0;
+
+            $effectiveQuantity = $quantity
+                * ($assortmentContent > 0 ? $assortmentContent : 1);
+
+            $wholesalePrice = $priceByKey[$this->priceKey(
+                $orderContext['price_list_id'],
+                $orderContext['season_id'],
+                $productId,
+            )] ?? 0.0;
+
+            $retailPrice = 0.0;
+
+            if ($orderContext['retail_price_list_id']) {
+                $retailPrice = $priceByKey[$this->priceKey(
+                    $orderContext['retail_price_list_id'],
+                    $orderContext['season_id'],
+                    $productId,
+                )] ?? 0.0;
+            }
+
+            $totalsByOrderId[$orderId]['quantity'] +=
+                $effectiveQuantity;
+
+            $totalsByOrderId[$orderId]['wholesale_value'] +=
+                $effectiveQuantity * $wholesalePrice;
+
+            $totalsByOrderId[$orderId]['retail_value'] +=
+                $effectiveQuantity * $retailPrice;
+        }
+
+        Log::info('SummaryService: numeric aggregation', [
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+        ]);
+
+        /*
+         * A végső megjelenítési tömb összeállítása.
+         *
+         * Itt már rendelésenként csak egyetlen egyszer olvassuk ki
+         * a kapcsolódó partner-, cím-, szezon- és pénznemadatokat.
+         */
+        $startedAt = microtime(true);
+
+        $locale = app()->getLocale();
+
         $summaries = $orders
             ->map(function (Order $order) use (
-                $itemsByOrderId,
-                $prices,
-                $exchangeRates
+                $totalsByOrderId,
+                $exchangeRateByKey,
+                $locale
             ): array {
-                $quantity = 0;
-                $wholesaleValue = 0.0;
-                $retailValue = 0.0;
+                $orderId = (int) $order->id;
 
-                $orderItems = $itemsByOrderId->get(
-                    (int) $order->id,
-                    collect()
-                );
-
-                foreach ($orderItems as $item) {
-                    if (! $item->sku) {
-                        continue;
-                    }
-
-                    $assortmentContent = (int) $item
-                        ->sku
-                        ->assortmentComponents
-                        ->sum('quantity');
-
-                    $effectiveQuantity =
-                        (int) $item->quantity
-                        * ($assortmentContent > 0 ? $assortmentContent : 1);
-
-                    $productId = (int) $item->sku->product_id;
-
-                    $wholesalePrice = $this->findPrice(
-                        $prices,
-                        (int) $order->price_list_id,
-                        (int) $order->season_id,
-                        $productId,
-                    );
-
-                    $retailPriceListId =
-                        $order->priceList?->retail_price_list_id;
-
-                    $retailPrice = $retailPriceListId
-                        ? $this->findPrice(
-                            $prices,
-                            (int) $retailPriceListId,
-                            (int) $order->season_id,
-                            $productId,
-                        )
-                        : 0.0;
-
-                    $quantity += $effectiveQuantity;
-                    $wholesaleValue += $effectiveQuantity * $wholesalePrice;
-                    $retailValue += $effectiveQuantity * $retailPrice;
-                }
+                $totals = $totalsByOrderId[$orderId] ?? [
+                    'quantity' => 0,
+                    'wholesale_value' => 0.0,
+                    'retail_value' => 0.0,
+                ];
 
                 $currencyId = $order->priceList?->currency_id;
 
                 $rateToHuf = 1.0;
 
                 if ($currencyId) {
-                    $rateKey = $this->exchangeRateKey(
-                        (int) $order->season_id,
-                        (int) $currencyId,
-                    );
-
-                    $rateToHuf = (float) (
-                        $exchangeRates->get($rateKey)?->rate_to_huf ?? 1
-                    );
+                    $rateToHuf = $exchangeRateByKey[
+                        $this->exchangeRateKey(
+                            (int) $order->season_id,
+                            (int) $currencyId,
+                        )
+                    ] ?? 1.0;
                 }
 
+                $wholesaleValue =
+                    (float) $totals['wholesale_value'];
+
+                $retailValue =
+                    (float) $totals['retail_value'];
+
                 return [
-                    'order_id' => (int) $order->id,
+                    'order_id' => $orderId,
                     'season_id' => (int) $order->season_id,
                     'brand_id' => (int) $order->brand_id,
                     'order_sheet_type_id' =>
@@ -228,7 +376,7 @@ class SalesRepOrderSummaryService
                     'season' => $order->season?->name ?? '',
                     'brand' => $order->brand?->name ?? '',
 
-                    'type' => app()->getLocale() === 'en'
+                    'type' => $locale === 'en'
                         ? (
                             $order->orderSheetType?->name_en
                             ?? $order->orderSheetType?->name_hu
@@ -241,9 +389,14 @@ class SalesRepOrderSummaryService
                     'status' => $order->status,
 
                     'status_label' => match ($order->status) {
-                        'submitted' => __('partner.status_submitted'),
-                        'draft' => __('partner.status_draft'),
-                        default => __('partner.status_in_progress'),
+                        'submitted' =>
+                            __('partner.status_submitted'),
+
+                        'draft' =>
+                            __('partner.status_draft'),
+
+                        default =>
+                            __('partner.status_in_progress'),
                     },
 
                     'status_icon' => match ($order->status) {
@@ -257,9 +410,13 @@ class SalesRepOrderSummaryService
                         ?? $order->priceList?->currency?->code
                         ?? '',
 
-                    'quantity' => $quantity,
-                    'wholesale_value' => $wholesaleValue,
-                    'retail_value' => $retailValue,
+                    'quantity' => (int) $totals['quantity'],
+
+                    'wholesale_value' =>
+                        $wholesaleValue,
+
+                    'retail_value' =>
+                        $retailValue,
 
                     'wholesale_value_huf' =>
                         $wholesaleValue * $rateToHuf,
@@ -271,36 +428,22 @@ class SalesRepOrderSummaryService
                 ];
             })
             ->values();
-            Log::info('SummaryService: order loop', [
-                'duration_ms' => round(
-                    (microtime(true) - $startedAt) * 1000,
-                    2
-                ),
-            ]);
 
-            Log::info('SummaryService: TOTAL', [
-                'duration_ms' => round(
-                    (microtime(true) - $buildStartedAt) * 1000,
-                    2
-                ),
-            ]);
+        Log::info('SummaryService: result mapping', [
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+        ]);
 
-            return $summaries;
-    }
+        Log::info('SummaryService: TOTAL', [
+            'duration_ms' => round(
+                (microtime(true) - $buildStartedAt) * 1000,
+                2
+            ),
+        ]);
 
-    protected function findPrice(
-        Collection $prices,
-        int $priceListId,
-        int $seasonId,
-        int $productId,
-    ): float {
-        $key = $this->priceKey(
-            $priceListId,
-            $seasonId,
-            $productId,
-        );
-
-        return (float) ($prices->get($key)?->net_price ?? 0);
+        return $summaries;
     }
 
     protected function priceKey(
@@ -308,11 +451,11 @@ class SalesRepOrderSummaryService
         int $seasonId,
         int $productId,
     ): string {
-        return implode(':', [
-            $priceListId,
-            $seasonId,
-            $productId,
-        ]);
+        return $priceListId
+            . ':'
+            . $seasonId
+            . ':'
+            . $productId;
     }
 
     protected function exchangeRateKey(
