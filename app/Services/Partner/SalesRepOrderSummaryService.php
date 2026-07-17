@@ -133,7 +133,7 @@ class SalesRepOrderSummaryService
         }
 
         $startedAt = microtime(true);
-        return $orders
+        $summaries = $orders
             ->map(function (Order $order) use (
                 $itemsByOrderId,
                 $prices,
@@ -271,16 +271,18 @@ class SalesRepOrderSummaryService
                 ];
             })
             ->values();
-            $summaries = $orders
-                ->map(...)
-                ->values();
-
             Log::info('SummaryService: order loop', [
-                'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+                'duration_ms' => round(
+                    (microtime(true) - $startedAt) * 1000,
+                    2
+                ),
             ]);
 
             Log::info('SummaryService: TOTAL', [
-                'duration_ms' => round((microtime(true) - $buildStartedAt) * 1000, 2),
+                'duration_ms' => round(
+                    (microtime(true) - $buildStartedAt) * 1000,
+                    2
+                ),
             ]);
 
             return $summaries;
