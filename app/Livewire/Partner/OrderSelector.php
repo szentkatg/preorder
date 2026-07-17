@@ -19,6 +19,7 @@ use App\Exports\PartnerOrderMatrixExport;
 use Illuminate\Support\Facades\Mail;
 use App\Livewire\Partner\Concerns\SetsPartnerLocale;
 use App\Services\Partner\SalesRepOrderSummaryService;
+use Illuminate\Support\Facades\Log;
 
 
 class OrderSelector extends Component
@@ -32,6 +33,8 @@ class OrderSelector extends Component
     protected ?Collection $filteredSalesRepOrderSummariesCache = null;
 
     protected ?Collection $summaryCurrenciesCache = null;
+
+    protected float $requestStartedAt = 0.0;
     
     public ?int $seasonId = null;
 
@@ -64,6 +67,33 @@ class OrderSelector extends Component
     public ?string $summaryFilledFilter = null;
 
     public ?string $summaryCurrency = null;
+
+    public function boot(): void
+    {
+        $this->requestStartedAt = microtime(true);
+    }
+
+    public function dehydrate(): void
+    {
+        if ($this->requestStartedAt <= 0) {
+            return;
+        }
+
+        Log::info('OrderSelector performance: teljes Livewire kérés', [
+            'duration_ms' => round(
+                (microtime(true) - $this->requestStartedAt) * 1000,
+                2
+            ),
+            'partner_user_id' => auth('partner')->id(),
+            'summary_search' => $this->summarySearch,
+            'summary_season_id' => $this->summarySeasonId,
+            'summary_brand_id' => $this->summaryBrandId,
+            'summary_order_sheet_type_id' =>
+                $this->summaryOrderSheetTypeId,
+            'summary_filled_filter' => $this->summaryFilledFilter,
+            'summary_currency' => $this->summaryCurrency,
+        ]);
+    }
 
     protected function saveSummaryFilters(): void
     {
@@ -159,13 +189,15 @@ class OrderSelector extends Component
             return $this->accessibleOrdersCache;
         }
 
+        $startedAt = microtime(true);
+
         $partnerUser = auth('partner')->user();
 
         if (! $partnerUser) {
             return $this->accessibleOrdersCache = collect();
         }
 
-        return $this->accessibleOrdersCache = $partnerUser
+        $orders = $partnerUser
             ->accessibleOrdersQuery()
             ->with([
                 'season',
@@ -180,6 +212,17 @@ class OrderSelector extends Component
             ->orderBy('partner_address_id')
             ->orderBy('order_sheet_type_id')
             ->get();
+
+        Log::info('OrderSelector performance: accessible orders', [
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+            'order_count' => $orders->count(),
+            'partner_user_id' => $partnerUser->id,
+        ]);
+
+        return $this->accessibleOrdersCache = $orders;
     }
 
     public function getSeasonsProperty(): Collection
@@ -662,9 +705,25 @@ class OrderSelector extends Component
             return $this->salesRepOrderSummariesCache;
         }
 
-        return $this->salesRepOrderSummariesCache = app(
+        $startedAt = microtime(true);
+
+        $orders = $this->accessibleOrders;
+
+        $summaries = app(
             SalesRepOrderSummaryService::class
-        )->build($this->accessibleOrders);
+        )->build($orders);
+
+        Log::info('OrderSelector performance: summary service', [
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+            'order_count' => $orders->count(),
+            'summary_count' => $summaries->count(),
+            'partner_user_id' => auth('partner')->id(),
+        ]);
+
+        return $this->salesRepOrderSummariesCache = $summaries;
     }
 
     public function getFilteredSalesRepOrderSummariesProperty(): Collection
@@ -676,96 +735,109 @@ class OrderSelector extends Component
             return $this->filteredSalesRepOrderSummariesCache;
         }
 
-        return $this->filteredSalesRepOrderSummariesCache =
-            $this->salesRepOrderSummaries
-                ->when(
-                    $this->summarySearch,
-                    function (Collection $summaries) {
-                        $search = mb_strtolower(
-                            trim($this->summarySearch)
-                        );
+        $startedAt = microtime(true);
 
-                        return $summaries->filter(
-                            function (array $summary) use ($search): bool {
-                                return str_contains(
+        $summaries = $this->salesRepOrderSummaries
+            ->when(
+                $this->summarySearch,
+                function (Collection $summaries) {
+                    $search = mb_strtolower(
+                        trim($this->summarySearch)
+                    );
+
+                    return $summaries->filter(
+                        function (array $summary) use ($search): bool {
+                            return str_contains(
+                                mb_strtolower(
+                                    (string) (
+                                        $summary['partner_code'] ?? ''
+                                    )
+                                ),
+                                $search
+                            )
+                                || str_contains(
                                     mb_strtolower(
                                         (string) (
-                                            $summary['partner_code'] ?? ''
+                                            $summary['partner_name'] ?? ''
                                         )
                                     ),
                                     $search
                                 )
-                                    || str_contains(
-                                        mb_strtolower(
-                                            (string) (
-                                                $summary['partner_name'] ?? ''
-                                            )
-                                        ),
-                                        $search
-                                    )
-                                    || str_contains(
-                                        mb_strtolower(
-                                            (string) (
-                                                $summary['address_name'] ?? ''
-                                            )
-                                        ),
-                                        $search
-                                    )
-                                    || str_contains(
-                                        mb_strtolower(
-                                            (string) (
-                                                $summary['address'] ?? ''
-                                            )
-                                        ),
-                                        $search
-                                    );
-                            }
-                        );
-                    }
+                                || str_contains(
+                                    mb_strtolower(
+                                        (string) (
+                                            $summary['address_name'] ?? ''
+                                        )
+                                    ),
+                                    $search
+                                )
+                                || str_contains(
+                                    mb_strtolower(
+                                        (string) (
+                                            $summary['address'] ?? ''
+                                        )
+                                    ),
+                                    $search
+                                );
+                        }
+                    );
+                }
+            )
+            ->when(
+                $this->summarySeasonId,
+                fn (Collection $summaries) => $summaries->where(
+                    'season_id',
+                    (int) $this->summarySeasonId
                 )
-                ->when(
-                    $this->summarySeasonId,
-                    fn (Collection $summaries) => $summaries->where(
-                        'season_id',
-                        (int) $this->summarySeasonId
-                    )
+            )
+            ->when(
+                $this->summaryBrandId,
+                fn (Collection $summaries) => $summaries->where(
+                    'brand_id',
+                    (int) $this->summaryBrandId
                 )
-                ->when(
-                    $this->summaryBrandId,
-                    fn (Collection $summaries) => $summaries->where(
-                        'brand_id',
-                        (int) $this->summaryBrandId
-                    )
+            )
+            ->when(
+                $this->summaryOrderSheetTypeId,
+                fn (Collection $summaries) => $summaries->where(
+                    'order_sheet_type_id',
+                    (int) $this->summaryOrderSheetTypeId
                 )
-                ->when(
-                    $this->summaryOrderSheetTypeId,
-                    fn (Collection $summaries) => $summaries->where(
-                        'order_sheet_type_id',
-                        (int) $this->summaryOrderSheetTypeId
-                    )
+            )
+            ->when(
+                $this->summaryFilledFilter === 'filled',
+                fn (Collection $summaries) => $summaries->filter(
+                    fn (array $summary): bool =>
+                        (int) ($summary['quantity'] ?? 0) > 0
                 )
-                ->when(
-                    $this->summaryFilledFilter === 'filled',
-                    fn (Collection $summaries) => $summaries->filter(
-                        fn (array $summary): bool =>
-                            (int) ($summary['quantity'] ?? 0) > 0
-                    )
+            )
+            ->when(
+                $this->summaryFilledFilter === 'empty',
+                fn (Collection $summaries) => $summaries->filter(
+                    fn (array $summary): bool =>
+                        (int) ($summary['quantity'] ?? 0) === 0
                 )
-                ->when(
-                    $this->summaryFilledFilter === 'empty',
-                    fn (Collection $summaries) => $summaries->filter(
-                        fn (array $summary): bool =>
-                            (int) ($summary['quantity'] ?? 0) === 0
-                    )
+            )
+            ->when(
+                $this->summaryCurrency,
+                fn (Collection $summaries) => $summaries->where(
+                    'currency',
+                    $this->summaryCurrency
                 )
-                ->when(
-                    $this->summaryCurrency,
-                    fn (Collection $summaries) => $summaries->where(
-                        'currency',
-                        $this->summaryCurrency
-                    )
-                )
-                ->values();
+            )
+            ->values();
+
+        Log::info('OrderSelector performance: summary filtering', [
+            'duration_ms' => round(
+                (microtime(true) - $startedAt) * 1000,
+                2
+            ),
+            'source_count' => $this->salesRepOrderSummaries->count(),
+            'filtered_count' => $summaries->count(),
+            'partner_user_id' => auth('partner')->id(),
+        ]);
+
+        return $this->filteredSalesRepOrderSummariesCache = $summaries;
     }
 
     public function openSummaryOrder(int $orderId)
