@@ -110,6 +110,19 @@ class OrderSelector extends Component
     }
 
     public function getSummaryCurrenciesProperty(): Collection
+    {
+        if ($this->summaryCurrenciesCache instanceof Collection) {
+            return $this->summaryCurrenciesCache;
+        }
+
+        return $this->summaryCurrenciesCache =
+            $this->salesRepOrderSummaries
+                ->pluck('currency')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values();
+    }
         
         public function mount(): void
         {
