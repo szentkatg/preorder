@@ -7,11 +7,13 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PriceListItem;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class SalesRepOrderSummaryService
 {
     public function build(Collection $orders): Collection
     {
+        $buildStartedAt = microtime(true);
         if ($orders->isEmpty()) {
             return collect();
         }
@@ -28,6 +30,7 @@ class SalesRepOrderSummaryService
          * Ez váltja ki a korábbi rendelésenkénti
          * OrderItem::where('order_id', ...)->get() lekérdezéseket.
          */
+        $startedAt = microtime(true);
         $itemsByOrderId = OrderItem::query()
             ->with([
                 'sku.assortmentComponents',
@@ -35,7 +38,9 @@ class SalesRepOrderSummaryService
             ->whereIn('order_id', $orderIds)
             ->get()
             ->groupBy(fn (OrderItem $item): int => (int) $item->order_id);
-
+        Log::info('SummaryService: order items', [
+            'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+        ]);
         $productIds = $itemsByOrderId
             ->flatten(1)
             ->pluck('sku.product_id')
@@ -74,6 +79,7 @@ class SalesRepOrderSummaryService
             && $seasonIds->isNotEmpty()
             && $productIds->isNotEmpty()
         ) {
+            $startedAt = microtime(true);
             $prices = PriceListItem::query()
                 ->whereIn('price_list_id', $priceListIds)
                 ->whereIn('season_id', $seasonIds)
@@ -89,6 +95,9 @@ class SalesRepOrderSummaryService
                     (int) $item->season_id,
                     (int) $item->product_id,
                 ));
+                Log::info('SummaryService: prices', [
+                    'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+                ]);
         }
 
         $currencyIds = $orders
@@ -104,6 +113,7 @@ class SalesRepOrderSummaryService
         $exchangeRates = collect();
 
         if ($seasonIds->isNotEmpty() && $currencyIds->isNotEmpty()) {
+            $startedAt = microtime(true);
             $exchangeRates = ExchangeRate::query()
                 ->whereIn('season_id', $seasonIds)
                 ->whereIn('currency_id', $currencyIds)
@@ -117,8 +127,12 @@ class SalesRepOrderSummaryService
                     (int) $rate->season_id,
                     (int) $rate->currency_id,
                 ));
+                Log::info('SummaryService: exchange rates', [
+                    'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+                ]);
         }
 
+        $startedAt = microtime(true);
         return $orders
             ->map(function (Order $order) use (
                 $itemsByOrderId,
@@ -257,6 +271,19 @@ class SalesRepOrderSummaryService
                 ];
             })
             ->values();
+            $summaries = $orders
+                ->map(...)
+                ->values();
+
+            Log::info('SummaryService: order loop', [
+                'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+            ]);
+
+            Log::info('SummaryService: TOTAL', [
+                'duration_ms' => round((microtime(true) - $buildStartedAt) * 1000, 2),
+            ]);
+
+            return $summaries;
     }
 
     protected function findPrice(
