@@ -13,6 +13,7 @@ use App\Models\Season;
 use Livewire\Component;
 use App\Exports\PartnerOrderSummaryMatrixExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Log;
 
 
 class OrderSummary extends Component
@@ -58,6 +59,12 @@ class OrderSummary extends Component
         Brand $brand,
         OrderSheetType $orderSheetType
     ): void {
+
+        $startedAt = microtime(true);
+        $checkpoint = $startedAt;
+
+        Log::info('OrderSummary timing: mount started');
+
         $this->season = $season;
         $this->brand = $brand;
         $this->orderSheetType = $orderSheetType;
@@ -98,6 +105,16 @@ class OrderSummary extends Component
             ])
             ->get();
 
+            Log::info('OrderSummary timing: orders loaded', [
+                'seconds' => round(microtime(true) - $checkpoint, 3),
+                'orders' => $this->orders->count(),
+                'items' => $this->orders->sum(
+                    fn ($order) => $order->items->count()
+                ),
+            ]);
+
+            $checkpoint = microtime(true);            
+
         $firstOrder = $this->orders->first();
 
         $this->priceListId = $firstOrder?->price_list_id;
@@ -105,12 +122,36 @@ class OrderSummary extends Component
         $this->setPartnerLocale();
         $this->loadExistingQuantities();
 
+        Log::info('OrderSummary timing: quantities loaded', [
+            'seconds' => round(microtime(true) - $checkpoint, 3),
+            'piece_skus' => count($this->pieceQuantities),
+            'assortment_skus' => count($this->assortmentQuantities),
+        ]);
+
+        $checkpoint = microtime(true);        
+
         $this->allowAssortmentOrdering = collect(
             $this->assortmentQuantities
         )->sum() > 0;
 
         $this->buildMatrixGroups();
+
+        Log::info('OrderSummary timing: matrix groups built', [
+            'seconds' => round(microtime(true) - $checkpoint, 3),
+            'matrix_groups' => count($this->matrixGroups),
+        ]);
+
+        $checkpoint = microtime(true);
+
         $this->calculateMatrixTotals();
+
+        Log::info('OrderSummary timing: totals calculated', [
+            'seconds' => round(microtime(true) - $checkpoint, 3),
+        ]);
+
+        Log::info('OrderSummary timing: mount finished', [
+            'seconds' => round(microtime(true) - $startedAt, 3),
+        ]);
     }
 
     protected function setPartnerLocale(): void
@@ -524,9 +565,17 @@ class OrderSummary extends Component
 
     public function render()
     {
+        $startedAt = microtime(true);
+
         $this->setPartnerLocale();
 
-        return view('livewire.partner.order-summary')
+        $view = view('livewire.partner.order-summary')
             ->layout('components.layouts.app');
+
+        Log::info('OrderSummary timing: render prepared', [
+            'seconds' => round(microtime(true) - $startedAt, 3),
+        ]);
+
+        return $view;
     }
 }
