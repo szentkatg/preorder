@@ -125,7 +125,7 @@
     @endif
 
     @php
-        $summary = $this->getCurrentGroupSummary();
+        $summary = $summaryTotals;
     @endphp
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -318,25 +318,36 @@
 
                                             <td class="border border-gray-400 bg-gray-50 p-1 text-center w-12 min-w-12">
                                                 @if ($sku)
-                                                    {{ $this->getTotalForSku($sku['id']) }}
+                                                    {{ (int) ($sku['total_quantity'] ?? 0) }}
                                                 @else
                                                     <span class="text-gray-400">-</span>
                                                 @endif
                                             </td>
                                         @endforeach
                                     @endif
+                                    
 
                                     <td class="border border-gray-400 bg-gray-200 p-1 text-center font-semibold w-24 min-w-24">
-                                        {{ $this->getRowTotal($color) }}
+                                        {{ (int) ($color['row_total'] ?? 0) }}
                                     </td>
 
                                     <td class="border border-gray-400 bg-gray-200 p-1 text-right font-semibold w-28 min-w-28 whitespace-nowrap">
-                                        {{ number_format($this->getRowWholesaleValue($product, $color), 2, ',', ' ') }}
+                                        {{ number_format(
+                                            (float) ($color['row_wholesale_value'] ?? 0),
+                                            2,
+                                            ',',
+                                            ' '
+                                        ) }}
                                         {{ $this->getCurrencySymbol() }}
                                     </td>
 
                                     <td class="border border-gray-400 bg-gray-200 p-1 text-right font-semibold w-28 min-w-28 whitespace-nowrap">
-                                        {{ number_format($this->getRowRetailValue($product, $color), 2, ',', ' ') }}
+                                        {{ number_format(
+                                            (float) ($color['row_retail_value'] ?? 0),
+                                            2,
+                                            ',',
+                                            ' '
+                                        ) }}
                                         {{ $this->getCurrencySymbol() }}
                                     </td>
                                 </tr>

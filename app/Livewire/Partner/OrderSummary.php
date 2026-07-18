@@ -33,6 +33,12 @@ class OrderSummary extends Component
 
     public array $assortmentQuantities = [];
 
+    public array $summaryTotals = [
+        'quantity' => 0,
+        'wholesale_value' => 0.0,
+        'retail_value' => 0.0,
+    ];    
+
     public bool $allowAssortmentOrdering = true;
 
     public bool $showAllCatalogGroups = true;
@@ -98,9 +104,13 @@ class OrderSummary extends Component
         $this->retailPriceListId = $firstOrder?->priceList?->retail_price_list_id;
         $this->setPartnerLocale();
         $this->loadExistingQuantities();
-        $this->allowAssortmentOrdering = collect($this->assortmentQuantities)
-                ->sum() > 0;
+
+        $this->allowAssortmentOrdering = collect(
+            $this->assortmentQuantities
+        )->sum() > 0;
+
         $this->buildMatrixGroups();
+        $this->calculateMatrixTotals();
     }
 
     protected function setPartnerLocale(): void
@@ -224,6 +234,130 @@ class OrderSummary extends Component
         $this->matrixGroups = $groups->values()->all();
     }
 
+    protected function calculateMatrixTotals(): void
+    {
+        /*
+        * A darabos mennyiségekkel indulunk.
+        *
+        * A kulcs a SKU azonosítója, az érték pedig az összes
+        * kiválasztott rendelésben szereplő darabszám.
+        */
+        $skuTotals = [];
+
+        foreach ($this->pieceQuantities as $skuId => $quantity) {
+            $skuTotals[(int) $skuId] = (int) $quantity;
+        }
+
+        /*
+        * Az assortmentek tartalmát csak egyszer bontjuk szét
+        * komponens SKU-kra.
+        */
+        foreach ($this->matrixGroups as $matrixGroup) {
+            foreach ($matrixGroup['products'] as $product) {
+                foreach ($product['colors'] as $color) {
+                    foreach ($color['assortments'] as $assortment) {
+                        $assortmentSkuId =
+                            (int) $assortment['sku_id'];
+
+                        $assortmentQuantity = (int) (
+                            $this->assortmentQuantities[
+                                $assortmentSkuId
+                            ] ?? 0
+                        );
+
+                        if ($assortmentQuantity === 0) {
+                            continue;
+                        }
+
+                        foreach (
+                            $assortment['content']
+                            as $componentSkuId => $componentQuantity
+                        ) {
+                            $componentSkuId =
+                                (int) $componentSkuId;
+
+                            $componentQuantity =
+                                (int) $componentQuantity;
+
+                            $skuTotals[$componentSkuId] = (
+                                $skuTotals[$componentSkuId] ?? 0
+                            ) + (
+                                $assortmentQuantity
+                                * $componentQuantity
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        $summaryQuantity = 0;
+        $summaryWholesaleValue = 0.0;
+        $summaryRetailValue = 0.0;
+
+        /*
+        * A kész SKU-összesítéseket beírjuk közvetlenül
+        * a matrixGroups struktúrába.
+        *
+        * Így a Blade-ben már nincs számítás.
+        */
+        foreach ($this->matrixGroups as &$matrixGroup) {
+            foreach ($matrixGroup['products'] as &$product) {
+                foreach ($product['colors'] as &$color) {
+                    $rowTotal = 0;
+
+                    foreach ($color['sku_map'] as &$sku) {
+                        $skuId = (int) $sku['id'];
+
+                        $skuTotal = (int) (
+                            $skuTotals[$skuId] ?? 0
+                        );
+
+                        $sku['total_quantity'] = $skuTotal;
+
+                        $rowTotal += $skuTotal;
+                    }
+
+                    unset($sku);
+
+                    $rowWholesaleValue = $rowTotal
+                        * (float) ($product['price'] ?? 0);
+
+                    $rowRetailValue = $rowTotal
+                        * (float) ($product['retail_price'] ?? 0);
+
+                    $color['row_total'] = $rowTotal;
+
+                    $color['row_wholesale_value'] =
+                        $rowWholesaleValue;
+
+                    $color['row_retail_value'] =
+                        $rowRetailValue;
+
+                    $summaryQuantity += $rowTotal;
+
+                    $summaryWholesaleValue +=
+                        $rowWholesaleValue;
+
+                    $summaryRetailValue +=
+                        $rowRetailValue;
+                }
+
+                unset($color);
+            }
+
+            unset($product);
+        }
+
+        unset($matrixGroup);
+
+        $this->summaryTotals = [
+            'quantity' => $summaryQuantity,
+            'wholesale_value' => $summaryWholesaleValue,
+            'retail_value' => $summaryRetailValue,
+        ];
+    }
+
     protected function formatProduct(Product $product): array
     {
         $wholesalePrice = $this->getProductPrice($product->id, $this->priceListId);
@@ -303,72 +437,6 @@ class OrderSummary extends Component
         );
     }
     
-    public function getTotalForSku(int $skuId): int
-    {
-        $total = (int) ($this->pieceQuantities[$skuId] ?? 0);
-
-        foreach ($this->matrixGroups as $matrixGroup) {
-            foreach ($matrixGroup['products'] as $product) {
-                foreach ($product['colors'] as $color) {
-                    foreach ($color['assortments'] as $assortment) {
-                        $assortmentQty = (int) ($this->assortmentQuantities[$assortment['sku_id']] ?? 0);
-                        $componentQty = (int) ($assortment['content'][$skuId] ?? 0);
-
-                        $total += $assortmentQty * $componentQty;
-                    }
-                }
-            }
-        }
-
-        return $total;
-    }
-
-    public function getRowTotal(array $color): int
-    {
-        $total = 0;
-
-        foreach ($color['sku_map'] as $sku) {
-            $total += $this->getTotalForSku($sku['id']);
-        }
-
-        return $total;
-    }
-
-    public function getRowWholesaleValue(array $product, array $color): float
-    {
-        return $this->getRowTotal($color) * (float) ($product['price'] ?? 0);
-    }
-
-    public function getRowRetailValue(array $product, array $color): float
-    {
-        return $this->getRowTotal($color) * (float) ($product['retail_price'] ?? 0);
-    }
-
-    public function getCurrentGroupSummary(): array
-    {
-        $quantity = 0;
-        $wholesaleValue = 0;
-        $retailValue = 0;
-
-        foreach ($this->matrixGroups as $matrixGroup) {
-            foreach ($matrixGroup['products'] as $product) {
-                foreach ($product['colors'] as $color) {
-                    $rowQty = $this->getRowTotal($color);
-
-                    $quantity += $rowQty;
-                    $wholesaleValue += $rowQty * (float) ($product['price'] ?? 0);
-                    $retailValue += $rowQty * (float) ($product['retail_price'] ?? 0);
-                }
-            }
-        }
-
-        return [
-            'quantity' => $quantity,
-            'wholesale_value' => $wholesaleValue,
-            'retail_value' => $retailValue,
-        ];
-    }
-
     public function getCurrencySymbol(): string
     {
         return $this->orders->first()?->priceList?->currency?->symbol ?? '';
