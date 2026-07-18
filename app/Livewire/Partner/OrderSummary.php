@@ -105,7 +105,7 @@ class OrderSummary extends Component
             'orders' => $this->orders->count(),
         ]);
 
-$       checkpoint = microtime(true);
+        $checkpoint = microtime(true);
 
         $firstOrder = $this->orders->first();
 
