@@ -5,7 +5,6 @@ namespace App\Livewire\Partner;
 use App\Models\Brand;
 use App\Models\Catalog;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\OrderSheetType;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -14,6 +13,7 @@ use Livewire\Component;
 use App\Exports\PartnerOrderSummaryMatrixExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 
 class OrderSummary extends Component
@@ -95,25 +95,17 @@ class OrderSummary extends Component
         
         $this->orders = $query
             ->with([
-                'partner',
                 'partnerAddress.language',
                 'priceList.currency',
-                'items.sku.assortmentComponents',
-                'items.sku.product',
-                'items.sku.size',
-                'items.sku.color',
             ])
             ->get();
 
-            Log::info('OrderSummary timing: orders loaded', [
-                'seconds' => round(microtime(true) - $checkpoint, 3),
-                'orders' => $this->orders->count(),
-                'items' => $this->orders->sum(
-                    fn ($order) => $order->items->count()
-                ),
-            ]);
+        Log::info('OrderSummary timing: orders loaded', [
+            'seconds' => round(microtime(true) - $checkpoint, 3),
+            'orders' => $this->orders->count(),
+        ]);
 
-            $checkpoint = microtime(true);            
+$       checkpoint = microtime(true);
 
         $firstOrder = $this->orders->first();
 
@@ -186,17 +178,51 @@ class OrderSummary extends Component
 
     protected function loadExistingQuantities(): void
     {
-        foreach ($this->orders as $order) {
-            foreach ($order->items as $item) {
-                if ($item->sku?->assortmentComponents?->isNotEmpty()) {
-                    $this->assortmentQuantities[$item->sku_id] =
-                        ($this->assortmentQuantities[$item->sku_id] ?? 0)
-                        + (int) $item->quantity;
-                } else {
-                    $this->pieceQuantities[$item->sku_id] =
-                        ($this->pieceQuantities[$item->sku_id] ?? 0)
-                        + (int) $item->quantity;
-                }
+        $this->pieceQuantities = [];
+        $this->assortmentQuantities = [];
+
+        $orderIds = $this->orders
+            ->modelKeys();
+
+        if ($orderIds === []) {
+            return;
+        }
+
+        /*
+        * Az adatbázis már SKU-nként összesíti a 212 000+
+        * rendelési tételt.
+        *
+        * Így PHP-ba csak néhány ezer összesített sor érkezik,
+        * nem több százezer Eloquent objektum.
+        */
+        $quantityRows = DB::table('order_items')
+            ->select([
+                'order_items.sku_id',
+            ])
+            ->selectRaw('SUM(order_items.quantity) AS total_quantity')
+            ->selectRaw(
+                'CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM item_assortments
+                        WHERE item_assortments.assortment_sku_id = order_items.sku_id
+                    )
+                    THEN 1
+                    ELSE 0
+                END AS is_assortment'
+            )
+            ->whereIn('order_items.order_id', $orderIds)
+            ->groupBy('order_items.sku_id')
+            ->get();
+
+        foreach ($quantityRows as $row) {
+            $skuId = (int) $row->sku_id;
+            $quantity = (int) $row->total_quantity;
+
+            if ((int) $row->is_assortment === 1) {
+                $this->assortmentQuantities[$skuId] = $quantity;
+            } else {
+                $this->pieceQuantities[$skuId] = $quantity;
             }
         }
     }
