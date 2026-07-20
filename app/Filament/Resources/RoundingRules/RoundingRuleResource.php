@@ -13,20 +13,30 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class RoundingRuleResource extends Resource
 {
     protected static ?string $model = RoundingRule::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedCalculator;
 
-    protected static ?string $navigationGroup = 'Törzsadatok';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Törzsadatok';
 
-    protected static ?string $navigationLabel = 'Gyártási kerekítések';
+    protected static ?int $navigationSort = 11;
 
-    protected static ?string $modelLabel = 'Gyártási kerekítés';
+    protected static ?string $navigationLabel =
+        'Gyártási kerekítések';
 
-    protected static ?string $pluralModelLabel = 'Gyártási kerekítések';
+    protected static ?string $modelLabel =
+        'gyártási kerekítés';
+
+    protected static ?string $pluralModelLabel =
+        'gyártási kerekítések';
+
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {
