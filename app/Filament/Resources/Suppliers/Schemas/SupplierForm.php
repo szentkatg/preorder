@@ -18,6 +18,10 @@ class SupplierForm
                     ->maxLength(50)
                     ->unique(ignoreRecord: true),
 
+                TextInput::make('addrid')
+                    ->label('Címkód')
+                    ->maxLength(20),
+
                 TextInput::make('short_name')
                     ->label('Rövid név')
                     ->required()

@@ -6,6 +6,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\DatePicker;
 
 class ProductForm
 {
@@ -51,6 +52,16 @@ class ProductForm
                     ->searchable()
                     ->preload()
                     ->required(),
+
+                Select::make('rounding_rule_id')
+                    ->label('Gyártási kerekítés')
+                    ->relationship('roundingRule', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                DatePicker::make('promised_delivery_date')
+                    ->label('Ígért szállítási határidő')
+                    ->native(false),
 
                 TextInput::make('catalog_group_name_hu')
                     ->label('Katalógus csoport HU'),

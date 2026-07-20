@@ -55,6 +55,14 @@ class SupplierImporter
                 $row['short_name'] ?? null
             );
 
+            $addrId = $this->spreadsheetHelper->nullIfEmpty(
+                $row['addrid'] ?? null
+            );
+
+            if ($addrId !== null) {
+                $supplier->addrid = $addrId;
+            }
+
             if ($shortName !== null) {
                 $supplier->short_name = $shortName;
             }

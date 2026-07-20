@@ -25,6 +25,11 @@ class SuppliersTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('addrid')
+                    ->label('Címkód')
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('short_name')
                     ->label('Rövid név')
                     ->searchable()

@@ -25,6 +25,8 @@ class Product extends Model
         'catalog_group_sort',
         'catalog_sort',
         'catalog_page',
+        'rounding_rule_id',
+        'promised_delivery_date',
         'active',
     ];
 
@@ -69,5 +71,13 @@ class Product extends Model
     public function colorImages()
     {
         return $this->hasMany(ColorImage::class);
+    }
+    public function roundingRule()
+    {
+        return $this->belongsTo(
+            RoundingRule::class,
+            'rounding_rule_id',
+            'rounding_rule_id'
+        );
     }
 }
