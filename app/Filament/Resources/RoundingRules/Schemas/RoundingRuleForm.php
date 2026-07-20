@@ -5,7 +5,7 @@ namespace App\Filament\Resources\RoundingRules\Schemas;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Get;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class RoundingRuleForm
@@ -51,7 +51,7 @@ class RoundingRuleForm
                 TextInput::make('round_up_from_remainder')
                     ->label('Felfelé ettől a maradéktól')
                     ->numeric()
-                    ->visible(fn (Get $get) => $get('rounding_mode') === 'threshold'),
+                    ->visible(fn (Get $get): bool => $get('rounding_mode') === 'threshold'),
 
                 Toggle::make('active')
                     ->label('Aktív')
