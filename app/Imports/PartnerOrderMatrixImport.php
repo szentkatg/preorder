@@ -184,7 +184,7 @@ class PartnerOrderMatrixImport implements ToCollection
             return;
         }
 
-        if ($quantity <= 0) {
+        if ((int) $quantity === 0) {
             $deleted = OrderItem::query()
                 ->where('order_id', $this->order->id)
                 ->where('sku_id', $skuId)
