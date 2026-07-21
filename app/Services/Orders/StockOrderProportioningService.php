@@ -89,6 +89,8 @@ class StockOrderProportioningService
         $writeQuantitiesBySku = [];
 
         $totalSizeCount = 0;
+        $totalPartnerDirectQuantity = 0;
+        $totalPartnerAssortmentQuantity = 0;
         $totalPartnerQuantity = 0;
         $totalNewStockQuantity = 0;
         $totalFinalQuantity = 0;
@@ -122,10 +124,6 @@ class StockOrderProportioningService
                 + $plannedStockTotal
                 === 0;
 
-            $roundingRule = $isZeroBalanceGroup
-                ? null
-                : $this->resolveRoundingRule($firstMetadata);
-
             $ratioSum = $skuIds->sum(
                 fn (int $skuId): int =>
                     max(
@@ -134,9 +132,20 @@ class StockOrderProportioningService
                     )
             );
 
+            $calculationMode = $isZeroBalanceGroup
+                ? 'zero_balance'
+                : ($ratioSum === 0 ? 'zero_ratio' : 'proportioning');
+
+            $roundingRule = $calculationMode === 'proportioning'
+                ? $this->resolveRoundingRule($firstMetadata)
+                : null;
+
             $groupItems = [];
 
+            $partnerDirectGroupTotal = 0;
+            $partnerAssortmentGroupTotal = 0;
             $partnerGroupTotal = 0;
+            $allocatedStockGroupTotal = 0.0;
             $newStockGroupTotal = 0;
             $finalGroupTotal = 0;
             $groupNegativeCorrectionCount = 0;
@@ -163,6 +172,10 @@ class StockOrderProportioningService
                 $ratio = max(
                     0,
                     (int) ($ratioQuantities[$skuId] ?? 0)
+                );
+
+                $originalStockQuantity = (int) (
+                    $stockPlanQuantities[$skuId] ?? 0
                 );
 
                 if ($isZeroBalanceGroup) {
@@ -243,6 +256,12 @@ class StockOrderProportioningService
                         $partnerAssortmentQuantity,
                     'ratio' => $ratio,
                     'ratio_sum' => $ratioSum,
+                    'original_stock_quantity' =>
+                        $originalStockQuantity,
+                    'allocated_stock_quantity' => round(
+                        $rawAllocatedStock,
+                        4
+                    ),
                     'raw_allocated_stock' => round(
                         $rawAllocatedStock,
                         4
@@ -253,11 +272,20 @@ class StockOrderProportioningService
                         $roundedFinalQuantity,
                 ];
 
+                $partnerDirectGroupTotal +=
+                    $partnerDirectQuantity;
+                $partnerAssortmentGroupTotal +=
+                    $partnerAssortmentQuantity;
                 $partnerGroupTotal += $partnerQuantity;
+                $allocatedStockGroupTotal += $rawAllocatedStock;
                 $newStockGroupTotal += $newStockQuantity;
                 $finalGroupTotal += $roundedFinalQuantity;
 
                 $totalSizeCount++;
+                $totalPartnerDirectQuantity +=
+                    $partnerDirectQuantity;
+                $totalPartnerAssortmentQuantity +=
+                    $partnerAssortmentQuantity;
                 $totalPartnerQuantity += $partnerQuantity;
                 $totalNewStockQuantity += $newStockQuantity;
                 $totalFinalQuantity += $roundedFinalQuantity;
@@ -282,7 +310,19 @@ class StockOrderProportioningService
 
                 'planned_stock_total' =>
                     $plannedStockTotal,
+                'original_stock_quantity' =>
+                    $plannedStockTotal,
+                'allocated_stock_quantity' => round(
+                    $allocatedStockGroupTotal,
+                    4
+                ),
                 'ratio_sum' => $ratioSum,
+                'calculation_mode' => $calculationMode,
+                'rounding_method_label' =>
+                    $this->roundingMethodLabel(
+                        $roundingRule,
+                        $calculationMode
+                    ),
                 'zero_balance_group' =>
                     $isZeroBalanceGroup,
                 'rounding_rule_id' =>
@@ -306,6 +346,10 @@ class StockOrderProportioningService
                         ? null
                         : (bool) $roundingRule->include_assortments,
 
+                'partner_direct_quantity' =>
+                    $partnerDirectGroupTotal,
+                'partner_assortment_quantity' =>
+                    $partnerAssortmentGroupTotal,
                 'partner_quantity' =>
                     $partnerGroupTotal,
                 'new_stock_quantity' =>
@@ -352,6 +396,10 @@ class StockOrderProportioningService
                 count($resultGroups),
             'size_count' =>
                 $totalSizeCount,
+            'partner_direct_quantity' =>
+                $totalPartnerDirectQuantity,
+            'partner_assortment_quantity' =>
+                $totalPartnerAssortmentQuantity,
             'partner_quantity' =>
                 $totalPartnerQuantity,
             'original_stock_quantity' =>
@@ -989,6 +1037,50 @@ class StockOrderProportioningService
                 . 'küszöbértéke érvénytelen.'
             );
         }
+    }
+
+    protected function roundingMethodLabel(
+        ?RoundingRule $rule,
+        string $calculationMode
+    ): string {
+        if ($calculationMode === 'zero_balance') {
+            return 'Nullszaldós korrekció, kerekítés nélkül';
+        }
+
+        if ($calculationMode === 'zero_ratio') {
+            return 'Nulla arányösszeg, kerekítés nélkül';
+        }
+
+        if (! $rule instanceof RoundingRule) {
+            return '—';
+        }
+
+        $parts = [
+            'Többszörös: ' . (int) $rule->rounding_multiple,
+            'Mód: ' . $this->roundingModeLabel(
+                (string) $rule->rounding_mode
+            ),
+            (bool) $rule->include_assortments
+                ? 'Normál és gyűjtős együtt kerekítve'
+                : 'Normál kerekítve, gyűjtős hozzáadva',
+        ];
+
+        if ((string) $rule->rounding_mode === 'threshold') {
+            $parts[] = 'Felfelé maradéktól: '
+                . (int) $rule->round_up_from_remainder;
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    protected function roundingModeLabel(string $mode): string
+    {
+        return match ($mode) {
+            'threshold' => 'küszöbös',
+            'floor' => 'lefelé',
+            'ceil' => 'felfelé',
+            default => $mode,
+        };
     }
 
     protected function roundQuantity(

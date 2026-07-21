@@ -64,8 +64,8 @@ class StockOrderProportioningPreviewExport
             'Partneri rendelés összesen',
             'Arány',
             'Arányösszeg',
-            'Eredeti készletterv összesen',
-            'Kiosztott készlet kerekítés előtt',
+            'Eredeti készletterv méretenként',
+            'Arányosított készlet kerekítés előtt',
             'Új készletmennyiség',
             'Végleges összmennyiség',
         ];
@@ -117,8 +117,10 @@ class StockOrderProportioningPreviewExport
                     $item['partner_quantity'] ?? 0,
                     $item['ratio'] ?? 0,
                     $item['ratio_sum'] ?? 0,
-                    $group['planned_stock_total'] ?? 0,
-                    $item['raw_allocated_stock'] ?? 0,
+                    $item['original_stock_quantity'] ?? 0,
+                    $item['allocated_stock_quantity']
+                        ?? $item['raw_allocated_stock']
+                        ?? 0,
                     $item['new_stock_quantity'] ?? 0,
                     $item['final_quantity'] ?? 0,
                 ], null, 'A' . $row);

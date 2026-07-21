@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\StockOrderProportioningPreviewExport;
 use App\Models\Brand;
 use App\Models\Order;
 use App\Models\OrderSheetType;
@@ -18,7 +19,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
-use App\Exports\StockOrderProportioningPreviewExport;
 
 class StockOrderProportioning extends Page implements
     Forms\Contracts\HasForms
@@ -401,18 +401,24 @@ class StockOrderProportioning extends Page implements
             );
         }
 
-        $cachedPreview = Cache::get(
-            $this->previewCacheKey($this->previewToken)
+        $groups = Cache::get(
+            $this->previewGroupsCacheKey(
+                $this->previewToken
+            )
         );
 
-        if (! is_array($cachedPreview)) {
+        if (! is_array($groups)) {
             throw new \RuntimeException(
                 'Az előnézet lejárt vagy már nem található. '
                 . 'Futtasd le újra a számítást.'
             );
         }
 
-        return $export->download($cachedPreview);
+        return $export->download([
+            'scope' => $this->preview['scope'] ?? [],
+            'summary' => $this->preview['summary'] ?? [],
+            'groups' => $groups,
+        ]);
     }
     
     public function applyCalculation(

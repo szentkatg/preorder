@@ -257,7 +257,7 @@
                     @else
                         <div class="overflow-x-auto">
                             <table
-                                class="w-full min-w-[1650px]
+                                class="w-full min-w-[1850px]
                                     border-collapse text-sm"
                             >
                                 <thead>
@@ -278,7 +278,10 @@
                                             Partner összesen
                                         </th>
                                         <th class="px-3 py-2 text-right">
-                                            Készletterv
+                                            Eredeti készletterv
+                                        </th>
+                                        <th class="px-3 py-2 text-right">
+                                            Arányosított készlet
                                         </th>
                                         <th class="px-3 py-2 text-right">
                                             Arány
@@ -381,7 +384,22 @@
                                             </td>
 
                                             <td class="px-3 py-2 text-right">
-                                                {{ $group['planned_stock_total'] }}
+                                                {{
+                                                    $group[
+                                                        'original_stock_quantity'
+                                                    ] ?? 0
+                                                }}
+                                            </td>
+
+                                            <td class="px-3 py-2 text-right">
+                                                {{ number_format(
+                                                    $group[
+                                                        'allocated_stock_quantity'
+                                                    ] ?? 0,
+                                                    4,
+                                                    ',',
+                                                    ' '
+                                                ) }}
                                             </td>
 
                                             <td class="px-3 py-2 text-right">
@@ -473,10 +491,18 @@
                                                 </td>
 
                                                 <td class="px-3 py-1.5 text-right">
+                                                    {{
+                                                        $item[
+                                                            'original_stock_quantity'
+                                                        ] ?? 0
+                                                    }}
+                                                </td>
+
+                                                <td class="px-3 py-1.5 text-right">
                                                     {{ number_format(
                                                         $item[
-                                                            'raw_allocated_stock'
-                                                        ],
+                                                            'allocated_stock_quantity'
+                                                        ] ?? 0,
                                                         4,
                                                         ',',
                                                         ' '
