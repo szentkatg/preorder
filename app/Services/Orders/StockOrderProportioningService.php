@@ -4,6 +4,7 @@ namespace App\Services\Orders;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\RoundingRule;
 use App\Models\Sku;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -55,10 +56,14 @@ class StockOrderProportioningService
             )
             ->all();
 
-        $partnerQuantities =
-            $this->aggregateExpandedQuantitiesForOrderIds(
+        $partnerQuantityParts =
+            $this->aggregateExpandedQuantityPartsForOrderIds(
                 $partnerOrderIds
             );
+
+        $partnerQuantities = $this->totalQuantityParts(
+            $partnerQuantityParts
+        );
 
         $ratioQuantities =
             $this->aggregateExpandedQuantitiesForOrderIds([
@@ -107,6 +112,20 @@ class StockOrderProportioningService
                     (int) ($stockPlanQuantities[$skuId] ?? 0)
             );
 
+            $partnerGroupTotalForBalance = $skuIds->sum(
+                fn (int $skuId): int =>
+                    (int) ($partnerQuantities[$skuId] ?? 0)
+            );
+
+            $isZeroBalanceGroup =
+                $partnerGroupTotalForBalance
+                + $plannedStockTotal
+                === 0;
+
+            $roundingRule = $isZeroBalanceGroup
+                ? null
+                : $this->resolveRoundingRule($firstMetadata);
+
             $ratioSum = $skuIds->sum(
                 fn (int $skuId): int =>
                     max(
@@ -129,41 +148,73 @@ class StockOrderProportioningService
                     continue;
                 }
 
-                $partnerQuantity = (int) (
-                    $partnerQuantities[$skuId] ?? 0
+                $partnerDirectQuantity = (int) (
+                    $partnerQuantityParts[$skuId]['direct'] ?? 0
                 );
+
+                $partnerAssortmentQuantity = (int) (
+                    $partnerQuantityParts[$skuId]['assortment'] ?? 0
+                );
+
+                $partnerQuantity =
+                    $partnerDirectQuantity
+                    + $partnerAssortmentQuantity;
 
                 $ratio = max(
                     0,
                     (int) ($ratioQuantities[$skuId] ?? 0)
                 );
 
-                if ($ratioSum === 0) {
+                if ($isZeroBalanceGroup) {
+                    /*
+                     * Ha a partneri igény és a jelenlegi készlet-
+                     * rendelés modell-szín szintű összege nulla,
+                     * nincs arányosítás és nincs kerekítés.
+                     */
+                    $rawAllocatedStock = 0.0;
+                    $roundedFinalQuantity = 0;
+                    $newStockQuantity = -$partnerQuantity;
+                } elseif ($ratioSum === 0) {
                     /*
                      * Nulla arányösszeg esetén az adott termék-szín
                      * végső célmennyisége nulla.
                      */
                     $rawAllocatedStock = 0.0;
                     $roundedFinalQuantity = 0;
+                    $newStockQuantity = -$partnerQuantity;
                 } else {
                     $rawAllocatedStock =
                         $plannedStockTotal
                         * $ratio
                         / $ratioSum;
 
-                    $rawCombinedQuantity =
-                        $partnerQuantity
-                        + $rawAllocatedStock;
-
-                    $roundedFinalQuantity =
-                        $this->roundToNearestFive(
-                            $rawCombinedQuantity
+                    if (! $roundingRule instanceof RoundingRule) {
+                        throw new InvalidArgumentException(
+                            'A kerekítési szabály nem tölthető be.'
                         );
-                }
+                    }
 
-                $newStockQuantity =
-                    $roundedFinalQuantity
-                    - $partnerQuantity;
+                    if ($roundingRule->include_assortments) {
+                        $roundedFinalQuantity =
+                            $this->roundQuantity(
+                                $partnerQuantity
+                                + $rawAllocatedStock,
+                                $roundingRule
+                            );
+                    } else {
+                        $roundedFinalQuantity =
+                            $this->roundQuantity(
+                                $partnerDirectQuantity
+                                + $rawAllocatedStock,
+                                $roundingRule
+                            )
+                            + $partnerAssortmentQuantity;
+                    }
+
+                    $newStockQuantity =
+                        $roundedFinalQuantity
+                        - $partnerQuantity;
+                }
 
                 /*
                  * A mentési térképben minden méret-SKU pontosan
@@ -186,6 +237,10 @@ class StockOrderProportioningService
                         $metadata['size_sort_order'],
 
                     'partner_quantity' => $partnerQuantity,
+                    'partner_direct_quantity' =>
+                        $partnerDirectQuantity,
+                    'partner_assortment_quantity' =>
+                        $partnerAssortmentQuantity,
                     'ratio' => $ratio,
                     'ratio_sum' => $ratioSum,
                     'raw_allocated_stock' => round(
@@ -228,6 +283,28 @@ class StockOrderProportioningService
                 'planned_stock_total' =>
                     $plannedStockTotal,
                 'ratio_sum' => $ratioSum,
+                'zero_balance_group' =>
+                    $isZeroBalanceGroup,
+                'rounding_rule_id' =>
+                    $roundingRule?->id === null
+                        ? null
+                        : (int) $roundingRule->id,
+                'rounding_multiple' =>
+                    $roundingRule?->rounding_multiple === null
+                        ? null
+                        : (int) $roundingRule->rounding_multiple,
+                'rounding_mode' =>
+                    $roundingRule?->rounding_mode === null
+                        ? null
+                        : (string) $roundingRule->rounding_mode,
+                'round_up_from_remainder' =>
+                    $roundingRule?->round_up_from_remainder === null
+                        ? null
+                        : (int) $roundingRule->round_up_from_remainder,
+                'include_assortments' =>
+                    $roundingRule?->include_assortments === null
+                        ? null
+                        : (bool) $roundingRule->include_assortments,
 
                 'partner_quantity' =>
                     $partnerGroupTotal,
@@ -548,6 +625,108 @@ class StockOrderProportioningService
     }
 
     /**
+     * A partneri rendeléseket közvetlen és gyűjtőből származó
+     * mennyiségekre bontva összesíti.
+     *
+     * @param array<int, int> $orderIds
+     *
+     * @return array<int, array{direct: int, assortment: int}>
+     */
+    protected function aggregateExpandedQuantityPartsForOrderIds(
+        array $orderIds
+    ): array {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $directQuantities = DB::table('order_items')
+            ->whereIn(
+                'order_items.order_id',
+                $orderIds
+            )
+            ->whereNotExists(function ($query): void {
+                $query
+                    ->selectRaw('1')
+                    ->from('item_assortments')
+                    ->whereColumn(
+                        'item_assortments.assortment_sku_id',
+                        'order_items.sku_id'
+                    );
+            })
+            ->groupBy('order_items.sku_id')
+            ->selectRaw(
+                'order_items.sku_id, '
+                . 'SUM(order_items.quantity) AS quantity'
+            )
+            ->pluck('quantity', 'sku_id');
+
+        $assortmentQuantities = DB::table('order_items')
+            ->join(
+                'item_assortments',
+                'item_assortments.assortment_sku_id',
+                '=',
+                'order_items.sku_id'
+            )
+            ->whereIn(
+                'order_items.order_id',
+                $orderIds
+            )
+            ->groupBy(
+                'item_assortments.component_sku_id'
+            )
+            ->selectRaw(
+                'item_assortments.component_sku_id AS sku_id, '
+                . 'SUM('
+                . 'order_items.quantity '
+                . '* item_assortments.quantity'
+                . ') AS quantity'
+            )
+            ->pluck('quantity', 'sku_id');
+
+        $result = [];
+
+        foreach ($directQuantities as $skuId => $quantity) {
+            $skuId = (int) $skuId;
+
+            $result[$skuId] = [
+                'direct' => (int) $quantity,
+                'assortment' => 0,
+            ];
+        }
+
+        foreach ($assortmentQuantities as $skuId => $quantity) {
+            $skuId = (int) $skuId;
+
+            $result[$skuId] ??= [
+                'direct' => 0,
+                'assortment' => 0,
+            ];
+
+            $result[$skuId]['assortment'] += (int) $quantity;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, array{direct: int, assortment: int}> $parts
+     *
+     * @return array<int, int>
+     */
+    protected function totalQuantityParts(array $parts): array
+    {
+        $result = [];
+
+        foreach ($parts as $skuId => $quantities) {
+            $result[(int) $skuId] =
+                (int) ($quantities['direct'] ?? 0)
+                + (int) ($quantities['assortment'] ?? 0);
+        }
+
+        return $result;
+    }
+
+    /**
      * A rendelések tételeit méret-SKU szintre összesíti.
      *
      * A normál SKU-k közvetlenül kerülnek az eredménybe.
@@ -657,7 +836,8 @@ class StockOrderProportioningService
         return Sku::query()
             ->whereIn('id', $skuIds)
             ->with([
-                'product:id,model_code,name_hu',
+                'product:id,model_code,name_hu,rounding_rule_id',
+                'product.roundingRule',
                 'color:id,code,name_hu',
                 'size:id,code,sort_order',
             ])
@@ -680,6 +860,8 @@ class StockOrderProportioningService
                             (string) (
                                 $sku->product?->name_hu ?? ''
                             ),
+                        'rounding_rule' =>
+                            $sku->product?->roundingRule,
 
                         'color_id' =>
                             (int) $sku->color_id,
@@ -739,15 +921,113 @@ class StockOrderProportioningService
             );
     }
 
-    protected function roundToNearestFive(
-        float $quantity
-    ): int {
-        return (int) (
-            round(
-                $quantity / 5,
-                0,
-                PHP_ROUND_HALF_UP
-            ) * 5
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    protected function resolveRoundingRule(
+        array $metadata
+    ): RoundingRule {
+        $rule = $metadata['rounding_rule'] ?? null;
+
+        if (! $rule instanceof RoundingRule) {
+            $modelCode = (string) (
+                $metadata['model_code'] ?? ''
+            );
+
+            throw new InvalidArgumentException(
+                "A(z) {$modelCode} termékhez nincs kerekítési "
+                . 'szabály beállítva.'
+            );
+        }
+
+        $this->validateRoundingRule($rule, $metadata);
+
+        return $rule;
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    protected function validateRoundingRule(
+        RoundingRule $rule,
+        array $metadata
+    ): void {
+        $modelCode = (string) (
+            $metadata['model_code'] ?? ''
         );
+
+        $multiple = (int) $rule->rounding_multiple;
+        $mode = (string) $rule->rounding_mode;
+
+        if ($multiple < 1) {
+            throw new InvalidArgumentException(
+                "A(z) {$modelCode} termék kerekítési "
+                . 'többszöröse nem lehet kisebb 1-nél.'
+            );
+        }
+
+        if (! in_array(
+            $mode,
+            ['threshold', 'floor', 'ceil'],
+            true
+        )) {
+            throw new InvalidArgumentException(
+                "A(z) {$modelCode} termék kerekítési módja "
+                . 'érvénytelen.'
+            );
+        }
+
+        if ($mode !== 'threshold') {
+            return;
+        }
+
+        $threshold = (int) $rule->round_up_from_remainder;
+
+        if ($threshold < 1 || $threshold > $multiple) {
+            throw new InvalidArgumentException(
+                "A(z) {$modelCode} termék kerekítési "
+                . 'küszöbértéke érvénytelen.'
+            );
+        }
+    }
+
+    protected function roundQuantity(
+        float|int $quantity,
+        RoundingRule $rule
+    ): int {
+        if ((float) $quantity === 0.0) {
+            return 0;
+        }
+
+        $sign = $quantity < 0 ? -1 : 1;
+        $absoluteQuantity = abs((float) $quantity);
+        $multiple = (int) $rule->rounding_multiple;
+        $mode = (string) $rule->rounding_mode;
+
+        $lowerMultiple = (int) (
+            floor($absoluteQuantity / $multiple)
+            * $multiple
+        );
+
+        $remainder =
+            $absoluteQuantity
+            - $lowerMultiple;
+
+        $roundedAbsoluteQuantity = match ($mode) {
+            'floor' => $lowerMultiple,
+            'ceil' => $remainder > 0
+                ? $lowerMultiple + $multiple
+                : $lowerMultiple,
+            'threshold' => $remainder >= (int) (
+                $rule->round_up_from_remainder
+            )
+                ? $lowerMultiple + $multiple
+                : $lowerMultiple,
+            default => throw new InvalidArgumentException(
+                'Ismeretlen kerekítési mód.'
+            ),
+        };
+
+        return $sign * $roundedAbsoluteQuantity;
     }
 }
