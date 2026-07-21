@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
+use App\Exports\StockOrderProportioningPreviewExport;
 
 class StockOrderProportioning extends Page implements
     Forms\Contracts\HasForms
@@ -245,6 +246,17 @@ class StockOrderProportioning extends Page implements
                 ->icon('heroicon-o-calculator')
                 ->action('calculatePreview'),
 
+            Action::make('exportPreview')
+                ->label('Előnézet exportálása Excelbe')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->visible(
+                    fn (): bool =>
+                        $this->previewToken !== null
+                        && ! ($this->preview['applied'] ?? false)
+                )
+                ->action('exportPreview'),
+
             Action::make('apply')
                 ->label('Készletrendelés felülírása')
                 ->icon('heroicon-o-arrow-path')
@@ -379,6 +391,30 @@ class StockOrderProportioning extends Page implements
         }
     }
 
+    public function exportPreview(
+        StockOrderProportioningPreviewExport $export
+    ): \Symfony\Component\HttpFoundation\StreamedResponse {
+        if (! $this->previewToken) {
+            throw new \RuntimeException(
+                'Nincs exportálható előnézet. '
+                . 'Először futtasd le a számítást.'
+            );
+        }
+
+        $cachedPreview = Cache::get(
+            $this->previewCacheKey($this->previewToken)
+        );
+
+        if (! is_array($cachedPreview)) {
+            throw new \RuntimeException(
+                'Az előnézet lejárt vagy már nem található. '
+                . 'Futtasd le újra a számítást.'
+            );
+        }
+
+        return $export->download($cachedPreview);
+    }
+    
     public function applyCalculation(
         StockOrderProportioningService $service
     ): void {

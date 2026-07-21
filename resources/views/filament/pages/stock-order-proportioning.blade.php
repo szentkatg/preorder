@@ -43,7 +43,7 @@
 
                 <div
                     class="grid grid-cols-1 gap-4 sm:grid-cols-2
-                        lg:grid-cols-4"
+                        lg:grid-cols-6"
                 >
                     <div class="rounded-lg border p-4">
                         <div class="text-sm text-gray-500">
@@ -54,6 +54,38 @@
                             {{ number_format(
                                 $preview['summary']
                                     ['partner_quantity'] ?? 0,
+                                0,
+                                ',',
+                                ' '
+                            ) }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg border p-4">
+                        <div class="text-sm text-gray-500">
+                            Normál partneri rendelés
+                        </div>
+
+                        <div class="text-2xl font-semibold">
+                            {{ number_format(
+                                $preview['summary']
+                                    ['partner_direct_quantity'] ?? 0,
+                                0,
+                                ',',
+                                ' '
+                            ) }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg border p-4">
+                        <div class="text-sm text-gray-500">
+                            Gyűjtős partneri rendelés
+                        </div>
+
+                        <div class="text-2xl font-semibold">
+                            {{ number_format(
+                                $preview['summary']
+                                    ['partner_assortment_quantity'] ?? 0,
                                 0,
                                 ',',
                                 ' '
@@ -225,7 +257,7 @@
                     @else
                         <div class="overflow-x-auto">
                             <table
-                                class="w-full min-w-[1000px]
+                                class="w-full min-w-[1650px]
                                     border-collapse text-sm"
                             >
                                 <thead>
@@ -233,148 +265,131 @@
                                         class="border-b bg-gray-50
                                             text-left"
                                     >
-                                        <th class="px-3 py-2">
-                                            Modell
+                                        <th class="px-3 py-2">Modell</th>
+                                        <th class="px-3 py-2">Szín</th>
+                                        <th class="px-3 py-2">Módszertan</th>
+                                        <th class="px-3 py-2 text-right">
+                                            Normál partner
                                         </th>
-
-                                        <th class="px-3 py-2">
-                                            Szín
+                                        <th class="px-3 py-2 text-right">
+                                            Gyűjtős partner
                                         </th>
-
-                                        <th
-                                            class="px-3 py-2
-                                                text-right"
-                                        >
-                                            Partner
+                                        <th class="px-3 py-2 text-right">
+                                            Partner összesen
                                         </th>
-
-                                        <th
-                                            class="px-3 py-2
-                                                text-right"
-                                        >
+                                        <th class="px-3 py-2 text-right">
                                             Készletterv
                                         </th>
-
-                                        <th
-                                            class="px-3 py-2
-                                                text-right"
-                                        >
-                                            Arányösszeg
+                                        <th class="px-3 py-2 text-right">
+                                            Arány
                                         </th>
-
-                                        <th
-                                            class="px-3 py-2
-                                                text-right"
-                                        >
+                                        <th class="px-3 py-2 text-right">
                                             Új készlet
                                         </th>
-
-                                        <th
-                                            class="px-3 py-2
-                                                text-right"
-                                        >
+                                        <th class="px-3 py-2 text-right">
                                             Végösszesen
                                         </th>
                                     </tr>
                                 </thead>
 
                                 <tbody>
-                                    @foreach (
-                                        $displayedGroups
-                                        as $group
-                                    )
+                                    @foreach ($displayedGroups as $group)
                                         <tr
                                             class="border-b bg-gray-100
                                                 font-semibold"
                                         >
                                             <td class="px-3 py-2">
-                                                {{
-                                                    $group[
-                                                        'model_code'
-                                                    ]
-                                                }}
+                                                {{ $group['model_code'] }}
 
-                                                @if (
-                                                    $group[
-                                                        'product_name'
-                                                    ]
-                                                )
+                                                @if ($group['product_name'])
                                                     <div
                                                         class="text-xs
                                                             font-normal
                                                             text-gray-500"
                                                     >
-                                                        {{
-                                                            $group[
-                                                                'product_name'
-                                                            ]
-                                                        }}
+                                                        {{ $group['product_name'] }}
                                                     </div>
                                                 @endif
                                             </td>
 
                                             <td class="px-3 py-2">
-                                                {{
-                                                    $group[
-                                                        'color_code'
-                                                    ]
-                                                }}
+                                                {{ $group['color_code'] }}
 
-                                                @if (
-                                                    $group[
-                                                        'color_name'
-                                                    ]
-                                                )
+                                                @if ($group['color_name'])
                                                     <div
                                                         class="text-xs
                                                             font-normal
                                                             text-gray-500"
                                                     >
-                                                        {{
-                                                            $group[
-                                                                'color_name'
-                                                            ]
-                                                        }}
+                                                        {{ $group['color_name'] }}
                                                     </div>
                                                 @endif
                                             </td>
 
-                                            <td
-                                                class="px-3 py-2
-                                                    text-right"
-                                            >
+                                            <td class="px-3 py-2">
+                                                <div>
+                                                    {{
+                                                        $group[
+                                                            'rounding_method_label'
+                                                        ] ?? '—'
+                                                    }}
+                                                </div>
+
+                                                <div
+                                                    class="mt-1 text-xs
+                                                        font-normal
+                                                        text-gray-500"
+                                                >
+                                                    @if (
+                                                        ($group[
+                                                            'calculation_mode'
+                                                        ] ?? null)
+                                                        === 'zero_balance'
+                                                    )
+                                                        Nullszaldós korrekció
+                                                    @elseif (
+                                                        ($group[
+                                                            'calculation_mode'
+                                                        ] ?? null)
+                                                        === 'zero_ratio'
+                                                    )
+                                                        Nulla arányösszeg
+                                                    @else
+                                                        Arányosítás és kerekítés
+                                                    @endif
+                                                </div>
+                                            </td>
+
+                                            <td class="px-3 py-2 text-right">
                                                 {{
                                                     $group[
-                                                        'partner_quantity'
-                                                    ]
+                                                        'partner_direct_quantity'
+                                                    ] ?? 0
                                                 }}
                                             </td>
 
-                                            <td
-                                                class="px-3 py-2
-                                                    text-right"
-                                            >
+                                            <td class="px-3 py-2 text-right">
                                                 {{
                                                     $group[
-                                                        'planned_stock_total'
-                                                    ]
+                                                        'partner_assortment_quantity'
+                                                    ] ?? 0
                                                 }}
                                             </td>
 
-                                            <td
-                                                class="px-3 py-2
-                                                    text-right"
-                                            >
-                                                {{
-                                                    $group[
-                                                        'ratio_sum'
-                                                    ]
-                                                }}
+                                            <td class="px-3 py-2 text-right">
+                                                {{ $group['partner_quantity'] }}
+                                            </td>
+
+                                            <td class="px-3 py-2 text-right">
+                                                {{ $group['planned_stock_total'] }}
+                                            </td>
+
+                                            <td class="px-3 py-2 text-right">
+                                                {{ $group['ratio_sum'] }}
                                             </td>
 
                                             <td
-                                                class="px-3 py-2
-                                                    text-right
+                                                class="px-3 py-2 text-right
                                                     {{
                                                         $group[
                                                             'new_stock_quantity'
@@ -390,92 +405,90 @@
                                                 }}
                                             </td>
 
-                                            <td
-                                                class="px-3 py-2
-                                                    text-right"
-                                            >
-                                                {{
-                                                    $group[
-                                                        'final_quantity'
-                                                    ]
-                                                }}
+                                            <td class="px-3 py-2 text-right">
+                                                {{ $group['final_quantity'] }}
                                             </td>
                                         </tr>
 
-                                        @foreach (
-                                            $group['items']
-                                            as $item
-                                        )
+                                        @foreach ($group['items'] as $item)
                                             <tr class="border-b">
                                                 <td
-                                                    class="px-3 py-1.5
-                                                        pl-8
+                                                    class="px-3 py-1.5 pl-8
                                                         text-gray-500"
                                                     colspan="2"
                                                 >
                                                     Méret:
-
                                                     <strong>
-                                                        {{
-                                                            $item[
-                                                                'size_code'
-                                                            ]
-                                                        }}
+                                                        {{ $item['size_code'] }}
                                                     </strong>
 
                                                     <span
-                                                        class="ml-3
-                                                            text-xs"
+                                                        class="ml-3 text-xs"
                                                     >
-                                                        {{
-                                                            $item[
-                                                                'sku_code'
-                                                            ]
-                                                        }}
+                                                        {{ $item['sku_code'] }}
                                                     </span>
                                                 </td>
 
                                                 <td
                                                     class="px-3 py-1.5
-                                                        text-right"
+                                                        text-xs text-gray-500"
                                                 >
+                                                    @if (
+                                                        ($group[
+                                                            'calculation_mode'
+                                                        ] ?? null)
+                                                        === 'zero_balance'
+                                                    )
+                                                        Kerekítés nélkül
+                                                    @elseif (
+                                                        $group[
+                                                            'include_assortments'
+                                                        ] ?? false
+                                                    )
+                                                        Normál + gyűjtős együtt
+                                                    @else
+                                                        Normál kerekítve,
+                                                        gyűjtős hozzáadva
+                                                    @endif
+                                                </td>
+
+                                                <td class="px-3 py-1.5 text-right">
                                                     {{
                                                         $item[
-                                                            'partner_quantity'
-                                                        ]
+                                                            'partner_direct_quantity'
+                                                        ] ?? 0
                                                     }}
                                                 </td>
 
-                                                <td
-                                                    class="px-3 py-1.5
-                                                        text-right"
-                                                >
-                                                    {{
-                                                        number_format(
-                                                            $item[
-                                                                'raw_allocated_stock'
-                                                            ],
-                                                            4,
-                                                            ',',
-                                                            ' '
-                                                        )
-                                                    }}
-                                                </td>
-
-                                                <td
-                                                    class="px-3 py-1.5
-                                                        text-right"
-                                                >
+                                                <td class="px-3 py-1.5 text-right">
                                                     {{
                                                         $item[
-                                                            'ratio'
-                                                        ]
+                                                            'partner_assortment_quantity'
+                                                        ] ?? 0
                                                     }}
                                                 </td>
 
+                                                <td class="px-3 py-1.5 text-right">
+                                                    {{ $item['partner_quantity'] }}
+                                                </td>
+
+                                                <td class="px-3 py-1.5 text-right">
+                                                    {{ number_format(
+                                                        $item[
+                                                            'raw_allocated_stock'
+                                                        ],
+                                                        4,
+                                                        ',',
+                                                        ' '
+                                                    ) }}
+                                                </td>
+
+                                                <td class="px-3 py-1.5 text-right">
+                                                    {{ $item['ratio'] }}
+                                                </td>
+
                                                 <td
-                                                    class="px-3 py-1.5
-                                                        text-right
+                                                    class="px-3 py-1.5 text-right
                                                         {{
                                                             $item[
                                                                 'new_stock_quantity'
@@ -491,15 +504,8 @@
                                                     }}
                                                 </td>
 
-                                                <td
-                                                    class="px-3 py-1.5
-                                                        text-right"
-                                                >
-                                                    {{
-                                                        $item[
-                                                            'final_quantity'
-                                                        ]
-                                                    }}
+                                                <td class="px-3 py-1.5 text-right">
+                                                    {{ $item['final_quantity'] }}
                                                 </td>
                                             </tr>
                                         @endforeach
