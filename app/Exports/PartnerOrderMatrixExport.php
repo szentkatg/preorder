@@ -861,6 +861,14 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
                     $sheet->getStyle($cell)
                         ->getNumberFormat()
                         ->setFormatCode('#,##0');
+
+                    $sheet->getStyle($cell)
+                        ->getFill()
+                        ->setFillType(
+                            \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID
+                        )
+                        ->getStartColor()
+                        ->setARGB('FFD9D9D9');
                 }
 
                 foreach (array_merge($this->wholesaleValueCells, $this->retailValueCells) as $cell) {
