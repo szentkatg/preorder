@@ -1,0 +1,49 @@
+.ht-table-top-container {
+    position: sticky;
+    top: 4rem;
+    z-index: 30;
+    display: none;
+    background: white;
+    border-bottom: 1px solid rgb(229 231 235);
+}
+
+.dark .ht-table-top-container {
+    background: rgb(17 24 39);
+    border-bottom-color: rgb(55 65 81);
+}
+
+.ht-table-top-container.ht-visible {
+    display: block;
+}
+
+.ht-table-header-copy {
+    overflow: hidden;
+    background: white;
+}
+
+.dark .ht-table-header-copy {
+    background: rgb(17 24 39);
+}
+
+.ht-table-header-copy table {
+    margin: 0;
+    table-layout: fixed;
+}
+
+.ht-table-header-copy thead {
+    background: rgb(249 250 251);
+}
+
+.dark .ht-table-header-copy thead {
+    background: rgb(31 41 55);
+}
+
+.ht-table-top-scroll {
+    height: 17px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.ht-table-top-scroll-inner {
+    height: 1px;
+}
