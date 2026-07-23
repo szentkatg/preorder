@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\Language;
 use App\Models\Translation;
+use App\Services\Translation\TranslationRegistry;
+use InvalidArgumentException;
 
 class TranslationService
 {
     /**
-     * Az egy kérésen belül már lekért fordítások gyorsítótára.
+     * Az egy kérésen belül már feloldott fordítások gyorsítótára.
      *
      * @var array<string, string>
      */
@@ -24,40 +25,42 @@ class TranslationService
         string $entityCode,
         string $field,
         ?int $languageId = null,
+        ?string $fallbackValue = null,
     ): string {
+        $this->validateTranslationRequest(
+            entity: $entity,
+            field: $field,
+        );
+
         $language = $this->languageResolver->resolve($languageId);
 
         if ($language === null) {
-            return $entityCode;
+            return $fallbackValue ?? $entityCode;
         }
 
         $cacheKey = $this->cacheKey(
             entity: $entity,
             entityCode: $entityCode,
             field: $field,
-            languageId: $language->getKey(),
+            languageId: (int) $language->getKey(),
         );
 
         if (array_key_exists($cacheKey, $this->resolvedTranslations)) {
             return $this->resolvedTranslations[$cacheKey];
         }
 
-        $value = $this->findTranslation(
+        $translation = $this->findTranslation(
             entity: $entity,
             entityCode: $entityCode,
             field: $field,
-            languageId: $language->getKey(),
+            languageId: (int) $language->getKey(),
         );
 
-        if ($value === null && $language->code !== LanguageResolver::DEFAULT_LANGUAGE_CODE) {
-            $value = $this->findDefaultLanguageTranslation(
-                entity: $entity,
-                entityCode: $entityCode,
-                field: $field,
-            );
-        }
+        $resolvedValue = $translation
+            ?? $fallbackValue
+            ?? $entityCode;
 
-        return $this->resolvedTranslations[$cacheKey] = $value ?? $entityCode;
+        return $this->resolvedTranslations[$cacheKey] = $resolvedValue;
     }
 
     private function findTranslation(
@@ -66,34 +69,41 @@ class TranslationService
         string $field,
         int $languageId,
     ): ?string {
-        return Translation::query()
+        $value = Translation::query()
             ->where('entity', $entity)
             ->where('entity_code', $entityCode)
             ->where('field', $field)
             ->where('language_id', $languageId)
             ->value('value');
-    }
 
-    private function findDefaultLanguageTranslation(
-        string $entity,
-        string $entityCode,
-        string $field,
-    ): ?string {
-        $defaultLanguageId = Language::query()
-            ->where('code', LanguageResolver::DEFAULT_LANGUAGE_CODE)
-            ->where('active', true)
-            ->value('id');
-
-        if ($defaultLanguageId === null) {
+        if (! is_string($value)) {
             return null;
         }
 
-        return $this->findTranslation(
-            entity: $entity,
-            entityCode: $entityCode,
-            field: $field,
-            languageId: (int) $defaultLanguageId,
-        );
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function validateTranslationRequest(
+        string $entity,
+        string $field,
+    ): void {
+        if (! TranslationRegistry::isValidEntity($entity)) {
+            throw new InvalidArgumentException(
+                "Ismeretlen fordítási entitás: {$entity}"
+            );
+        }
+
+        if (! TranslationRegistry::isValidField($entity, $field)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'A(z) %s mező nincs fordítható mezőként regisztrálva a(z) %s entitáshoz.',
+                    $field,
+                    $entity,
+                )
+            );
+        }
     }
 
     private function cacheKey(

@@ -28,6 +28,7 @@ class TranslationRegistry
                 'label' => 'Márka',
                 'model' => Brand::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -37,6 +38,7 @@ class TranslationRegistry
                 'label' => 'Szín',
                 'model' => Color::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -46,6 +48,7 @@ class TranslationRegistry
                 'label' => 'Pénznem',
                 'model' => Currency::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -55,6 +58,7 @@ class TranslationRegistry
                 'label' => 'Termékfőcsoport',
                 'model' => ItemMainGroup::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -64,6 +68,7 @@ class TranslationRegistry
                 'label' => 'Nyelv',
                 'model' => Language::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -73,6 +78,7 @@ class TranslationRegistry
                 'label' => 'Rendelési ív típusa',
                 'model' => OrderSheetType::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -82,6 +88,7 @@ class TranslationRegistry
                 'label' => 'Termék',
                 'model' => Product::class,
                 'code_column' => 'model_code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                     'catalog_group_name' => 'Katalóguscsoport neve',
@@ -92,6 +99,7 @@ class TranslationRegistry
                 'label' => 'Szezon',
                 'model' => Season::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -101,6 +109,7 @@ class TranslationRegistry
                 'label' => 'Méret',
                 'model' => Size::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -110,6 +119,7 @@ class TranslationRegistry
                 'label' => 'Méretsor',
                 'model' => SizeRange::class,
                 'code_column' => 'code',
+                'fallback_column' => 'name',
                 'fields' => [
                     'name' => 'Név',
                 ],
@@ -193,6 +203,17 @@ class TranslationRegistry
         }
 
         return $codeColumn;
+    }
+
+    public static function fallbackColumn(string $entity): string
+    {
+        if (! self::isValidEntity($entity)) {
+            throw new InvalidArgumentException(
+                "Ismeretlen fordítási entitás: {$entity}"
+            );
+        }
+
+        return self::all()[$entity]['fallback_column'] ?? 'name';
     }
 
     public static function isValidEntity(string $entity): bool
