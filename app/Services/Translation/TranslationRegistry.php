@@ -34,16 +34,6 @@ class TranslationRegistry
                 ],
             ],
 
-            'color' => [
-                'label' => 'Szín',
-                'model' => Color::class,
-                'code_column' => 'code',
-                'fallback_column' => 'name',
-                'fields' => [
-                    'name' => 'Név',
-                ],
-            ],
-
             'currency' => [
                 'label' => 'Pénznem',
                 'model' => Currency::class,
@@ -84,17 +74,6 @@ class TranslationRegistry
                 ],
             ],
 
-            'product' => [
-                'label' => 'Termék',
-                'model' => Product::class,
-                'code_column' => 'model_code',
-                'fallback_column' => 'name',
-                'fields' => [
-                    'name' => 'Név',
-                    'catalog_group_name' => 'Katalóguscsoport neve',
-                ],
-            ],
-
             'season' => [
                 'label' => 'Szezon',
                 'model' => Season::class,
@@ -105,25 +84,6 @@ class TranslationRegistry
                 ],
             ],
 
-            'size' => [
-                'label' => 'Méret',
-                'model' => Size::class,
-                'code_column' => 'code',
-                'fallback_column' => 'name',
-                'fields' => [
-                    'name' => 'Név',
-                ],
-            ],
-
-            'size_range' => [
-                'label' => 'Méretsor',
-                'model' => SizeRange::class,
-                'code_column' => 'code',
-                'fallback_column' => 'name',
-                'fields' => [
-                    'name' => 'Név',
-                ],
-            ],
         ];
     }
 
