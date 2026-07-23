@@ -12,7 +12,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class TranslationForm
@@ -98,7 +97,7 @@ class TranslationForm
                                         column: 'language_id'
                                     )
                                         ->where(
-                                            fn (Builder $query): Builder =>
+                                            fn ($query) =>
                                                 $query
                                                     ->where(
                                                         'entity',
