@@ -179,6 +179,7 @@ return [
     'export_in_progress'        => 'Az Excel export összeállítása folyamatban...',
     'prepare'                   => 'Előkészítés...',
     'no_orders'                 => 'Nincs megjeleníthető rendelés.',
+    'toggle_section'            => 'Szakasz összecsukása vagy kinyitása',
 
 //PartnerOrderCoverage oldal fordítása
 

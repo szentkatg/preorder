@@ -179,6 +179,7 @@ return [
     'export_in_progress'                => 'Preparing Excel export...',
     'prepare'                           => 'Preparing...',
     'no_orders'                         => 'There are no orders to display.',
+    'toggle_section'                    => 'Collapse or expand section',
 
 //PartnerOrderCoverage oldal fordítása
 

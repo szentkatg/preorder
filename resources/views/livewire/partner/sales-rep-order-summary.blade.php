@@ -1,4 +1,4 @@
-<div class="mt-2">
+<div x-data="{ open: true }" class="mt-2">
     @if (! $summaryLoaded)
         <div
             wire:init="loadSummary"
@@ -13,35 +13,63 @@
                     {{ __('partner.sales_rep_summary') }}
                 </h2>
 
-                <div class="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        wire:click="openSelectedSummaryOrders"
-                        wire:loading.attr="disabled"
-                        class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
-                    >
-                        {{ __('partner.open_selected_summary') }}
-                    </button>
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <div x-show="open" class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            wire:click="openSelectedSummaryOrders"
+                            wire:loading.attr="disabled"
+                            class="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                        >
+                            {{ __('partner.open_selected_summary') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            wire:click="exportSalesRepSummary"
+                            wire:loading.attr="disabled"
+                            class="rounded bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+                        >
+                            {{ __('partner.excel_export') }}
+                        </button>
+
+                        <a
+                            href="{{ route('partner.order-coverage', ['locale' => app()->getLocale()]) }}"
+                            class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+                        >
+                            {{ __('partner.partner_order_coverage') }}
+                        </a>
+                    </div>
 
                     <button
                         type="button"
-                        wire:click="exportSalesRepSummary"
-                        wire:loading.attr="disabled"
-                        class="rounded bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+                        @click="open = ! open"
+                        :aria-expanded="open"
+                        aria-controls="sales-rep-summary-content"
+                        aria-label="{{ __('partner.toggle_section') }}"
+                        title="{{ __('partner.toggle_section') }}"
+                        class="rounded border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     >
-                        {{ __('partner.excel_export') }}
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="2"
+                            stroke="currentColor"
+                            class="h-5 w-5 transition-transform"
+                            :class="{ 'rotate-180': ! open }"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M4.5 15.75l7.5-7.5 7.5 7.5"
+                            />
+                        </svg>
                     </button>
-
-                    <a
-                        href="{{ route('partner.order-coverage', ['locale' => app()->getLocale()]) }}"
-                        class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
-                    >
-                        {{ __('partner.partner_order_coverage') }}
-                    </a>
                 </div>
             </div>
 
-            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
+            <div x-show="open" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
                 <input
                     type="text"
                     wire:model.live.debounce.300ms="summarySearch"
@@ -85,15 +113,16 @@
             </div>
         </div>
 
-        @error('selectedSummaryOrderIds')
-            <div class="mt-4 rounded bg-red-100 p-3 text-sm text-red-800">
-                {{ $message }}
-            </div>
-        @enderror
+        <div id="sales-rep-summary-content" x-show="open">
+            @error('selectedSummaryOrderIds')
+                <div class="mt-4 rounded bg-red-100 p-3 text-sm text-red-800">
+                    {{ $message }}
+                </div>
+            @enderror
 
-        <div class="mt-4 rounded-lg border bg-white shadow-sm">
-            <div class="max-h-[45vh] overflow-auto overscroll-contain">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <div class="mt-4 rounded-lg border bg-white shadow-sm">
+                <div class="max-h-[45vh] overflow-auto overscroll-contain">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="sticky top-0 z-30 bg-white shadow-sm">
                         <tr class="text-left text-gray-700">
                             <th class="w-10 bg-white px-3 py-2 text-center">
@@ -200,7 +229,8 @@
                             </tr>
                         @endforeach
                     </tfoot>
-                </table>
+                    </table>
+                </div>
             </div>
         </div>
     @endif
