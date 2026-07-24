@@ -70,6 +70,8 @@ class OrderSelector extends Component
 
     public bool $summaryLoaded = false;
 
+    public ?array $salesRepOrderSummariesData = null;
+
     public function boot(): void
     {
         $this->requestStartedAt = microtime(true);
@@ -117,6 +119,8 @@ class OrderSelector extends Component
         $this->salesRepOrderSummariesCache = null;
         $this->filteredSalesRepOrderSummariesCache = null;
         $this->summaryCurrenciesCache = null;
+        $this->salesRepOrderSummariesData = null;
+        $this->summaryLoaded = false;
     }
 
     protected function restoreSummaryFilters(): void
@@ -326,26 +330,15 @@ class OrderSelector extends Component
             return collect();
         }
 
-        $address = PartnerAddress::query()
-            ->with('brands')
-            ->where('active', true)
-            ->find($this->partnerAddressId);
-
-        if (! $address) {
-            return collect();
-        }
-
-        $brandIds = $address->brands
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if ($brandIds === []) {
-            return collect();
-        }
-
         return Brand::query()
-            ->whereIn('id', $brandIds)
+            ->join(
+                'partner_address_brand',
+                'partner_address_brand.brand_id',
+                '=',
+                'brands.id'
+            )
+            ->where('partner_address_brand.partner_address_id', $this->partnerAddressId)
+            ->where('brands.active', true)
             ->whereExists(function ($query) {
                 $query
                     ->selectRaw('1')
@@ -354,6 +347,7 @@ class OrderSelector extends Component
                     ->where('products.season_id', $this->seasonId)
                     ->where('products.active', true);
             })
+            ->select('brands.*')
             ->orderBy('name')
             ->get();
     }
@@ -426,26 +420,18 @@ class OrderSelector extends Component
             return collect();
         }
 
-        $address = PartnerAddress::query()
-            ->with('orderSheetTypes')
-            ->where('active', true)
-            ->find($this->partnerAddressId);
-
-        if (! $address) {
-            return collect();
-        }
-
-        $typeIds = $address->orderSheetTypes
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if ($typeIds === []) {
-            return collect();
-        }
-
         return OrderSheetType::query()
-            ->whereIn('id', $typeIds)
+            ->join(
+                'partner_address_order_sheet_type',
+                'partner_address_order_sheet_type.order_sheet_type_id',
+                '=',
+                'order_sheet_types.id'
+            )
+            ->where(
+                'partner_address_order_sheet_type.partner_address_id',
+                $this->partnerAddressId
+            )
+            ->where('order_sheet_types.active', true)
             ->whereExists(function ($query) {
                 $query
                     ->selectRaw('1')
@@ -455,6 +441,7 @@ class OrderSelector extends Component
                     ->where('products.brand_id', $this->brandId)
                     ->where('products.active', true);
             })
+            ->select('order_sheet_types.*')
             ->orderBy(app()->getLocale() === 'en' ? 'name_en' : 'name_hu')
             ->get();
     }
@@ -539,6 +526,9 @@ class OrderSelector extends Component
 
     public function loadSummary(): void
     {
+        $this->salesRepOrderSummariesData = app(
+            SalesRepOrderSummaryService::class
+        )->build($this->accessibleOrders)->all();
         $this->summaryLoaded = true;
     }
 
@@ -710,6 +700,11 @@ class OrderSelector extends Component
     {
         if ($this->salesRepOrderSummariesCache instanceof Collection) {
             return $this->salesRepOrderSummariesCache;
+        }
+        if ($this->salesRepOrderSummariesData !== null) {
+            return $this->salesRepOrderSummariesCache = collect(
+                $this->salesRepOrderSummariesData
+            );
         }
 
         $startedAt = microtime(true);
