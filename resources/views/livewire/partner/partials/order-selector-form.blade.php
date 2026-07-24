@@ -106,13 +106,13 @@
                 </select>
             </div>
 
-            <div class="flex items-end md:col-span-2">
+            <div class="flex items-end justify-end md:col-span-2">
                 @if ($seasonId && $partnerAddressId && $brandId && $orderSheetTypeId)
                     @if ($this->selectedOrder)
                         <button
                             type="button"
                             wire:click="openOrder"
-                            class="w-full rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
+                            class="whitespace-nowrap rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
                         >
                             {{ __('partner.open_order') }}
                         </button>
@@ -120,7 +120,7 @@
                         <button
                             type="button"
                             wire:click="proceed"
-                            class="w-full rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
+                            class="whitespace-nowrap rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
                         >
                             {{ __('partner.load_order_sheet') }}
                         </button>
