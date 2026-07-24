@@ -64,7 +64,7 @@
             </div>
 
             {{-- 2. sor --}}
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 <label class="mb-1 block text-sm font-medium">
                     {{ __('partner.brand') }}
                 </label>
@@ -84,7 +84,7 @@
                 </select>
             </div>
 
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 <label class="mb-1 block text-sm font-medium">
                     {{ __('partner.order_sheet') }}
                 </label>
@@ -106,27 +106,27 @@
                 </select>
             </div>
 
-        </div>
-
-        @if($seasonId && $partnerAddressId && $brandId && $orderSheetTypeId)
-            <div class="mt-6 flex justify-end">
-                @if($this->selectedOrder)
-                    <button
-                        type="button"
-                        wire:click="openOrder"
-                        class="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
-                    >
-                        {{ __('partner.open_order') }}
-                    </button>
-                @else
-                    <button
-                        type="button"
-                        wire:click="proceed"
-                        class="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
-                    >
-                        {{ __('partner.load_order_sheet') }}
-                    </button>
+            <div class="flex items-end md:col-span-2">
+                @if ($seasonId && $partnerAddressId && $brandId && $orderSheetTypeId)
+                    @if ($this->selectedOrder)
+                        <button
+                            type="button"
+                            wire:click="openOrder"
+                            class="w-full rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
+                        >
+                            {{ __('partner.open_order') }}
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="proceed"
+                            class="w-full rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
+                        >
+                            {{ __('partner.load_order_sheet') }}
+                        </button>
+                    @endif
                 @endif
             </div>
-        @endif
+
+        </div>
     </div>
