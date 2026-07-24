@@ -316,13 +316,10 @@ class SalesRepOrderSummaryService
          */
         $startedAt = microtime(true);
 
-        $locale = app()->getLocale();
-
         $summaries = $orders
             ->map(function (Order $order) use (
                 $totalsByOrderId,
-                $exchangeRateByKey,
-                $locale
+                $exchangeRateByKey
             ): array {
                 $orderId = (int) $order->id;
 
@@ -376,15 +373,7 @@ class SalesRepOrderSummaryService
                     'season' => $order->season?->name ?? '',
                     'brand' => $order->brand?->name ?? '',
 
-                    'type' => $locale === 'en'
-                        ? (
-                            $order->orderSheetType?->name_en
-                            ?? $order->orderSheetType?->name_hu
-                        )
-                        : (
-                            $order->orderSheetType?->name_hu
-                            ?? $order->orderSheetType?->name_en
-                        ),
+                    'type' => $order->orderSheetType?->translate('name'),
 
                     'status' => $order->status,
 

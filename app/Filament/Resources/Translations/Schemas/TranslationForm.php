@@ -141,8 +141,7 @@ class TranslationForm
 
     private static function languageLabel(Language $language): string
     {
-        $name = $language->name_hu
-            ?: $language->name_en;
+        $name = $language->translate('name');
 
         if (blank($name)) {
             return strtoupper($language->code);

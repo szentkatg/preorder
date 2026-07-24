@@ -26,7 +26,7 @@ class CatalogsTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('orderSheetType.name_hu')
+                TextColumn::make('orderSheetType.name')
                     ->label('Rendelőlap típus')
                     ->searchable()
                     ->sortable(),
@@ -86,7 +86,7 @@ class CatalogsTable
 
                 SelectFilter::make('orderSheetType')
                     ->label('Rendelőlap típus')
-                    ->relationship('orderSheetType', 'name_hu')
+                    ->relationship('orderSheetType', 'name')
                     ->searchable()
                     ->preload(),
             ])

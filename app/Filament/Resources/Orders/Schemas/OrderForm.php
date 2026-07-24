@@ -107,8 +107,8 @@ class OrderForm
                             ->whereHas('partnerAddresses', fn ($query) =>
                                 $query->where('partner_addresses.id', $addressId)
                             )
-                            ->orderBy('name_hu')
-                            ->pluck('name_hu', 'id');
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
                     })
                     ->searchable()
                     ->required()

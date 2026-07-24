@@ -29,7 +29,7 @@ class CatalogForm
 
                 Select::make('order_sheet_type_id')
                     ->label('Rendelőlap típus')
-                    ->relationship('orderSheetType', 'name_hu')
+                    ->relationship('orderSheetType', 'name')
                     ->searchable()
                     ->preload()
                     ->required(),

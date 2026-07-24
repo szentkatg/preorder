@@ -2,7 +2,7 @@
 
     <div class="mb-8">
         <h1 class="text-3xl font-bold">
-            {{ $season->name }} / {{ $brand->name }} / {{ $type->name_hu }}
+            {{ $season->translate('name') }} / {{ $brand->translate('name') }} / {{ $type->translate('name') }}
         </h1>
 
         <div class="text-gray-600">

@@ -73,10 +73,7 @@
                     {{ __('partner.order_sheet_type') }}:
                 </span>
         
-                {{ app()->getLocale() === 'en'
-                    ? ($orderSheetType->name_en ?? $orderSheetType->name_hu)
-                    : ($orderSheetType->name_hu ?? $orderSheetType->name_en)
-                }}
+                {{ $orderSheetType->translate('name') }}
             </div>
         
         </div>

@@ -34,7 +34,7 @@ class OrdersTable
                 TextColumn::make('brand.name')
                     ->label('Márka'),
 
-                TextColumn::make('orderSheetType.name_hu')
+                TextColumn::make('orderSheetType.name')
                     ->label('Rendelőlap'),
 
                 TextColumn::make('priceList.code')
@@ -76,7 +76,7 @@ class OrdersTable
 
                 SelectFilter::make('orderSheetType')
                     ->label('Rendelőlap')
-                    ->relationship('orderSheetType', 'name_hu'),
+                    ->relationship('orderSheetType', 'name'),
 
                 SelectFilter::make('status')
                     ->label('Státusz')

@@ -16,12 +16,9 @@ class OrderSheetTypeForm
                     ->label('Kód')
                     ->required(),
 
-                TextInput::make('name_hu')
-                    ->label('Név HU')
+                TextInput::make('name')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
 
                 Toggle::make('active')
                     ->label('Aktív')

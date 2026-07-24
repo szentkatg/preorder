@@ -98,9 +98,7 @@
 
                     @foreach ($this->orderSheetTypes as $type)
                         <option value="{{ $type->id }}">
-                            {{ app()->getLocale() === 'en'
-                                ? ($type->name_en ?? $type->name_hu)
-                                : ($type->name_hu ?? $type->name_en) }}
+                            {{ $type->translated_name ?? $type->translate('name') }}
                         </option>
                     @endforeach
                 </select>

@@ -295,34 +295,7 @@ class OrderSelector extends Component
             ->orderBy('name')
             ->get();
 
-        if ($brands->isEmpty()) {
-            return $brands;
-        }
-
-        $languageId = (int) session('partner.language_id', 0);
-
-        if ($languageId <= 0) {
-            $languageId = (int) Language::query()
-                ->whereRaw('LOWER(code) = ?', [strtolower(app()->getLocale())])
-                ->where('active', true)
-                ->value('id');
-        }
-
-        $translations = $languageId > 0
-            ? Translation::query()
-                ->where('entity', 'brand')
-                ->where('field', 'name')
-                ->where('language_id', $languageId)
-                ->whereIn('entity_code', $brands->pluck('code')->filter())
-                ->pluck('value', 'entity_code')
-            : collect();
-
-        return $brands->each(function (Brand $brand) use ($translations): void {
-            $brand->setAttribute(
-                'translated_name',
-                $translations->get($brand->code) ?: $brand->name
-            );
-        });
+        return $this->withTranslatedNames($brands, 'brand');
     }
 
     public function updatedModelSearch(): void
@@ -393,7 +366,7 @@ class OrderSelector extends Component
             return collect();
         }
 
-        return OrderSheetType::query()
+        $types = OrderSheetType::query()
             ->join(
                 'partner_address_order_sheet_type',
                 'partner_address_order_sheet_type.order_sheet_type_id',
@@ -415,8 +388,42 @@ class OrderSelector extends Component
                     ->where('products.active', true);
             })
             ->select('order_sheet_types.*')
-            ->orderBy(app()->getLocale() === 'en' ? 'name_en' : 'name_hu')
+            ->orderBy('name')
             ->get();
+
+        return $this->withTranslatedNames($types, 'order_sheet_type');
+    }
+
+    protected function withTranslatedNames(Collection $models, string $entity): Collection
+    {
+        if ($models->isEmpty()) {
+            return $models;
+        }
+
+        $languageId = (int) session('partner.language_id', 0);
+
+        if ($languageId <= 0) {
+            $languageId = (int) Language::query()
+                ->whereRaw('LOWER(code) = ?', [strtolower(app()->getLocale())])
+                ->where('active', true)
+                ->value('id');
+        }
+
+        $translations = $languageId > 0
+            ? Translation::query()
+                ->where('entity', $entity)
+                ->where('field', 'name')
+                ->where('language_id', $languageId)
+                ->whereIn('entity_code', $models->pluck('code')->filter())
+                ->pluck('value', 'entity_code')
+            : collect();
+
+        return $models->each(function ($model) use ($translations): void {
+            $model->setAttribute(
+                'translated_name',
+                $translations->get($model->code) ?: $model->name
+            );
+        });
     }
 
     public function getSelectedOrderProperty(): ?Order
@@ -899,9 +906,7 @@ class OrderSelector extends Component
             $order->partner?->name,
             $order->partnerAddress?->name,
             $order->brand?->name,
-            app()->getLocale() === 'en'
-                ? ($order->orderSheetType?->name_en ?? $order->orderSheetType?->name_hu)
-                : ($order->orderSheetType?->name_hu ?? $order->orderSheetType?->name_en),
+            $order->orderSheetType?->translate('name'),
         ]));
             $subject = __('partner.order_submitted_email_subject') . ' | ' . $subject;
             Mail::raw(__('partner.order_submitted_email_body'), function ($message) use (

@@ -68,7 +68,7 @@ class PartnerAddressForm
 
                 Select::make('language_id')
                     ->label('Nyelv')
-                    ->relationship('language', 'name_hu')
+                    ->relationship('language', 'name')
                     ->searchable()
                     ->preload(),
 
@@ -81,7 +81,7 @@ class PartnerAddressForm
 
                 Select::make('orderSheetTypes')
                     ->label('Rendelőlap típusok')
-                    ->relationship('orderSheetTypes', 'name_hu')
+                    ->relationship('orderSheetTypes', 'name')
                     ->multiple()
                     ->searchable()
                     ->preload(),

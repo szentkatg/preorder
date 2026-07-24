@@ -17,12 +17,9 @@ class CurrencyForm
                     ->required()
                     ->maxLength(3),
 
-                TextInput::make('name_hu')
-                    ->label('Név HU')
+                TextInput::make('name')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
 
                 TextInput::make('symbol')
                     ->label('Jel')

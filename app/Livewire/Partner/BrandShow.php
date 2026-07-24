@@ -30,7 +30,7 @@ class BrandShow extends Component
         return view('livewire.partner.brand-show', [
             'orderSheetTypes' => $this->address
                 ->orderSheetTypes()
-                ->orderBy('name_hu')
+                ->orderBy('name')
                 ->get(),
         ]);
     }

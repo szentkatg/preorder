@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Resources\Languages\Schemas;
+namespace App\Filament\Resources\ItemMainGroups\Schemas;
 
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
-class LanguageForm
+class ItemGroupForm
 {
     public static function configure(Schema $schema): Schema
     {
@@ -14,8 +14,7 @@ class LanguageForm
             ->components([
                 TextInput::make('code')
                     ->label('Kód')
-                    ->required()
-                    ->maxLength(5),
+                    ->required(),
 
                 TextInput::make('name')
                     ->label('Név')

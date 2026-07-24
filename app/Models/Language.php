@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 
 class Language extends Model
 {
+    use HasTranslations;
+
     protected $fillable = [
         'code',
+        'name',
         'name_hu',
         'name_en',
         'active',
@@ -20,6 +24,6 @@ class Language extends Model
 
     public function __toString(): string
     {
-        return $this->code;
+        return $this->translate('name');
     }
 }

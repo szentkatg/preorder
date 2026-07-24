@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderSheetType extends Model
 {
+    use HasTranslations;
+
     protected $fillable = [
         'code',
+        'name',
         'name_hu',
         'name_en',
         'active',
@@ -25,6 +29,6 @@ class OrderSheetType extends Model
 
     public function __toString(): string
     {
-        return $this->name_hu;
+        return $this->translate('name');
     }
 }

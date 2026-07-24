@@ -20,12 +20,9 @@ class OrderSheetTypesTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('name_hu')
-                    ->label('Név HU')
+                TextColumn::make('name')
+                    ->label('Név')
                     ->searchable(),
-
-                TextColumn::make('name_en')
-                    ->label('Név EN'),
 
                 IconColumn::make('active')
                     ->label('Aktív')

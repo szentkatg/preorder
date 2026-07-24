@@ -135,7 +135,7 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
         $rows[] = ['', __('partner.address'), $fullAddress];
         $rows[] = ['', __('partner.season'), $order->season?->name];
         $rows[] = ['', __('partner.brand'), $order->brand?->name];
-        $rows[] = ['', __('partner.order_sheet_type'), $order->orderSheetType?->name_hu];
+        $rows[] = ['', __('partner.order_sheet_type'), $order->orderSheetType?->translate('name')];
         $rows[] = [
             '',
             __('partner.price_list'),
@@ -685,16 +685,8 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
             $order->brand?->name ?? 'marka'
         );
 
-        $lang = app()->getLocale();
-        
         $orderSheetTypeName = $this->sanitizeFilenamePart(
-            $lang === 'en'
-                ? ($order->orderSheetType?->name_en
-                    ?: $order->orderSheetType?->name_hu
-                    ?: 'ordersheet')
-                : ($order->orderSheetType?->name_hu
-                    ?: $order->orderSheetType?->name_en
-                    ?: 'rendelolap')
+            $order->orderSheetType?->translate('name') ?: 'rendelolap'
         );
 
         $partnerCode = $this->sanitizeFilenamePart(

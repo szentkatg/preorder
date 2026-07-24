@@ -21,7 +21,7 @@ class ProductForm
 
                 Select::make('item_main_group_id')
                     ->label('ItemMainGroup')
-                    ->relationship('itemMainGroup', 'name_hu')
+                    ->relationship('itemMainGroup', 'name')
                     ->required(),
 
                 Select::make('size_range_id')
@@ -48,7 +48,7 @@ class ProductForm
                 
                 Select::make('order_sheet_type_id')
                     ->label('Rendelőlap típus')
-                    ->relationship('orderSheetType', 'name_hu')
+                    ->relationship('orderSheetType', 'name')
                     ->searchable()
                     ->preload()
                     ->required(),

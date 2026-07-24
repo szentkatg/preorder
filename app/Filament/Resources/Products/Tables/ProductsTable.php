@@ -25,7 +25,7 @@ class ProductsTable
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('orderSheetType.name_hu')
+                TextColumn::make('orderSheetType.name')
                     ->label('Rendelőlap')
                     ->sortable(),
 
@@ -70,7 +70,7 @@ class ProductsTable
 
                 SelectFilter::make('orderSheetType')
                     ->label('Rendelőlap')
-                    ->relationship('orderSheetType', 'name_hu'),
+                    ->relationship('orderSheetType', 'name'),
 
                 SelectFilter::make('season')
                     ->label('Szezon')

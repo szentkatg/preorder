@@ -27,7 +27,7 @@
             <div class="border rounded-lg p-4">
 
                 <div class="text-lg font-semibold">
-                    {{ $type->name_hu }}
+                    {{ $type->translate('name') }}
                 </div>
 
                 <div class="mt-4">

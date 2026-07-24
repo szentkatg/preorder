@@ -138,7 +138,7 @@ class StockOrderProportioning extends Page implements
                                     $type->id => trim(
                                         collect([
                                             $type->code,
-                                            $type->name_hu,
+                                            $type->translate('name'),
                                         ])
                                             ->filter()
                                             ->implode(' | ')

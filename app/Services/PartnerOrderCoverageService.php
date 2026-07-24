@@ -67,7 +67,7 @@ class PartnerOrderCoverageService
 
         $types = OrderSheetType::query()
             ->where('active', true)
-            ->orderBy('name_hu')
+            ->orderBy('name')
             ->get();
 
         return $brands
@@ -77,9 +77,7 @@ class PartnerOrderCoverageService
                         'brand_id' => (int) $brand->id,
                         'brand' => $brand->name,
                         'order_sheet_type_id' => (int) $type->id,
-                        'order_sheet' => app()->getLocale() === 'en'
-                            ? ($type->name_en ?? $type->name_hu)
-                            : ($type->name_hu ?? $type->name_en),
+                        'order_sheet' => $type->translate('name'),
                     ];
                 });
             })
