@@ -499,7 +499,6 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
-        $this->summaryLoaded = false;
 
         $this->storeSelection();
     }
@@ -509,7 +508,6 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
-        $this->summaryLoaded = false;
         $this->setPartnerLocale(
                         $this->partnerAddressId ? (int) $this->partnerAddressId : null
                     );
@@ -526,7 +524,6 @@ class OrderSelector extends Component
     {
         $this->selectedOrderId = null;
         $this->orderSheetTypeId = null;
-        $this->summaryLoaded = false;
 
         $this->storeSelection();
     }
@@ -536,7 +533,6 @@ class OrderSelector extends Component
         $order = $this->findExistingOrder();
 
         $this->selectedOrderId = $order?->id;
-        $this->summaryLoaded = false;
     
         $this->storeSelection();
     }
