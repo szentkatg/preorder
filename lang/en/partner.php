@@ -116,6 +116,7 @@ return [
     'confirm_reset_order_to_draft' => 'Are you sure you want to reset this order sheet to draft? It will become editable again.',
     'open_order'    =>  'Open order sheet',
     'load_order_sheet'      =>  'Generate blank order sheet',
+    'loading'               =>  'Loading...',
     'show_all_catalog_groups' => 'Show all catalog groups',
     'show_current_catalog_group_only' => 'Show current catalog group only',
     'catalog_group_navigation' => 'Catalog group navigation',

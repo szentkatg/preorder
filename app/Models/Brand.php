@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 
 class Brand extends Model
 {
+    use HasTranslations;
+
     protected $fillable = [
         'code',
         'name',
@@ -19,11 +22,14 @@ class Brand extends Model
 
     public function partnerAddresses()
     {
-        return $this->belongsToMany(PartnerAddress::class, 'partner_address_brand');
+        return $this->belongsToMany(
+            PartnerAddress::class,
+            'partner_address_brand'
+        );
     }
 
     public function __toString(): string
     {
-        return $this->name;
+        return $this->translate('name');
     }
 }

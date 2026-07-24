@@ -35,6 +35,15 @@
         {{-- keskeny háttérsáv --}}
         <div class="h-2"></div>
 
+        @if (! $summaryLoaded)
+            <div
+                wire:init="loadSummary"
+                class="rounded-lg border bg-white p-4 text-sm text-gray-600 shadow-sm"
+            >
+                {{ __('partner.loading') }}
+            </div>
+        @endif
+
         {{-- 2. Partner adatok --}}
         @if ($this->selectedOrder)
             <div class="rounded-lg border bg-white p-4 text-sm shadow-sm">
@@ -57,7 +66,7 @@
         @endif
 
         {{-- 3. Sales rep summary fejléc + gombok + szűrők --}}
-        @if($this->accessibleOrders->isNotEmpty())
+        @if($summaryLoaded && $this->accessibleOrders->isNotEmpty())
             <div class="rounded-lg border bg-white p-4 shadow-sm">
                 <div class="flex items-center justify-between">
                     <h2 class="text-lg font-semibold">
@@ -164,7 +173,7 @@
         @endif
     </div>
 
-    @if($this->accessibleOrders->isNotEmpty())
+    @if($summaryLoaded && $this->accessibleOrders->isNotEmpty())
         @error('selectedSummaryOrderIds')
             <div class="mt-4 rounded bg-red-100 p-3 text-sm text-red-800">
                 {{ $message }}
@@ -467,8 +476,8 @@
                     <option value="">{{ __('partner.select_brand') }}</option>
 
                     @foreach ($this->brands as $brand)
-                        <option value="{{ $brand['id'] }}">
-                            {{ $brand['name'] }}
+                        <option value="{{ $brand->id }}">
+                            {{ $brand->translate('name') }}
                         </option>
                     @endforeach
                 </select>

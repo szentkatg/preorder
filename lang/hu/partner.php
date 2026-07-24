@@ -117,6 +117,7 @@ return [
     'confirm_reset_order_to_draft' => 'Biztosan visszaállítod piszkozatba ezt a rendelőlapot? Ezután újra módosítható lesz.',
     'open_order'            =>  'Rendelőlap megnyitása',
     'load_order_sheet'      =>  'Üres rendelőlap generálás',
+    'loading'               =>  'Betöltés...',
     'show_all_catalog_groups' => 'Minden katalóguscsoport megjelenítése',
     'show_current_catalog_group_only' => 'Csak aktuális katalóguscsoport',
     'catalog_group_navigation' => 'Katalóguscsoport navigáció',

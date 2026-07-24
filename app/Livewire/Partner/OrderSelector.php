@@ -68,6 +68,8 @@ class OrderSelector extends Component
 
     public ?string $summaryCurrency = null;
 
+    public bool $summaryLoaded = false;
+
     public function boot(): void
     {
         $this->requestStartedAt = microtime(true);
@@ -497,6 +499,7 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
+        $this->summaryLoaded = false;
 
         $this->storeSelection();
     }
@@ -506,6 +509,7 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
+        $this->summaryLoaded = false;
         $this->setPartnerLocale(
                         $this->partnerAddressId ? (int) $this->partnerAddressId : null
                     );
@@ -522,6 +526,7 @@ class OrderSelector extends Component
     {
         $this->selectedOrderId = null;
         $this->orderSheetTypeId = null;
+        $this->summaryLoaded = false;
 
         $this->storeSelection();
     }
@@ -529,10 +534,16 @@ class OrderSelector extends Component
     public function updatedOrderSheetTypeId(): void
     {
         $order = $this->findExistingOrder();
-    
+
         $this->selectedOrderId = $order?->id;
+        $this->summaryLoaded = false;
     
         $this->storeSelection();
+    }
+
+    public function loadSummary(): void
+    {
+        $this->summaryLoaded = true;
     }
 
     protected function createOrder(): Order
@@ -1203,7 +1214,8 @@ class OrderSelector extends Component
             $this->partnerAddressId ? (int) $this->partnerAddressId : null
         );
     
-        $summarySeasons = $this->salesRepOrderSummaries
+        $summarySeasons = $this->summaryLoaded
+            ? $this->salesRepOrderSummaries
             ->map(fn (array $summary) => [
                 'id' => (int) ($summary['season_id'] ?? 0),
                 'name' => (string) ($summary['season'] ?? ''),
@@ -1211,9 +1223,11 @@ class OrderSelector extends Component
             ->filter(fn (array $season) => $season['id'] > 0)
             ->unique('id')
             ->sortBy('name')
-            ->values();
+            ->values()
+            : collect();
 
-        $summaryBrands = $this->salesRepOrderSummaries
+        $summaryBrands = $this->summaryLoaded
+            ? $this->salesRepOrderSummaries
             ->map(fn (array $summary) => [
                 'id' => (int) ($summary['brand_id'] ?? 0),
                 'name' => (string) ($summary['brand'] ?? ''),
@@ -1221,9 +1235,11 @@ class OrderSelector extends Component
             ->filter(fn (array $brand) => $brand['id'] > 0)
             ->unique('id')
             ->sortBy('name')
-            ->values();
+            ->values()
+            : collect();
 
-        $summaryOrderSheetTypes = $this->salesRepOrderSummaries
+        $summaryOrderSheetTypes = $this->summaryLoaded
+            ? $this->salesRepOrderSummaries
             ->map(fn (array $summary) => [
                 'id' => (int) ($summary['order_sheet_type_id'] ?? 0),
                 'name' => (string) ($summary['type'] ?? ''),
@@ -1231,7 +1247,8 @@ class OrderSelector extends Component
             ->filter(fn (array $type) => $type['id'] > 0)
             ->unique('id')
             ->sortBy('name')
-            ->values();
+            ->values()
+            : collect();
 
         return view('livewire.partner.order-selector', [
             'summarySeasons' => $summarySeasons,
