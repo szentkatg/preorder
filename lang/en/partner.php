@@ -178,6 +178,7 @@ return [
     'no_images_uploaded'                => 'No images have been uploaded for this model.',
     'export_in_progress'                => 'Preparing Excel export...',
     'prepare'                           => 'Preparing...',
+    'no_orders'                         => 'There are no orders to display.',
 
 //PartnerOrderCoverage oldal fordítása
 

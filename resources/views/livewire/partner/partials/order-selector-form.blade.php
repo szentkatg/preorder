@@ -78,7 +78,7 @@
 
                     @foreach ($this->brands as $brand)
                         <option value="{{ $brand->id }}">
-                            {{ $brand->translate('name') }}
+                            {{ $brand->translated_name ?? $brand->name }}
                         </option>
                     @endforeach
                 </select>

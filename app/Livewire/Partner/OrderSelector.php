@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\SalesRepSummaryExport;
 use App\Models\Brand;
+use App\Models\Language;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSheetType;
@@ -12,6 +13,7 @@ use App\Models\PriceListItem;
 use App\Models\PartnerUser;
 use App\Models\Product;
 use App\Models\Season;
+use App\Models\Translation;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -32,8 +34,6 @@ class OrderSelector extends Component
 
     protected ?Collection $filteredSalesRepOrderSummariesCache = null;
 
-    protected ?Collection $summaryCurrenciesCache = null;
-
     protected float $requestStartedAt = 0.0;
     
     public ?int $seasonId = null;
@@ -52,28 +52,29 @@ class OrderSelector extends Component
     
     public int $modelSearchIndex = -1;
 
-    public array $selectedSummaryOrderIds = [];
+    protected array $selectedSummaryOrderIds = [];
 
-    public string $summarySearch = '';
+    protected string $summarySearch = '';
 
     public string $addressSearch = '';
 
-    public ?int $summarySeasonId = null;
+    protected ?int $summarySeasonId = null;
 
-    public ?int $summaryBrandId = null;
+    protected ?int $summaryBrandId = null;
 
-    public ?int $summaryOrderSheetTypeId = null;
-    
-    public ?string $summaryFilledFilter = null;
+    protected ?int $summaryOrderSheetTypeId = null;
 
-    public ?string $summaryCurrency = null;
+    protected ?string $summaryFilledFilter = null;
 
-    public bool $summaryLoaded = false;
+    protected ?string $summaryCurrency = null;
 
-    public ?array $salesRepOrderSummariesData = null;
+    protected bool $summaryLoaded = false;
+
+    protected ?array $salesRepOrderSummariesData = null;
 
     public function boot(): void
     {
+        app()->setLocale((string) session('partner.locale', 'hu'));
         $this->requestStartedAt = microtime(true);
     }
 
@@ -89,105 +90,31 @@ class OrderSelector extends Component
                 2
             ),
             'partner_user_id' => auth('partner')->id(),
-            'summary_search' => $this->summarySearch,
-            'summary_season_id' => $this->summarySeasonId,
-            'summary_brand_id' => $this->summaryBrandId,
-            'summary_order_sheet_type_id' =>
-                $this->summaryOrderSheetTypeId,
-            'summary_filled_filter' => $this->summaryFilledFilter,
-            'summary_currency' => $this->summaryCurrency,
         ]);
     }
 
-    protected function saveSummaryFilters(): void
+    public function mount(): void
     {
-        session([
-            'order_selector.summary_filters' => [
-                'search' => $this->summarySearch,
-                'season_id' => $this->summarySeasonId,
-                'brand_id' => $this->summaryBrandId,
-                'order_sheet_type_id' => $this->summaryOrderSheetTypeId,
-                'currency' => $this->summaryCurrency,
-                'filled_filter' => $this->summaryFilledFilter,
-            ],
-        ]);
-    }
+        $this->seasonId = session('partner_order_selector.season_id');
+        $this->brandId = session('partner_order_selector.brand_id');
+        $this->partnerAddressId = session('partner_order_selector.partner_address_id');
+        $this->orderSheetTypeId = session('partner_order_selector.order_sheet_type_id');
+        $this->selectedOrderId = session('partner_order_selector.order_id');
 
-    protected function clearSummaryCaches(): void
-    {
-        $this->accessibleOrdersCache = null;
-        $this->salesRepOrderSummariesCache = null;
-        $this->filteredSalesRepOrderSummariesCache = null;
-        $this->summaryCurrenciesCache = null;
-        $this->salesRepOrderSummariesData = null;
-        $this->summaryLoaded = false;
-    }
+        $this->clearInvalidSessionSelection();
 
-    protected function restoreSummaryFilters(): void
-    {
-        $filters = session('order_selector.summary_filters');
-    
-        if (! $filters) {
+        $selectedOrderId = session()->pull('order_selector.open_order_id');
+
+        if ($selectedOrderId) {
+            $this->selectedOrderId = (int) $selectedOrderId;
+            $this->setPartnerLocale($this->selectedAddress);
+            $this->openOrder();
+
             return;
         }
-    
-        $this->summarySearch = $filters['search'] ?? '';
-        $this->summarySeasonId = $filters['season_id'] ?? null;
-        $this->summaryBrandId = $filters['brand_id'] ?? null;
-        $this->summaryOrderSheetTypeId = $filters['order_sheet_type_id'] ?? null;
-        $this->summaryCurrency = $filters['currency'] ?? null;
-        $this->summaryFilledFilter = $filters['filled_filter'] ?? null;
-    }
 
-    public function updated($property): void
-    {
-        if (str_starts_with($property, 'summary')) {
-            $this->saveSummaryFilters();
-        }
+        $this->setPartnerLocale($this->selectedAddress);
     }
-
-    public function getSummaryCurrenciesProperty(): Collection
-    {
-        if ($this->summaryCurrenciesCache instanceof Collection) {
-            return $this->summaryCurrenciesCache;
-        }
-
-        return $this->summaryCurrenciesCache =
-            $this->salesRepOrderSummaries
-                ->pluck('currency')
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values();
-    }
-        
-        public function mount(): void
-        {
-            $this->seasonId = session('partner_order_selector.season_id');
-            $this->brandId = session('partner_order_selector.brand_id');
-            $this->partnerAddressId = session('partner_order_selector.partner_address_id');
-            $this->orderSheetTypeId = session('partner_order_selector.order_sheet_type_id');
-            $this->selectedOrderId = session('partner_order_selector.order_id');
-        
-            $this->clearInvalidSessionSelection();
-            $this->restoreSummaryFilters();
-        
-            $selectedOrderId = session()->pull('order_selector.open_order_id');
-        
-            if ($selectedOrderId) {
-                $this->selectedOrderId = (int) $selectedOrderId;
-        
-                $this->setPartnerLocale((int) $this->partnerAddressId);
-        
-                $this->openOrder();
-        
-                return;
-            }
-        
-            $this->setPartnerLocale(
-                $this->partnerAddressId ? (int) $this->partnerAddressId : null
-            );
-        }
 
     public function getAccessibleOrdersProperty(): Collection
     {
@@ -296,6 +223,23 @@ class OrderSelector extends Component
             ->values();
     }
 
+    public function getSelectedAddressProperty(): ?PartnerAddress
+    {
+        if (! $this->partnerAddressId) {
+            return null;
+        }
+
+        $partnerUser = auth('partner')->user();
+
+        if (! $partnerUser) {
+            return null;
+        }
+
+        return $this->accessibleAddressesQuery($partnerUser)
+            ->with(['partner', 'language'])
+            ->find($this->partnerAddressId);
+    }
+
     protected function accessibleAddressesQuery(PartnerUser $partnerUser)
     {
         $query = PartnerAddress::query()
@@ -330,7 +274,7 @@ class OrderSelector extends Component
             return collect();
         }
 
-        return Brand::query()
+        $brands = Brand::query()
             ->join(
                 'partner_address_brand',
                 'partner_address_brand.brand_id',
@@ -350,6 +294,35 @@ class OrderSelector extends Component
             ->select('brands.*')
             ->orderBy('name')
             ->get();
+
+        if ($brands->isEmpty()) {
+            return $brands;
+        }
+
+        $languageId = (int) session('partner.language_id', 0);
+
+        if ($languageId <= 0) {
+            $languageId = (int) Language::query()
+                ->whereRaw('LOWER(code) = ?', [strtolower(app()->getLocale())])
+                ->where('active', true)
+                ->value('id');
+        }
+
+        $translations = $languageId > 0
+            ? Translation::query()
+                ->where('entity', 'brand')
+                ->where('field', 'name')
+                ->where('language_id', $languageId)
+                ->whereIn('entity_code', $brands->pluck('code')->filter())
+                ->pluck('value', 'entity_code')
+            : collect();
+
+        return $brands->each(function (Brand $brand) use ($translations): void {
+            $brand->setAttribute(
+                'translated_name',
+                $translations->get($brand->code) ?: $brand->name
+            );
+        });
     }
 
     public function updatedModelSearch(): void
@@ -495,9 +468,7 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
-        $this->setPartnerLocale(
-                        $this->partnerAddressId ? (int) $this->partnerAddressId : null
-                    );
+        $this->setPartnerLocale($this->selectedAddress);
         $this->storeSelection();
     }
 
@@ -910,7 +881,7 @@ class OrderSelector extends Component
         ]);
     
         $order->refresh();
-        $this->clearSummaryCaches();
+        $this->dispatch('order-summary-changed');
     
         $partnerUser = auth('partner')->user();
     
@@ -972,7 +943,7 @@ class OrderSelector extends Component
             'status' => 'draft',
             'submitted_at' => null,
         ]);
-        $this->clearSummaryCaches();
+        $this->dispatch('order-summary-changed');
         $this->dispatch('$refresh');
     }
 
@@ -1131,6 +1102,10 @@ class OrderSelector extends Component
     
         if (! $this->partnerAddressId && $this->addresses->count() === 1) {
             $this->partnerAddressId = $this->addresses->first()['id'] ?? null;
+
+            if ($this->partnerAddressId) {
+                $this->setPartnerLocale($this->selectedAddress);
+            }
         }
     
         if (! $this->brandId && $this->brands->count() === 1) {
@@ -1200,51 +1175,8 @@ class OrderSelector extends Component
     public function render()
     {
         $this->autoSelectSingleOptions();
-    
-        $this->setPartnerLocale(
-            $this->partnerAddressId ? (int) $this->partnerAddressId : null
-        );
-    
-        $summarySeasons = $this->summaryLoaded
-            ? $this->salesRepOrderSummaries
-            ->map(fn (array $summary) => [
-                'id' => (int) ($summary['season_id'] ?? 0),
-                'name' => (string) ($summary['season'] ?? ''),
-            ])
-            ->filter(fn (array $season) => $season['id'] > 0)
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            : collect();
 
-        $summaryBrands = $this->summaryLoaded
-            ? $this->salesRepOrderSummaries
-            ->map(fn (array $summary) => [
-                'id' => (int) ($summary['brand_id'] ?? 0),
-                'name' => (string) ($summary['brand'] ?? ''),
-            ])
-            ->filter(fn (array $brand) => $brand['id'] > 0)
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            : collect();
-
-        $summaryOrderSheetTypes = $this->summaryLoaded
-            ? $this->salesRepOrderSummaries
-            ->map(fn (array $summary) => [
-                'id' => (int) ($summary['order_sheet_type_id'] ?? 0),
-                'name' => (string) ($summary['type'] ?? ''),
-            ])
-            ->filter(fn (array $type) => $type['id'] > 0)
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            : collect();
-
-        return view('livewire.partner.order-selector', [
-            'summarySeasons' => $summarySeasons,
-            'summaryBrands' => $summaryBrands,
-            'summaryOrderSheetTypes' => $summaryOrderSheetTypes,
-        ])->layout('components.layouts.app');
+        return view('livewire.partner.order-selector')
+            ->layout('components.layouts.app');
     }
 }

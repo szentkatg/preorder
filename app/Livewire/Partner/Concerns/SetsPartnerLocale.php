@@ -6,32 +6,41 @@ use App\Models\PartnerAddress;
 
 trait SetsPartnerLocale
 {
-    protected function setPartnerLocale(?int $partnerAddressId = null): void
+    protected function setPartnerLocale(
+        PartnerAddress|int|null $partnerAddress = null
+    ): void
     {
         $languageCode = null;
+        $languageId = null;
 
-        if ($partnerAddressId) {
-            $languageCode = PartnerAddress::query()
+        if (is_int($partnerAddress)) {
+            $partnerAddress = PartnerAddress::query()
                 ->with('language')
-                ->find($partnerAddressId)
-                ?->language
-                ?->code;
+                ->find($partnerAddress);
+        } elseif ($partnerAddress instanceof PartnerAddress) {
+            $partnerAddress->loadMissing('language');
+        }
+
+        if ($partnerAddress instanceof PartnerAddress) {
+            $languageCode = $partnerAddress->language?->code;
+            $languageId = $partnerAddress->language_id;
         }
 
         if (! $languageCode) {
             $partnerUser = auth('partner')->user();
 
             if ($partnerUser) {
-                $languageCode = PartnerAddress::query()
+                $fallbackAddress = PartnerAddress::query()
                     ->with('language')
                     ->whereIn(
                         'partner_id',
                         $partnerUser->partners()->pluck('partners.id')
                     )
                     ->orderBy('id')
-                    ->first()
-                    ?->language
-                    ?->code;
+                    ->first();
+
+                $languageCode = $fallbackAddress?->language?->code;
+                $languageId = $fallbackAddress?->language_id;
             }
         }
 
@@ -39,6 +48,9 @@ trait SetsPartnerLocale
 
         app()->setLocale($locale);
 
-        session(['partner.locale' => $locale]);
+        session([
+            'partner.locale' => $locale,
+            'partner.language_id' => $languageId,
+        ]);
     }
 }

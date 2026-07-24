@@ -178,6 +178,7 @@ return [
     'summary_all_partner_addresses' => 'A partner összes címe',
     'export_in_progress'        => 'Az Excel export összeállítása folyamatban...',
     'prepare'                   => 'Előkészítés...',
+    'no_orders'                 => 'Nincs megjeleníthető rendelés.',
 
 //PartnerOrderCoverage oldal fordítása
 
