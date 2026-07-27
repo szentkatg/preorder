@@ -4,38 +4,37 @@ namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderMatrixExport;
 use App\Livewire\Partner\Concerns\HandlesMultiAddressExcelImport;
+use App\Models\Catalog;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Sku;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Models\Catalog;
-use Livewire\Attributes\Renderless;
 
 class CatalogGroupOrder extends Component
 {
-    use WithFileUploads;
-
     use HandlesMultiAddressExcelImport;
+    use WithFileUploads;
 
     protected ?array $matrixGroupsCache = null;
 
     public ?string $scrollToModelCode = null;
-    
+
     public string $modelSearch = '';
-    
+
     public array $modelSearchResults = [];
-    
+
     public int $modelSearchIndex = -1;
 
     public Order $order;
 
     public string $catalogGroupName;
 
-//    public array $matrixGroups = [];
+    //    public array $matrixGroups = [];
 
     public array $pieceQuantities = [];
 
@@ -58,16 +57,16 @@ class CatalogGroupOrder extends Component
     public array $imageModalImages = [];
 
     public array $excelFiles = [];
-    
+
     public function deleteOrder(): void
     {
         if ($this->order->isSubmitted()) {
             return;
         }
-    
+
         $this->order->items()->delete();
         $this->order->delete();
-    
+
         $this->redirectRoute('partner.orders.select', navigate: true);
     }
 
@@ -76,7 +75,7 @@ class CatalogGroupOrder extends Component
         if ($this->matrixGroupsCache !== null) {
             return $this->matrixGroupsCache;
         }
-    
+
         return $this->matrixGroupsCache = $this->buildMatrixGroups();
     }
 
@@ -86,35 +85,36 @@ class CatalogGroupOrder extends Component
         if ($this->order->isSubmitted()) {
             return;
         }
-    
+
         $quantity = max(0, (int) $value);
-    
+
         $this->pieceQuantities[$skuId] = $quantity;
-    
+
         $this->saveQuantities([
             $skuId => $quantity,
         ]);
-    
+
         $this->skipRender();
     }
-    
+
     #[Renderless]
     public function saveAssortmentQuantity(int $skuId, mixed $value): void
     {
         if ($this->order->isSubmitted()) {
             return;
         }
-    
+
         $quantity = max(0, (int) $value);
-    
+
         $this->assortmentQuantities[$skuId] = $quantity;
-    
+
         $this->saveQuantities([
             $skuId => $quantity,
         ]);
-    
+
         $this->skipRender();
     }
+
     public function updatedModelSearch(): void
     {
         $this->modelSearchResults = [];
@@ -125,40 +125,40 @@ class CatalogGroupOrder extends Component
     {
         $this->modelSearchResults = [];
         $this->modelSearchIndex = -1;
-    
+
         $this->jumpToNextModelSearchResult();
-    }    
+    }
 
     public function getOrderSummary(): array
     {
         $quantity = 0;
         $wholesaleValue = 0;
         $retailValue = 0;
-    
+
         foreach ($this->order->items()->with('sku.product')->get() as $item) {
             $itemQuantity = (int) $item->quantity;
-    
+
             $wholesalePrice = $this->getProductPrice(
                 $item->sku?->product_id,
                 $this->order->price_list_id
             );
-    
+
             $retailPrice = $this->retailPriceListId
                 ? $this->getProductPrice($item->sku?->product_id, $this->retailPriceListId)
                 : 0;
-    
+
             $quantity += $itemQuantity;
             $wholesaleValue += $itemQuantity * $wholesalePrice;
             $retailValue += $itemQuantity * $retailPrice;
         }
-    
+
         return [
             'quantity' => $quantity,
             'wholesale_value' => $wholesaleValue,
             'retail_value' => $retailValue,
         ];
     }
-    
+
     public function jumpToNextModelSearchResult(): void
     {
         $search = trim($this->modelSearch ?? '');
@@ -166,10 +166,10 @@ class CatalogGroupOrder extends Component
         if ($search === '') {
             $this->modelSearchResults = [];
             $this->modelSearchIndex = -1;
-    
+
             return;
         }
-    
+
         if (empty($this->modelSearchResults)) {
             $products = Product::query()
                 ->where('season_id', $this->order->season_id)
@@ -177,8 +177,8 @@ class CatalogGroupOrder extends Component
                 ->where('order_sheet_type_id', $this->order->order_sheet_type_id)
                 ->where('active', true)
                 ->where(function ($query) use ($search) {
-                    $like = '%' . $search . '%';
-        
+                    $like = '%'.$search.'%';
+
                     $query
                         ->where('model_code', 'like', $like)
                         ->orWhere('name_hu', 'like', $like)
@@ -187,9 +187,9 @@ class CatalogGroupOrder extends Component
                 ->orderBy('catalog_group_sort')
                 ->orderBy('catalog_sort')
                 ->get();
-        
+
             $catalogGroupColumn = $this->catalogGroupNameColumn();
-        
+
             $this->modelSearchResults = $products
                 ->map(function (Product $product) use ($catalogGroupColumn) {
                     return [
@@ -201,25 +201,24 @@ class CatalogGroupOrder extends Component
                 ->values()
                 ->all();
         }
-            
+
         if (empty($this->modelSearchResults)) {
             return;
         }
-    
+
         $this->modelSearchIndex++;
-    
+
         if ($this->modelSearchIndex >= count($this->modelSearchResults)) {
             $this->modelSearchIndex = 0;
         }
-    
+
         $result = $this->modelSearchResults[$this->modelSearchIndex];
-    
+
         $this->scrollToModelCode = $result['model_code'];
 
         $this->navigateToCatalogGroup($result['catalog_group_name']);
-    
-    }
 
+    }
 
     public function formatAddress($address): string
     {
@@ -273,11 +272,7 @@ class CatalogGroupOrder extends Component
 
     protected function setPartnerLocale(): void
     {
-        $languageCode = strtolower(
-            $this->order->partnerAddress?->language?->code ?? 'hu'
-        );
-
-        app()->setLocale($languageCode);
+        app()->setLocale((string) session('partner.locale', 'hu'));
     }
 
     protected function catalogGroupNameColumn(): string
@@ -307,8 +302,8 @@ class CatalogGroupOrder extends Component
         $fallback = $locale === 'en' ? 'hu' : 'en';
 
         return (string) (
-            $model->{$baseName . '_' . $locale}
-            ?? $model->{$baseName . '_' . $fallback}
+            $model->{$baseName.'_'.$locale}
+            ?? $model->{$baseName.'_'.$fallback}
             ?? ''
         );
     }
@@ -327,7 +322,7 @@ class CatalogGroupOrder extends Component
     protected function buildMatrixGroups(): array
     {
         $catalogGroupColumn = $this->catalogGroupNameColumn();
-    
+
         $query = Product::query()
             ->with([
                 'sizeRange.items.size',
@@ -339,7 +334,7 @@ class CatalogGroupOrder extends Component
             ->where('brand_id', $this->order->brand_id)
             ->where('order_sheet_type_id', $this->order->order_sheet_type_id)
             ->where('active', true);
-    
+
         if ($this->showAllCatalogGroups) {
             $query
                 ->whereNotNull($catalogGroupColumn)
@@ -347,18 +342,18 @@ class CatalogGroupOrder extends Component
         } else {
             $query->where($catalogGroupColumn, $this->catalogGroupName);
         }
-    
+
         $products = $query
             ->orderBy('catalog_group_sort')
             ->orderBy('catalog_sort')
             ->orderBy('model_code')
             ->get();
-    
+
         $groups = collect();
-    
+
         foreach ($products->groupBy(fn (Product $product) => $product->{$catalogGroupColumn} ?: 'EGYEB') as $catalogGroupName => $catalogProducts) {
             foreach ($catalogProducts->groupBy(fn (Product $product) => $product->sizeRange?->matrix_group ?: 'EGYEB') as $matrixGroup => $matrixProducts) {
-    
+
                 $sizes = $matrixProducts
                     ->pluck('sizeRange')
                     ->filter()
@@ -367,7 +362,7 @@ class CatalogGroupOrder extends Component
                     ->map(fn ($item) => [
                         'id' => (int) $item->size->id,
                         'code' => (string) $item->size->code,
-    
+
                         /*
                          * Elsődlegesen a sizes tábla order mezőjét használjuk.
                          * Ha nálad mégis sort_order a mező neve a sizes táblában,
@@ -387,11 +382,11 @@ class CatalogGroupOrder extends Component
                     ])
                     ->values()
                     ->all();
-    
+
                 $groups->push([
                     'catalog_group' => $catalogGroupName,
                     'matrix_group' => $this->showAllCatalogGroups
-                        ? $catalogGroupName . ' / ' . $matrixGroup
+                        ? $catalogGroupName.' / '.$matrixGroup
                         : $matrixGroup,
                     'raw_matrix_group' => $matrixGroup,
                     'sizes' => $sizes,
@@ -402,7 +397,7 @@ class CatalogGroupOrder extends Component
                 ]);
             }
         }
-    
+
         return $groups->values()->all();
     }
 
@@ -665,40 +660,40 @@ class CatalogGroupOrder extends Component
                 'colorImages.color',
             ])
             ->find($productId);
-    
+
         if (! $product) {
             return;
         }
-    
-        $this->imageModalTitle = $product->model_code . ' - ' . $this->localizedValue($product, 'name');
-    
+
+        $this->imageModalTitle = $product->model_code.' - '.$this->localizedValue($product, 'name');
+
         $images = collect();
-    
+
         $catalog = Catalog::query()
             ->where('season_id', $this->order->season_id)
             ->where('brand_id', $this->order->brand_id)
             ->where('order_sheet_type_id', $this->order->order_sheet_type_id)
             ->where('active', true)
             ->first();
-    
+
         if ($catalog && $product->catalog_page) {
             $pageNumber = (int) $product->catalog_page + (int) $catalog->page_offset;
-    
+
             if ($pageNumber > 0) {
                 $images->push([
                     'url' => asset(
-                        'catalog-pages/' .
-                        trim($catalog->image_folder, '/') .
-                        '/page-' .
-                        str_pad($pageNumber, 3, '0', STR_PAD_LEFT) .
+                        'catalog-pages/'.
+                        trim($catalog->image_folder, '/').
+                        '/page-'.
+                        str_pad($pageNumber, 3, '0', STR_PAD_LEFT).
                         '.jpg'
                     ),
-                    'color_name' => __('partner.catalog_page') . ': ' . $product->catalog_page,
+                    'color_name' => __('partner.catalog_page').': '.$product->catalog_page,
                     'type' => 'catalog',
                 ]);
             }
         }
-    
+
         $product->colorImages
             ->where('active', true)
             ->sortBy('sort_order')
@@ -713,11 +708,11 @@ class CatalogGroupOrder extends Component
                     'type' => 'product',
                 ]);
             });
-    
+
         $this->imageModalImages = $images
             ->values()
             ->all();
-    
+
         $this->showImageModal = true;
     }
 
@@ -816,7 +811,7 @@ class CatalogGroupOrder extends Component
     public function render()
     {
         $this->setPartnerLocale();
-    
+
         return view('livewire.partner.catalog-group-order', [
             'matrixGroups' => $this->matrixGroups(),
         ])->layout('components.layouts.app');

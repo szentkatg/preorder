@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Partner portál</title>
+    <title>{{ __('partner.dashboard') }}</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
 

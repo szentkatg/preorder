@@ -1,31 +1,40 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-
-use App\Livewire\Partner\Auth\Login;
-use App\Livewire\Partner\Auth\ForgotPassword;
-use App\Livewire\Partner\Auth\ResetPassword;
-use App\Livewire\Partner\Dashboard;
-use App\Livewire\Partner\SeasonShow;
 use App\Livewire\Partner\AddressShow;
+use App\Livewire\Partner\Auth\ForgotPassword;
+use App\Livewire\Partner\Auth\Login;
+use App\Livewire\Partner\Auth\ResetPassword;
 use App\Livewire\Partner\BrandShow;
-use App\Livewire\Partner\ProductList;
 use App\Livewire\Partner\CatalogGroupOrder;
+use App\Livewire\Partner\Dashboard;
 use App\Livewire\Partner\OrderSelector;
 use App\Livewire\Partner\OrderSummary;
 use App\Livewire\Partner\PartnerOrderCoverage;
+use App\Livewire\Partner\ProductList;
+use App\Livewire\Partner\SeasonShow;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
 Route::post('/partner/logout', function (Request $request) {
+    $locale = $request->session()->get('partner.locale');
+    $languageId = $request->session()->get('partner.language_id');
+
     Auth::guard('partner')->logout();
 
     $request->session()->invalidate();
     $request->session()->regenerateToken();
+
+    if (is_string($locale) && is_numeric($languageId)) {
+        $request->session()->put([
+            'partner.locale' => $locale,
+            'partner.language_id' => (int) $languageId,
+        ]);
+    }
 
     return redirect()->route('partner.login');
 })->name('partner.logout');
@@ -43,6 +52,7 @@ Route::get('/reset-password/{token}', function (string $token) {
 
 Route::prefix('partner')
     ->name('partner.')
+    ->middleware('partner.locale')
     ->group(function () {
         Route::get('/login', Login::class)
             ->name('login');

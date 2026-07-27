@@ -86,6 +86,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Partner portal locales
+    |--------------------------------------------------------------------------
+    |
+    | Only locales with a matching lang/{locale} translation directory should
+    | be listed here. Active database languages are intersected with this list.
+    |
+    */
+
+    'available_locales' => ['hu', 'en'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |
@@ -130,6 +142,5 @@ return [
     |
     */
     'order_notification_cc' => env('ORDER_NOTIFICATION_CC'),
-
 
 ];

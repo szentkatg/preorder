@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Partner;
 
+use App\Exports\PartnerOrderSummaryMatrixExport;
 use App\Models\Brand;
 use App\Models\Catalog;
 use App\Models\Order;
@@ -9,12 +10,10 @@ use App\Models\OrderSheetType;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
-use Livewire\Component;
-use App\Exports\PartnerOrderSummaryMatrixExport;
-use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Log;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OrderSummary extends Component
 {
@@ -38,7 +37,7 @@ class OrderSummary extends Component
         'quantity' => 0,
         'wholesale_value' => 0.0,
         'retail_value' => 0.0,
-    ];    
+    ];
 
     public bool $allowAssortmentOrdering = true;
 
@@ -82,17 +81,17 @@ class OrderSummary extends Component
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->values();
-        
+
         $query = Order::query()
             ->whereIn('partner_id', $partnerIds)
             ->where('season_id', $this->season->id)
             ->where('brand_id', $this->brand->id)
             ->where('order_sheet_type_id', $this->orderSheetType->id);
-        
+
         if ($selectedOrderIds->isNotEmpty()) {
             $query->whereIn('id', $selectedOrderIds);
         }
-        
+
         $this->orders = $query
             ->with([
                 'partnerAddress.language',
@@ -120,7 +119,7 @@ class OrderSummary extends Component
             'assortment_skus' => count($this->assortmentQuantities),
         ]);
 
-        $checkpoint = microtime(true);        
+        $checkpoint = microtime(true);
 
         $this->allowAssortmentOrdering = collect(
             $this->assortmentQuantities
@@ -148,13 +147,7 @@ class OrderSummary extends Component
 
     protected function setPartnerLocale(): void
     {
-        $firstOrder = $this->orders?->first();
-
-        $languageCode = strtolower(
-            $firstOrder?->partnerAddress?->language?->code ?? 'hu'
-        );
-
-        app()->setLocale($languageCode);
+        app()->setLocale((string) session('partner.locale', 'hu'));
     }
 
     protected function catalogGroupNameColumn(): string
@@ -170,8 +163,8 @@ class OrderSummary extends Component
         $fallback = $locale === 'en' ? 'hu' : 'en';
 
         return (string) (
-            $model->{$baseName . '_' . $locale}
-            ?? $model->{$baseName . '_' . $fallback}
+            $model->{$baseName.'_'.$locale}
+            ?? $model->{$baseName.'_'.$fallback}
             ?? ''
         );
     }
@@ -253,7 +246,7 @@ class OrderSummary extends Component
 
         foreach ($products->groupBy(fn (Product $product) => $product->{$catalogGroupColumn} ?: 'EGYEB') as $catalogGroupName => $catalogProducts) {
             foreach ($catalogProducts->groupBy(fn (Product $product) => $product->sizeRange?->matrix_group ?: 'EGYEB') as $matrixGroup => $matrixProducts) {
-    
+
                 $sizes = $matrixProducts
                     ->pluck('sizeRange')
                     ->filter()
@@ -262,7 +255,7 @@ class OrderSummary extends Component
                     ->map(fn ($item) => [
                         'id' => (int) $item->size->id,
                         'code' => (string) $item->size->code,
-    
+
                         /*
                          * Elsődlegesen a sizes tábla order mezőjét használjuk.
                          * Ha nálad mégis sort_order a mező neve a sizes táblában,
@@ -282,11 +275,11 @@ class OrderSummary extends Component
                     ])
                     ->values()
                     ->all();
-    
+
                 $groups->push([
                     'catalog_group' => $catalogGroupName,
                     'matrix_group' => $this->showAllCatalogGroups
-                        ? $catalogGroupName . ' / ' . $matrixGroup
+                        ? $catalogGroupName.' / '.$matrixGroup
                         : $matrixGroup,
                     'raw_matrix_group' => $matrixGroup,
                     'sizes' => $sizes,
@@ -337,8 +330,7 @@ class OrderSummary extends Component
                         }
 
                         foreach (
-                            $assortment['content']
-                            as $componentSkuId => $componentQuantity
+                            $assortment['content'] as $componentSkuId => $componentQuantity
                         ) {
                             $componentSkuId =
                                 (int) $componentSkuId;
@@ -503,7 +495,7 @@ class OrderSummary extends Component
                 ->value('net_price') ?? 0
         );
     }
-    
+
     public function getCurrencySymbol(): string
     {
         return $this->orders->first()?->priceList?->currency?->symbol ?? '';
@@ -521,7 +513,7 @@ class OrderSummary extends Component
             return;
         }
 
-        $this->imageModalTitle = $product->model_code . ' - ' . $this->localizedValue($product, 'name');
+        $this->imageModalTitle = $product->model_code.' - '.$this->localizedValue($product, 'name');
 
         $images = collect();
 
@@ -538,13 +530,13 @@ class OrderSummary extends Component
             if ($pageNumber > 0) {
                 $images->push([
                     'url' => asset(
-                        'catalog-pages/' .
-                        trim($catalog->image_folder, '/') .
-                        '/page-' .
-                        str_pad($pageNumber, 3, '0', STR_PAD_LEFT) .
+                        'catalog-pages/'.
+                        trim($catalog->image_folder, '/').
+                        '/page-'.
+                        str_pad($pageNumber, 3, '0', STR_PAD_LEFT).
                         '.jpg'
                     ),
-                    'color_name' => __('partner.catalog_page') . ': ' . $product->catalog_page,
+                    'color_name' => __('partner.catalog_page').': '.$product->catalog_page,
                     'type' => 'catalog',
                 ]);
             }
@@ -582,7 +574,7 @@ class OrderSummary extends Component
     public function exportExcel()
     {
         $export = new PartnerOrderSummaryMatrixExport($this->orders);
-    
+
         return Excel::download(
             $export,
             $export->filename()
