@@ -9,7 +9,8 @@
             >
                 @foreach ($languages as $language)
                     <option value="{{ $language->id }}">
-                        {{ $language->translate('name', $languageId) }}
+                        {{ config('app.locale_flags.'.strtolower($language->code), '🌐') }}
+                        {{ strtoupper($language->code) }}
                     </option>
                 @endforeach
             </select>
