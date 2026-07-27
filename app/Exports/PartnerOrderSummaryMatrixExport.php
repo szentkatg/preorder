@@ -159,7 +159,14 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $rows[] = ['', __('partner.address'), $fullAddress];
         $rows[] = ['', __('partner.season'), $order->season?->name];
         $rows[] = ['', __('partner.brand'), $order->brand?->name];
-        $rows[] = ['', __('partner.order_sheet_type'), $order->orderSheetType?->translate('name')];
+        $rows[] = [
+            '',
+            __('partner.order_sheet_type'),
+            $order->orderSheetType?->translate(
+                'name',
+                $this->translationLanguageId($order)
+            ),
+        ];
         $rows[] = [
             '',
             __('partner.price_list'),
@@ -703,14 +710,22 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
 
     public function filename(): string
     {
-        $order = $this->order->load(['partner', 'brand', 'orderSheetType']);
+        $order = $this->order->load([
+            'partner',
+            'partnerAddress',
+            'brand',
+            'orderSheetType',
+        ]);
 
         $brandName = $this->sanitizeFilenamePart(
             $order->brand?->name ?? 'marka'
         );
 
         $orderSheetTypeName = $this->sanitizeFilenamePart(
-            $order->orderSheetType?->translate('name') ?? 'rendelolap'
+            $order->orderSheetType?->translate(
+                'name',
+                $this->translationLanguageId($order)
+            ) ?? 'rendelolap'
         );
 
         $partnerCode = $this->sanitizeFilenamePart(
@@ -733,6 +748,13 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $value = trim($value, '_');
 
         return $value ?: 'adat';
+    }
+
+    protected function translationLanguageId(Order $order): ?int
+    {
+        $languageId = $order->partnerAddress?->language_id;
+
+        return $languageId ? (int) $languageId : null;
     }
 
     public function registerEvents(): array

@@ -50,7 +50,8 @@ class LanguageResolver
             return null;
         }
 
-        $languageId = $this->request->session()->get('language_id');
+        $languageId = $this->request->session()->get('partner.language_id')
+            ?? $this->request->session()->get('language_id');
 
         if (! is_numeric($languageId)) {
             return null;
@@ -93,7 +94,7 @@ class LanguageResolver
                 ->first();
     }
 
-    private function findActiveLanguageById(int $languageId): ?Language
+    protected function findActiveLanguageById(int $languageId): ?Language
     {
         return Language::query()
             ->whereKey($languageId)
