@@ -55,7 +55,7 @@ class PartnerUsersTable
                     ->sortable(),
 
                 TextColumn::make('partners_count')
-                    ->label('Egyedi partnerek')
+                    ->label('Partnerek / képviselők')
                     ->counts('partners')
                     ->sortable(),
 

@@ -145,6 +145,40 @@ class PartnerAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_sales_rep_inherits_the_portfolio_of_an_assigned_representative(): void
+    {
+        $data = $this->createAccessFixture();
+
+        $salesRep = $this->createPartnerUser(
+            $data['partners']['d'],
+            PartnerUser::ROLE_SALES_REP,
+            'delegated-sales@example.test'
+        );
+        $salesRep->partners()->attach($data['partners']['c']);
+
+        $this->assertSameIds(
+            $salesRep->accessiblePartnersQuery()->get(),
+            [
+                $data['partners']['b']->id,
+                $data['partners']['c']->id,
+            ]
+        );
+        $this->assertSameIds(
+            $salesRep->accessibleAddressesQuery()->get(),
+            [
+                $data['addresses']['b1']->id,
+                $data['addresses']['c1']->id,
+            ]
+        );
+        $this->assertSameIds(
+            $salesRep->accessibleOrdersQuery()->get(),
+            [
+                $data['orders']['b1']->id,
+                $data['orders']['c1']->id,
+            ]
+        );
+    }
+
     private function createAccessFixture(): array
     {
         $partners = [

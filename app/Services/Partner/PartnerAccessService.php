@@ -28,9 +28,7 @@ class PartnerAccessService
         }
 
         if ($user->role === PartnerUser::ROLE_SALES_REP) {
-            $salesRepErpPartnerCode = $user->partner?->erp_partner_code;
-
-            return $query->where(function (Builder $query) use ($user, $salesRepErpPartnerCode): void {
+            return $query->where(function (Builder $query) use ($user): void {
                 $query
                     ->whereIn(
                         'partners.id',
@@ -41,14 +39,12 @@ class PartnerAccessService
                         $user->addresses()
                             ->select('partner_addresses.partner_id')
                             ->distinct()
+                    )
+                    ->orWhereIn(
+                        'partners.id',
+                        $this->representedPartnersQuery($user)
+                            ->select('partners.id')
                     );
-
-                if (filled($salesRepErpPartnerCode)) {
-                    $query->orWhere(
-                        'partners.sales_rep_erp_partner_code',
-                        $salesRepErpPartnerCode
-                    );
-                }
             });
         }
 
@@ -71,9 +67,7 @@ class PartnerAccessService
         }
 
         if ($user->role === PartnerUser::ROLE_SALES_REP) {
-            $salesRepErpPartnerCode = $user->partner?->erp_partner_code;
-
-            return $query->where(function (Builder $query) use ($user, $salesRepErpPartnerCode): void {
+            return $query->where(function (Builder $query) use ($user): void {
                 $query
                     ->whereIn(
                         'partner_addresses.partner_id',
@@ -82,19 +76,12 @@ class PartnerAccessService
                     ->orWhereIn(
                         'partner_addresses.id',
                         $user->addresses()->select('partner_addresses.id')
-                    );
-
-                if (filled($salesRepErpPartnerCode)) {
-                    $query->orWhereIn(
+                    )
+                    ->orWhereIn(
                         'partner_addresses.partner_id',
-                        Partner::query()
+                        $this->representedPartnersQuery($user)
                             ->select('partners.id')
-                            ->where(
-                                'partners.sales_rep_erp_partner_code',
-                                $salesRepErpPartnerCode
-                            )
                     );
-                }
             });
         }
 
@@ -131,5 +118,26 @@ class PartnerAccessService
         return $this->accessibleOrdersQuery($user)
             ->whereKey($order->getKey())
             ->exists();
+    }
+
+    private function representedPartnersQuery(PartnerUser $user): Builder
+    {
+        $ownSalesRepCode = $user->partner?->erp_partner_code;
+
+        return Partner::query()->where(function (Builder $query) use ($user, $ownSalesRepCode): void {
+            $query->whereIn(
+                'partners.sales_rep_erp_partner_code',
+                $user->partners()
+                    ->whereNotNull('partners.erp_partner_code')
+                    ->select('partners.erp_partner_code')
+            );
+
+            if (filled($ownSalesRepCode)) {
+                $query->orWhere(
+                    'partners.sales_rep_erp_partner_code',
+                    $ownSalesRepCode
+                );
+            }
+        });
     }
 }

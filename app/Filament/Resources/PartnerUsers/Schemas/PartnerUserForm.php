@@ -109,7 +109,7 @@ class PartnerUserForm
                     ->helperText('Cím felhasználónál kötelező megadni, mely címekhez férhet hozzá.'),
 
                 Select::make('partners')
-                    ->label('Engedélyezett partnerek')
+                    ->label('Engedélyezett partnerek / képviselők')
                     ->relationship(
                         name: 'partners',
                         titleAttribute: 'name',
@@ -119,7 +119,7 @@ class PartnerUserForm
                     ->searchable()
                     ->preload()
                     ->visible(fn ($get): bool => $get('role') === PartnerUser::ROLE_SALES_REP)
-                    ->helperText('Az ERP-kód alapján automatikusan elérhető partnereken felüli egyedi hozzárendelések.'),
+                    ->helperText('Partner választásakor az adott partner, képviselő választásakor pedig az ERP-kódjához tartozó teljes partnerkör is elérhetővé válik.'),
             ]);
     }
 }
