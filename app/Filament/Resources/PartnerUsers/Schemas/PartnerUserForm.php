@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PartnerUsers\Schemas;
 
+use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use Filament\Forms\Components\Select;
@@ -18,7 +19,10 @@ class PartnerUserForm
                 Select::make('partner_id')
                     ->label('Partner')
                     ->relationship('partner', 'name')
-                    ->searchable()
+                    ->getOptionLabelFromRecordUsing(
+                        fn (Partner $record): string => "{$record->erp_partner_code} - {$record->name}"
+                    )
+                    ->searchable(['erp_partner_code', 'name'])
                     ->preload()
                     ->required()
                     ->live()
@@ -115,7 +119,7 @@ class PartnerUserForm
                     ->searchable()
                     ->preload()
                     ->visible(fn ($get): bool => $get('role') === PartnerUser::ROLE_SALES_REP)
-                    ->helperText('Területi képviselő ezeknek a partnereknek a rendeléseit láthatja.'),
+                    ->helperText('Az ERP-kód alapján automatikusan elérhető partnereken felüli egyedi hozzárendelések.'),
             ]);
     }
 }

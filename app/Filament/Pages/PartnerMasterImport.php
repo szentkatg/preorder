@@ -269,7 +269,7 @@ class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
         }
 
         $headerRow = $sheet->rangeToArray(
-            'A1:' . $sheet->getHighestColumn() . '1',
+            'A1:'.$sheet->getHighestColumn().'1',
             null,
             true,
             true,
@@ -340,6 +340,7 @@ class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
         foreach ($this->sheets['partners'] ?? [] as $index => $row) {
             $rowNumber = $index + 2;
             $partnerCode = $this->nullIfEmpty($row['erp_partner_code'] ?? null);
+            $salesRepCode = $this->nullIfEmpty($row['sales_rep_erp_partner_code'] ?? null);
             $name = $this->nullIfEmpty($row['name'] ?? null);
 
             if (! $partnerCode) {
@@ -356,6 +357,13 @@ class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $name) {
                 $this->addRowError($partnerCode, "partners {$rowNumber}. sor: hiányzó név");
+            }
+
+            if ($salesRepCode && ! $validPartnerCodes->contains($salesRepCode)) {
+                $this->addRowError(
+                    $partnerCode,
+                    "partners {$rowNumber}. sor: nem létező területi képviselő ERP kód: {$salesRepCode}"
+                );
             }
         }
 
@@ -511,12 +519,20 @@ class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
 
             $exists = $partner->exists;
 
-            $partner->forceFill([
+            $attributes = [
                 'name' => $row['name'],
                 'email' => $this->nullIfEmpty($row['email'] ?? null),
                 'phone' => $this->nullIfEmpty($row['phone'] ?? null),
                 'active' => $this->boolValue($row['active'] ?? true),
-            ]);
+            ];
+
+            if (array_key_exists('sales_rep_erp_partner_code', $row)) {
+                $attributes['sales_rep_erp_partner_code'] = $this->nullIfEmpty(
+                    $row['sales_rep_erp_partner_code']
+                );
+            }
+
+            $partner->forceFill($attributes);
 
             $partner->save();
 

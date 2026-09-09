@@ -55,8 +55,8 @@ class PartnerAccessTest extends TestCase
             PartnerUser::ROLE_SALES_REP,
             'sales@example.test'
         );
-        $salesRep->partners()->attach($data['partners']['b']);
-        $salesRep->addresses()->attach($data['addresses']['a1']);
+        $salesRep->partners()->attach($data['partners']['a']);
+        $salesRep->addresses()->attach($data['addresses']['d1']);
 
         $this->assertSameIds(
             $partnerAdmin->accessibleAddressesQuery()->get(),
@@ -78,15 +78,29 @@ class PartnerAccessTest extends TestCase
 
         $this->assertSameIds(
             $salesRep->accessiblePartnersQuery()->get(),
-            [$data['partners']['a']->id, $data['partners']['b']->id]
+            [
+                $data['partners']['a']->id,
+                $data['partners']['b']->id,
+                $data['partners']['d']->id,
+            ]
         );
         $this->assertSameIds(
             $salesRep->accessibleAddressesQuery()->get(),
-            [$data['addresses']['a1']->id, $data['addresses']['b1']->id]
+            [
+                $data['addresses']['a1']->id,
+                $data['addresses']['a2']->id,
+                $data['addresses']['b1']->id,
+                $data['addresses']['d1']->id,
+            ]
         );
         $this->assertSameIds(
             $salesRep->accessibleOrdersQuery()->get(),
-            [$data['orders']['a1']->id, $data['orders']['b1']->id]
+            [
+                $data['orders']['a1']->id,
+                $data['orders']['a2']->id,
+                $data['orders']['b1']->id,
+                $data['orders']['d1']->id,
+            ]
         );
     }
 
@@ -142,11 +156,17 @@ class PartnerAccessTest extends TestCase
             'b' => Partner::query()->create([
                 'name' => 'Partner B',
                 'erp_partner_code' => 'B',
+                'sales_rep_erp_partner_code' => 'C',
                 'active' => true,
             ]),
             'c' => Partner::query()->create([
                 'name' => 'Partner C',
                 'erp_partner_code' => 'C',
+                'active' => true,
+            ]),
+            'd' => Partner::query()->create([
+                'name' => 'Partner D',
+                'erp_partner_code' => 'D',
                 'active' => true,
             ]),
         ];
@@ -156,6 +176,7 @@ class PartnerAccessTest extends TestCase
             'a2' => $this->createAddress($partners['a'], 'A2'),
             'b1' => $this->createAddress($partners['b'], 'B1'),
             'c1' => $this->createAddress($partners['c'], 'C1'),
+            'd1' => $this->createAddress($partners['d'], 'D1'),
         ];
 
         $season = Season::query()->create([
@@ -184,6 +205,7 @@ class PartnerAccessTest extends TestCase
             'a2' => $this->createOrder($addresses['a2'], $season, $brand, $orderSheetType),
             'b1' => $this->createOrder($addresses['b1'], $season, $brand, $orderSheetType),
             'c1' => $this->createOrder($addresses['c1'], $season, $brand, $orderSheetType),
+            'd1' => $this->createOrder($addresses['d1'], $season, $brand, $orderSheetType),
         ];
 
         return compact(
@@ -202,6 +224,7 @@ class PartnerAccessTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('erp_partner_code')->nullable();
+            $table->string('sales_rep_erp_partner_code')->nullable();
             $table->boolean('active')->default(true);
             $table->timestamps();
         });

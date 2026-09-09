@@ -27,6 +27,7 @@ class DatabaseMigrationTest extends TestCase
         ]));
         $this->assertTrue(Schema::hasTable('size_ranges'));
         $this->assertTrue(Schema::hasTable('size_range_items'));
+        $this->assertTrue(Schema::hasColumn('partners', 'sales_rep_erp_partner_code'));
         $this->assertFalse(Schema::hasColumn('products', 'serial_number'));
         $this->assertTrue(Schema::hasColumn('skus', 'sku_name'));
         $this->assertTrue(Schema::hasColumn('order_import_logs', 'partner_user_id'));

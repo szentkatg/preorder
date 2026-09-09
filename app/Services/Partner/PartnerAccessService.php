@@ -28,7 +28,9 @@ class PartnerAccessService
         }
 
         if ($user->role === PartnerUser::ROLE_SALES_REP) {
-            return $query->where(function (Builder $query) use ($user): void {
+            $salesRepErpPartnerCode = $user->partner?->erp_partner_code;
+
+            return $query->where(function (Builder $query) use ($user, $salesRepErpPartnerCode): void {
                 $query
                     ->whereIn(
                         'partners.id',
@@ -40,6 +42,13 @@ class PartnerAccessService
                             ->select('partner_addresses.partner_id')
                             ->distinct()
                     );
+
+                if (filled($salesRepErpPartnerCode)) {
+                    $query->orWhere(
+                        'partners.sales_rep_erp_partner_code',
+                        $salesRepErpPartnerCode
+                    );
+                }
             });
         }
 
@@ -62,7 +71,9 @@ class PartnerAccessService
         }
 
         if ($user->role === PartnerUser::ROLE_SALES_REP) {
-            return $query->where(function (Builder $query) use ($user): void {
+            $salesRepErpPartnerCode = $user->partner?->erp_partner_code;
+
+            return $query->where(function (Builder $query) use ($user, $salesRepErpPartnerCode): void {
                 $query
                     ->whereIn(
                         'partner_addresses.partner_id',
@@ -72,6 +83,18 @@ class PartnerAccessService
                         'partner_addresses.id',
                         $user->addresses()->select('partner_addresses.id')
                     );
+
+                if (filled($salesRepErpPartnerCode)) {
+                    $query->orWhereIn(
+                        'partner_addresses.partner_id',
+                        Partner::query()
+                            ->select('partners.id')
+                            ->where(
+                                'partners.sales_rep_erp_partner_code',
+                                $salesRepErpPartnerCode
+                            )
+                    );
+                }
             });
         }
 

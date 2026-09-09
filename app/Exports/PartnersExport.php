@@ -11,7 +11,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 
-class PartnersExport extends DefaultValueBinder implements FromQuery, WithHeadings, WithMapping, WithCustomValueBinder
+class PartnersExport extends DefaultValueBinder implements FromQuery, WithCustomValueBinder, WithHeadings, WithMapping
 {
     public function query()
     {
@@ -25,6 +25,7 @@ class PartnersExport extends DefaultValueBinder implements FromQuery, WithHeadin
             'ID',
             'Név',
             'ERP partnerkód',
+            'Területi képviselő ERP partnerkód',
             'E-mail',
             'Telefon',
             'Aktív',
@@ -37,6 +38,7 @@ class PartnersExport extends DefaultValueBinder implements FromQuery, WithHeadin
             $partner->id,
             $partner->name,
             (string) $partner->erp_partner_code,
+            (string) $partner->sales_rep_erp_partner_code,
             $partner->email,
             (string) $partner->phone,
             $partner->active ? 'Igen' : 'Nem',
@@ -45,7 +47,7 @@ class PartnersExport extends DefaultValueBinder implements FromQuery, WithHeadin
 
     public function bindValue(Cell $cell, $value): bool
     {
-        if ($cell->getColumn() === 'E' && $cell->getRow() > 1) {
+        if (in_array($cell->getColumn(), ['C', 'D', 'F'], true) && $cell->getRow() > 1) {
             $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
 
             return true;

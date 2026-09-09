@@ -3,14 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
 
 class Partner extends Model
 {
     protected $fillable = [
         'name',
         'erp_partner_code',
+        'sales_rep_erp_partner_code',
         'email',
         'phone',
         'active',
@@ -24,20 +25,41 @@ class Partner extends Model
     {
         return $this->hasMany(PartnerAddress::class);
     }
+
     public function users(): HasMany
     {
         return $this->hasMany(PartnerUser::class);
     }
+
+    public function salesRepresentative(): BelongsTo
+    {
+        return $this->belongsTo(
+            self::class,
+            'sales_rep_erp_partner_code',
+            'erp_partner_code'
+        );
+    }
+
+    public function representedPartners(): HasMany
+    {
+        return $this->hasMany(
+            self::class,
+            'sales_rep_erp_partner_code',
+            'erp_partner_code'
+        );
+    }
+
     public function language()
     {
         return $this->belongsTo(Language::class);
     }
-    
+
     public static function exportColumns(): array
     {
         return [
             'id' => 'ID',
             'erp_partner_code' => 'Partner ERP kód',
+            'sales_rep_erp_partner_code' => 'Területi képviselő ERP kód',
             'name' => 'Partner',
             'addrid' => 'Címkód',
             'name' => 'Cím név',
@@ -58,24 +80,24 @@ class Partner extends Model
             ],
         ];
     }
-    
+
     public static function exportRelations(): array
     {
-       return [];
+        return [];
     }
-    
+
     public static function exportStringColumns(): array
     {
         return [
             'erp_partner_code',
+            'sales_rep_erp_partner_code',
             'addrid',
             'phone',
         ];
     }
-    
+
     public static function exportOrderBy(): ?string
     {
         return 'name';
-    }    
-    
+    }
 }
