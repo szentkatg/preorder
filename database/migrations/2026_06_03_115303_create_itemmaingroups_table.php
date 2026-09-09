@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('item_main_groups', function (Blueprint $table) {
             $table->id();
-        
+
             $table->string('code', 3)->unique();
-        
+
             $table->string('name_hu');
             $table->string('name_en')->nullable();
-        
+
             $table->boolean('active')->default(true);
-        
+
             $table->timestamps();
         });
     }
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('itemmaingroups');
+        Schema::dropIfExists('item_main_groups');
     }
 };
