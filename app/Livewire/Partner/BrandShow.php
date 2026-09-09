@@ -20,6 +20,17 @@ class BrandShow extends Component
         PartnerAddress $address,
         Brand $brand
     ): void {
+        $partnerUser = auth('partner')->user();
+
+        abort_unless(
+            $partnerUser
+                && $address->active
+                && $address->partner?->active
+                && $partnerUser->canAccessAddress($address)
+                && $address->brands()->whereKey($brand->getKey())->exists(),
+            403
+        );
+
         $this->season = $season;
         $this->address = $address;
         $this->brand = $brand;

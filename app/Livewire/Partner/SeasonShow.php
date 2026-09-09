@@ -17,13 +17,11 @@ class SeasonShow extends Component
 
     public function render()
     {
-        $partner = Auth::guard('partner')
-            ->user()
-            ->partner;
+        $partnerUser = Auth::guard('partner')->user();
 
         return view('livewire.partner.season-show', [
-            'partner' => $partner,
-            'addresses' => $partner->addresses()
+            'partner' => $partnerUser->partner,
+            'addresses' => $partnerUser->accessibleAddressesQuery()
                 ->where('active', true)
                 ->orderBy('name')
                 ->get(),

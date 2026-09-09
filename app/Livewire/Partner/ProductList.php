@@ -28,6 +28,18 @@ class ProductList extends Component
         Brand $brand,
         OrderSheetType $type
     ): void {
+        $partnerUser = auth('partner')->user();
+
+        abort_unless(
+            $partnerUser
+                && $address->active
+                && $address->partner?->active
+                && $partnerUser->canAccessAddress($address)
+                && $address->brands()->whereKey($brand->getKey())->exists()
+                && $address->orderSheetTypes()->whereKey($type->getKey())->exists(),
+            403
+        );
+
         $this->season = $season;
         $this->address = $address;
         $this->brand = $brand;

@@ -16,6 +16,16 @@ class AddressShow extends Component
         Season $season,
         PartnerAddress $address
     ): void {
+        $partnerUser = auth('partner')->user();
+
+        abort_unless(
+            $partnerUser
+                && $address->active
+                && $address->partner?->active
+                && $partnerUser->canAccessAddress($address),
+            403
+        );
+
         $this->season = $season;
         $this->address = $address;
     }

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Brand;
-use App\Models\Order;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
 use Illuminate\Support\Collection;
@@ -16,27 +15,22 @@ class PartnerOrderCoverageService
 
         $partnerUser = auth('partner')->user();
 
-        $accessiblePartnerIds = $partnerUser
-            ->partners()
-            ->pluck('partners.id')
-            ->all();
-
-        $addresses = PartnerAddress::query()
+        $addresses = $partnerUser
+            ->accessibleAddressesQuery()
             ->with([
                 'partner',
                 'brands',
                 'orderSheetTypes',
             ])
             ->where('active', true)
-            ->whereIn('partner_id', $accessiblePartnerIds)
             ->whereHas('partner', fn ($query) => $query->where('active', true))
             ->orderBy('partner_id')
             ->orderBy('name')
             ->get();
 
-        $orders = Order::query()
+        $orders = $partnerUser
+            ->accessibleOrdersQuery()
             ->withSum('items as quantity', 'quantity')
-            ->whereIn('partner_id', $accessiblePartnerIds)
             ->when($seasonId, fn ($query) => $query->where('season_id', $seasonId))
             ->get()
             ->keyBy(fn ($order) => $this->orderKey(

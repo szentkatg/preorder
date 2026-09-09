@@ -242,30 +242,10 @@ class OrderSelector extends Component
 
     protected function accessibleAddressesQuery(PartnerUser $partnerUser)
     {
-        $query = PartnerAddress::query()
+        return $partnerUser
+            ->accessibleAddressesQuery()
             ->with('partner')
             ->where('partner_addresses.active', true);
-
-        if ($partnerUser->role === PartnerUser::ROLE_PARTNER_ADMIN) {
-            return $query->where('partner_addresses.partner_id', $partnerUser->partner_id);
-        }
-
-        if ($partnerUser->role === PartnerUser::ROLE_ADDRESS_USER) {
-            return $query->whereIn(
-                'partner_addresses.id',
-                $partnerUser->addresses()->select('partner_addresses.id')
-            );
-        }
-
-        if ($partnerUser->role === PartnerUser::ROLE_SALES_REP) {
-            return $query->where(function ($query) use ($partnerUser) {
-                $query
-                    ->whereIn('partner_addresses.partner_id', $partnerUser->partners()->select('partners.id'))
-                    ->orWhereIn('partner_addresses.id', $partnerUser->addresses()->select('partner_addresses.id'));
-            });
-        }
-
-        return $query->whereRaw('1 = 0');
     }
 
     public function getBrandsProperty(): Collection
@@ -985,7 +965,7 @@ class OrderSelector extends Component
 
     public function selectAllSummaryOrders(): void
     {
-//        abort_unless($this->isSalesRep, 403);
+        abort_unless($this->isSalesRep, 403);
 
         $this->selectedSummaryOrderIds = $this->filteredSalesRepOrderSummaries
             ->pluck('order_id')
@@ -1001,7 +981,7 @@ class OrderSelector extends Component
 
     public function openSelectedSummaryOrders()
     {
-//        abort_unless($this->isSalesRep, 403);
+        abort_unless($this->isSalesRep, 403);
 
         $selectedOrderIds = collect($this->selectedSummaryOrderIds)
             ->map(fn ($id) => (int) $id)
@@ -1052,7 +1032,7 @@ class OrderSelector extends Component
 
     public function exportSalesRepSummary()
     {
-//        abort_unless($this->isSalesRep, 403);
+        abort_unless($this->isSalesRep, 403);
 
         return Excel::download(
             new SalesRepSummaryExport($this->filteredSalesRepOrderSummaries),

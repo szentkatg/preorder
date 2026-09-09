@@ -70,20 +70,15 @@ class OrderSummary extends Component
 
         $partnerUser = auth('partner')->user();
 
-        $partnerIds = $partnerUser->partners()
-            ->pluck('partners.id');
-
-        if ($partnerIds->isEmpty() && $partnerUser->partner_id) {
-            $partnerIds = collect([$partnerUser->partner_id]);
-        }
+        abort_unless($partnerUser, 403);
 
         $selectedOrderIds = collect(explode(',', (string) request('orders')))
             ->filter()
             ->map(fn ($id) => (int) $id)
+            ->unique()
             ->values();
 
-        $query = Order::query()
-            ->whereIn('partner_id', $partnerIds)
+        $query = $partnerUser->accessibleOrdersQuery()
             ->where('season_id', $this->season->id)
             ->where('brand_id', $this->brand->id)
             ->where('order_sheet_type_id', $this->orderSheetType->id);
@@ -98,6 +93,13 @@ class OrderSummary extends Component
                 'priceList.currency',
             ])
             ->get();
+
+        abort_if(
+            $this->orders->isEmpty()
+                || ($selectedOrderIds->isNotEmpty()
+                    && $this->orders->count() !== $selectedOrderIds->count()),
+            403
+        );
 
         Log::info('OrderSummary timing: orders loaded', [
             'seconds' => round(microtime(true) - $checkpoint, 3),

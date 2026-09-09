@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\PartnerResetPasswordNotification;
+use App\Services\Partner\PartnerAccessService;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,35 +72,38 @@ class PartnerUser extends Authenticatable implements CanResetPasswordContract
 
     public function accessibleOrdersQuery(): Builder
     {
-        $query = Order::query();
+        return app(PartnerAccessService::class)
+            ->accessibleOrdersQuery($this);
+    }
 
-        if ($this->role === self::ROLE_PARTNER_ADMIN) {
-            return $query->where('partner_id', $this->partner_id);
-        }
+    public function accessiblePartnersQuery(): Builder
+    {
+        return app(PartnerAccessService::class)
+            ->accessiblePartnersQuery($this);
+    }
 
-        if ($this->role === self::ROLE_ADDRESS_USER) {
-            return $query->whereIn(
-                'partner_address_id',
-                $this->addresses()->select('partner_addresses.id')
-            );
-        }
+    public function accessibleAddressesQuery(): Builder
+    {
+        return app(PartnerAccessService::class)
+            ->accessibleAddressesQuery($this);
+    }
 
-        if ($this->role === self::ROLE_SALES_REP) {
-            return $query->where(function (Builder $query) {
-                $query
-                    ->whereIn('partner_id', $this->partners()->select('partners.id'))
-                    ->orWhereIn('partner_address_id', $this->addresses()->select('partner_addresses.id'));
-            });
-        }
+    public function canAccessPartner(Partner $partner): bool
+    {
+        return app(PartnerAccessService::class)
+            ->canAccessPartner($this, $partner);
+    }
 
-        return $query->whereRaw('1 = 0');
+    public function canAccessAddress(PartnerAddress $address): bool
+    {
+        return app(PartnerAccessService::class)
+            ->canAccessAddress($this, $address);
     }
 
     public function canAccessOrder(Order $order): bool
     {
-        return $this->accessibleOrdersQuery()
-            ->whereKey($order->id)
-            ->exists();
+        return app(PartnerAccessService::class)
+            ->canAccessOrder($this, $order);
     }
     
     public static function exportColumns(): array

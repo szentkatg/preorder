@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Partner;
 
+use App\Exports\PartnerOrderCoverageExport;
+use App\Models\PartnerUser;
 use App\Models\Season;
 use App\Services\PartnerOrderCoverageService;
 use Livewire\Component;
-use App\Exports\PartnerOrderCoverageExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -26,6 +27,8 @@ class PartnerOrderCoverage extends Component
 
     public function export(): BinaryFileResponse
     {
+        $this->authorizeAccess();
+
         return Excel::download(
             new PartnerOrderCoverageExport(
                 $this->seasonId,
@@ -37,12 +40,17 @@ class PartnerOrderCoverage extends Component
 
     public function mount(): void
     {
+        $this->authorizeAccess();
+
         if ($locale = request('locale')) {
             app()->setLocale($locale);
         }
     }
+
     public function getCoverageProperty(): array
     {
+        $this->authorizeAccess();
+
         $coverage = app(PartnerOrderCoverageService::class)
             ->build($this->seasonId);
 
@@ -76,14 +84,16 @@ class PartnerOrderCoverage extends Component
         int $brandId,
         int $orderSheetTypeId,
     ): void {
+        $this->authorizeAccess();
+
         if ($orderId) {
             session(['order_selector.open_order_id' => $orderId]);
-    
+
             $this->redirectRoute('partner.orders.select');
-    
+
             return;
         }
-    
+
         session([
             'order_selector.preselect' => [
                 'partner_address_id' => $partnerAddressId,
@@ -92,12 +102,20 @@ class PartnerOrderCoverage extends Component
                 'season_id' => $this->seasonId,
             ],
         ]);
-    
+
         $this->redirectRoute('partner.orders.select');
     }
 
     public function render()
     {
         return view('livewire.partner.partner-order-coverage');
+    }
+
+    private function authorizeAccess(): void
+    {
+        abort_unless(
+            auth('partner')->user()?->role === PartnerUser::ROLE_SALES_REP,
+            403
+        );
     }
 }
