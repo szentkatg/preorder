@@ -1,32 +1,17 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('order_import_logs', function (Blueprint $table) {
-            $table->foreignId('partner_user_id')
-                ->nullable()
-                ->after('user_id')
-                ->constrained('partner_users')
-                ->nullOnDelete();
-        });
+        // partner_user_id is already added by the immediately preceding
+        // 2026_06_09_161747_add_partner_user_id_to_order_import_logs_table migration.
     }
 
     public function down(): void
     {
-        Schema::table('order_import_logs', function (Blueprint $table) {
-            $table->dropForeign(['partner_user_id']);
-            $table->dropColumn('partner_user_id');
-
-            $table->foreign('user_id')
-                ->references('id')
-                ->on('users')
-                ->nullOnDelete();
-        });
+        // The preceding migration owns the column and removes it on rollback.
     }
 };

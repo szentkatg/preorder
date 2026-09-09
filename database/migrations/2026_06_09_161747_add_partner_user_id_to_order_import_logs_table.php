@@ -26,7 +26,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('order_import_logs', function (Blueprint $table) {
-            //
+            $table->dropConstrainedForeignId('partner_user_id');
         });
     }
 };

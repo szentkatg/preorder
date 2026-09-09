@@ -10,6 +10,10 @@ return new class extends Migration
     {
         if (Schema::hasColumn('products', 'serial_number')) {
             Schema::table('products', function (Blueprint $table) {
+                $table->dropUnique('products_unique_model');
+            });
+
+            Schema::table('products', function (Blueprint $table) {
                 $table->dropColumn('serial_number');
             });
         }
@@ -32,6 +36,13 @@ return new class extends Migration
         if (! Schema::hasColumn('products', 'serial_number')) {
             Schema::table('products', function (Blueprint $table) {
                 $table->string('serial_number', 3)->after('size_range_id');
+            });
+
+            Schema::table('products', function (Blueprint $table) {
+                $table->unique(
+                    ['season_id', 'item_main_group_id', 'serial_number'],
+                    'products_unique_model'
+                );
             });
         }
     }
