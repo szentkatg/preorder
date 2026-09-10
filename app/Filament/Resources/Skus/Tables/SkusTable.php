@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Skus\Tables;
 
+use App\Models\Season;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -9,6 +10,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SkusTable
 {
@@ -77,6 +79,28 @@ class SkusTable
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->filters([
+                SelectFilter::make('season_id')
+                    ->label('Szezon')
+                    ->options(
+                        Season::query()
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all()
+                    )
+                    ->searchable()
+                    ->query(
+                        fn (Builder $query, array $data): Builder =>
+                            $query->when(
+                                $data['value'] ?? null,
+                                fn (Builder $query, $seasonId): Builder =>
+                                    $query->whereHas(
+                                        'product',
+                                        fn (Builder $productQuery): Builder =>
+                                            $productQuery->where('season_id', $seasonId)
+                                    )
+                            )
+                    ),
+
                 SelectFilter::make('product')
                     ->label('Modell')
                     ->relationship('product', 'model_code')
