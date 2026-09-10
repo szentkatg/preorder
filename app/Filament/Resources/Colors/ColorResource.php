@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Colors;
 use App\Filament\Resources\Colors\Pages\CreateColor;
 use App\Filament\Resources\Colors\Pages\EditColor;
 use App\Filament\Resources\Colors\Pages\ListColors;
+use App\Filament\Resources\Colors\Pages\ViewColor;
 use App\Filament\Resources\Colors\Schemas\ColorForm;
 use App\Filament\Resources\Colors\Tables\ColorsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Color;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class ColorResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ColorsTable::configure($table);
+        return AdminResourceTable::configure(
+            ColorsTable::configure($table),
+            Color::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class ColorResource extends Resource
         return [
             'index' => ListColors::route('/'),
             'create' => CreateColor::route('/create'),
+            'view' => ViewColor::route('/{record}'),
             'edit' => EditColor::route('/{record}/edit'),
         ];
     }

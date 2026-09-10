@@ -8,10 +8,6 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use App\Models\PartnerAddress;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\GenericTableExport;
-use Filament\Actions\Action;
 
 class PartnerAddressesTable
 {
@@ -53,15 +49,6 @@ class PartnerAddressesTable
                     ->label('Aktív')
                     ->boolean(),
             ])
-                    ->headerActions([
-                        Action::make('export')
-                            ->label('Export')
-                            ->icon('heroicon-o-arrow-down-tray')
-                            ->action(fn () => Excel::download(
-                                new GenericTableExport(PartnerAddress::class),
-                                'partner_addresses.xlsx'
-                            )),
-                    ])
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([

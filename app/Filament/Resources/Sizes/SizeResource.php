@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Sizes;
 use App\Filament\Resources\Sizes\Pages\CreateSize;
 use App\Filament\Resources\Sizes\Pages\EditSize;
 use App\Filament\Resources\Sizes\Pages\ListSizes;
+use App\Filament\Resources\Sizes\Pages\ViewSize;
 use App\Filament\Resources\Sizes\Schemas\SizeForm;
 use App\Filament\Resources\Sizes\Tables\SizesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Size;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -27,7 +29,10 @@ class SizeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return SizesTable::configure($table);
+        return AdminResourceTable::configure(
+            SizesTable::configure($table),
+            Size::class,
+        );
     }
 
     public static function getRelations(): array
@@ -42,6 +47,7 @@ class SizeResource extends Resource
         return [
             'index' => ListSizes::route('/'),
             'create' => CreateSize::route('/create'),
+            'view' => ViewSize::route('/{record}'),
             'edit' => EditSize::route('/{record}/edit'),
         ];
     }

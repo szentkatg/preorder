@@ -2,16 +2,13 @@
 
 namespace App\Filament\Resources\PartnerUsers\Tables;
 
-use App\Exports\GenericTableExport;
 use App\Models\PartnerUser;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Maatwebsite\Excel\Facades\Excel;
 
 class PartnerUsersTable
 {
@@ -70,15 +67,6 @@ class PartnerUsersTable
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->headerActions([
-                Action::make('export')
-                    ->label('Export')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->action(fn () => Excel::download(
-                        new GenericTableExport(PartnerUser::class),
-                        'partner_users.xlsx'
-                    )),
             ])
             ->filters([
                 //

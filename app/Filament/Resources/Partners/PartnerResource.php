@@ -5,10 +5,12 @@ namespace App\Filament\Resources\Partners;
 use App\Filament\Resources\Partners\Pages\CreatePartner;
 use App\Filament\Resources\Partners\Pages\EditPartner;
 use App\Filament\Resources\Partners\Pages\ListPartners;
+use App\Filament\Resources\Partners\Pages\ViewPartner;
 use App\Filament\Resources\Partners\RelationManagers\AddressesRelationManager;
 use App\Filament\Resources\Partners\RelationManagers\UsersRelationManager;
 use App\Filament\Resources\Partners\Schemas\PartnerForm;
 use App\Filament\Resources\Partners\Tables\PartnersTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Partner;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class PartnerResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return PartnersTable::configure($table);
+        return AdminResourceTable::configure(
+            PartnersTable::configure($table),
+            Partner::class,
+        );
     }
 
     public static function getRelations(): array
@@ -45,6 +50,7 @@ class PartnerResource extends Resource
         return [
             'index' => ListPartners::route('/'),
             'create' => CreatePartner::route('/create'),
+            'view' => ViewPartner::route('/{record}'),
             'edit' => EditPartner::route('/{record}/edit'),
         ];
     }

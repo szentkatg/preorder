@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Currencies;
 use App\Filament\Resources\Currencies\Pages\CreateCurrency;
 use App\Filament\Resources\Currencies\Pages\EditCurrency;
 use App\Filament\Resources\Currencies\Pages\ListCurrencies;
+use App\Filament\Resources\Currencies\Pages\ViewCurrency;
 use App\Filament\Resources\Currencies\Schemas\CurrencyForm;
 use App\Filament\Resources\Currencies\Tables\CurrenciesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Currency;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -27,7 +29,10 @@ class CurrencyResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return CurrenciesTable::configure($table);
+        return AdminResourceTable::configure(
+            CurrenciesTable::configure($table),
+            Currency::class,
+        );
     }
 
     public static function getRelations(): array
@@ -42,6 +47,7 @@ class CurrencyResource extends Resource
         return [
             'index' => ListCurrencies::route('/'),
             'create' => CreateCurrency::route('/create'),
+            'view' => ViewCurrency::route('/{record}'),
             'edit' => EditCurrency::route('/{record}/edit'),
         ];
     }

@@ -5,8 +5,10 @@ namespace App\Filament\Resources\AdminUsers;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\EditAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\ListAdminUsers;
+use App\Filament\Resources\AdminUsers\Pages\ViewAdminUser;
 use App\Filament\Resources\AdminUsers\Schemas\AdminUserForm;
 use App\Filament\Resources\AdminUsers\Tables\AdminUsersTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -40,7 +42,10 @@ class AdminUserResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return AdminUsersTable::configure($table);
+        return AdminResourceTable::configure(
+            AdminUsersTable::configure($table),
+            User::class,
+        );
     }
 
     public static function getRelations(): array
@@ -53,6 +58,7 @@ class AdminUserResource extends Resource
         return [
             'index' => ListAdminUsers::route('/'),
             'create' => CreateAdminUser::route('/create'),
+            'view' => ViewAdminUser::route('/{record}'),
             'edit' => EditAdminUser::route('/{record}/edit'),
         ];
     }

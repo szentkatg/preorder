@@ -5,8 +5,10 @@ namespace App\Filament\Resources\RoundingRules;
 use App\Filament\Resources\RoundingRules\Pages\CreateRoundingRule;
 use App\Filament\Resources\RoundingRules\Pages\EditRoundingRule;
 use App\Filament\Resources\RoundingRules\Pages\ListRoundingRules;
+use App\Filament\Resources\RoundingRules\Pages\ViewRoundingRule;
 use App\Filament\Resources\RoundingRules\Schemas\RoundingRuleForm;
 use App\Filament\Resources\RoundingRules\Tables\RoundingRulesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\RoundingRule;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -45,7 +47,10 @@ class RoundingRuleResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return RoundingRulesTable::configure($table);
+        return AdminResourceTable::configure(
+            RoundingRulesTable::configure($table),
+            RoundingRule::class,
+        );
     }
 
     public static function getRelations(): array
@@ -58,6 +63,7 @@ class RoundingRuleResource extends Resource
         return [
             'index' => ListRoundingRules::route('/'),
             'create' => CreateRoundingRule::route('/create'),
+            'view' => ViewRoundingRule::route('/{record}'),
             'edit' => EditRoundingRule::route('/{record}/edit'),
         ];
     }

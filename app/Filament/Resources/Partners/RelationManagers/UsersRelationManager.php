@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Partners\RelationManagers;
 
+use App\Filament\Support\AdminResourceTable;
+use App\Models\PartnerUser;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -51,7 +53,7 @@ class UsersRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        $table = $table
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')
@@ -78,5 +80,11 @@ class UsersRelationManager extends RelationManager
                     DeleteBulkAction::make(),
                 ]),
             ]);
+
+        return AdminResourceTable::configure(
+            $table,
+            PartnerUser::class,
+            withViewAction: false,
+        );
     }
 }

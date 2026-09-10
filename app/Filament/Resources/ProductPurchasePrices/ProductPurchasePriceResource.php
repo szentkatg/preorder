@@ -5,8 +5,10 @@ namespace App\Filament\Resources\ProductPurchasePrices;
 use App\Filament\Resources\ProductPurchasePrices\Pages\CreateProductPurchasePrice;
 use App\Filament\Resources\ProductPurchasePrices\Pages\EditProductPurchasePrice;
 use App\Filament\Resources\ProductPurchasePrices\Pages\ListProductPurchasePrices;
+use App\Filament\Resources\ProductPurchasePrices\Pages\ViewProductPurchasePrice;
 use App\Filament\Resources\ProductPurchasePrices\Schemas\ProductPurchasePriceForm;
 use App\Filament\Resources\ProductPurchasePrices\Tables\ProductPurchasePricesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\ProductPurchasePrice;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -42,7 +44,10 @@ class ProductPurchasePriceResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ProductPurchasePricesTable::configure($table);
+        return AdminResourceTable::configure(
+            ProductPurchasePricesTable::configure($table),
+            ProductPurchasePrice::class,
+        );
     }
 
     public static function getRelations(): array
@@ -55,6 +60,7 @@ class ProductPurchasePriceResource extends Resource
         return [
             'index' => ListProductPurchasePrices::route('/'),
             'create' => CreateProductPurchasePrice::route('/create'),
+            'view' => ViewProductPurchasePrice::route('/{record}'),
             'edit' => EditProductPurchasePrice::route('/{record}/edit'),
         ];
     }

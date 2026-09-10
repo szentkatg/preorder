@@ -5,8 +5,10 @@ namespace App\Filament\Resources\PriceListItems;
 use App\Filament\Resources\PriceListItems\Pages\CreatePriceListItem;
 use App\Filament\Resources\PriceListItems\Pages\EditPriceListItem;
 use App\Filament\Resources\PriceListItems\Pages\ListPriceListItems;
+use App\Filament\Resources\PriceListItems\Pages\ViewPriceListItem;
 use App\Filament\Resources\PriceListItems\Schemas\PriceListItemForm;
 use App\Filament\Resources\PriceListItems\Tables\PriceListItemsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PriceListItem;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -35,7 +37,10 @@ class PriceListItemResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return PriceListItemsTable::configure($table);
+        return AdminResourceTable::configure(
+            PriceListItemsTable::configure($table),
+            PriceListItem::class,
+        );
     }
 
     public static function getRelations(): array
@@ -50,6 +55,7 @@ class PriceListItemResource extends Resource
         return [
             'index' => ListPriceListItems::route('/'),
             'create' => CreatePriceListItem::route('/create'),
+            'view' => ViewPriceListItem::route('/{record}'),
             'edit' => EditPriceListItem::route('/{record}/edit'),
         ];
     }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Products\RelationManagers;
 
+use App\Filament\Support\AdminResourceTable;
+use App\Models\Color;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -48,7 +50,7 @@ class ColorsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        $table = $table
             ->columns([
                 TextColumn::make('code')
                     ->label('Kód')
@@ -81,5 +83,11 @@ class ColorsRelationManager extends RelationManager
                     DeleteBulkAction::make(),
                 ]),
             ]);
+
+        return AdminResourceTable::configure(
+            $table,
+            Color::class,
+            withViewAction: false,
+        );
     }
 }
