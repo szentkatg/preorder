@@ -7,14 +7,19 @@ use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\EditAdminUser;
 use App\Filament\Resources\Languages\LanguageResource;
+use App\Filament\Resources\Products\Pages\ViewProduct;
+use App\Filament\Resources\Products\RelationManagers\ColorsRelationManager;
+use App\Models\Color;
 use App\Models\Language;
 use App\Models\PartnerUser;
+use App\Models\Product;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Facades\FilamentShield as Shield;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -164,6 +169,61 @@ class AdminAuthorizationTest extends TestCase
         $user->givePermissionTo(Permission::findOrCreate('Update:Language', 'web'));
 
         $this->assertTrue(Gate::forUser($user)->allows('update', new Language));
+    }
+
+    public function test_product_and_color_view_permissions_provide_a_read_only_product_page(): void
+    {
+        $seasonId = DB::table('seasons')->insertGetId([
+            'name' => 'Teszt szezon',
+            'code' => 'TST',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $itemMainGroupId = DB::table('item_main_groups')->insertGetId([
+            'code' => 'TST',
+            'name' => 'Teszt főcsoport',
+            'name_hu' => 'Teszt főcsoport',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $product = Product::query()->create([
+            'season_id' => $seasonId,
+            'item_main_group_id' => $itemMainGroupId,
+            'model_code' => 'TEST001',
+            'name_hu' => 'Teszt termék',
+        ]);
+        $color = Color::query()->create([
+            'product_id' => $product->getKey(),
+            'code' => '01',
+            'name_hu' => 'Fekete',
+        ]);
+
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('sales_rep', 'web'));
+        $user->givePermissionTo([
+            Permission::findOrCreate('ViewAny:Product', 'web'),
+            Permission::findOrCreate('View:Product', 'web'),
+            Permission::findOrCreate('ViewAny:Color', 'web'),
+        ]);
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->get("/admin/products/{$product->getRouteKey()}")
+            ->assertOk();
+        $this->get("/admin/products/{$product->getRouteKey()}/edit")
+            ->assertForbidden();
+
+        $this->assertTrue(ColorsRelationManager::canViewForRecord($product, ViewProduct::class));
+
+        Livewire::test(ColorsRelationManager::class, [
+            'ownerRecord' => $product,
+            'pageClass' => ViewProduct::class,
+        ])
+            ->assertTableActionHidden('create')
+            ->assertTableActionHidden('edit', $color)
+            ->assertTableActionHidden('delete', $color);
     }
 
     public function test_custom_page_permission_controls_page_access(): void
