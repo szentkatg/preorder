@@ -12,6 +12,7 @@ use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\PartnerUsers\Pages\ListPartnerUsers;
 use App\Filament\Resources\Products\Pages\ViewProduct;
 use App\Filament\Resources\Products\RelationManagers\ColorsRelationManager;
+use App\Filament\Resources\Skus\Pages\ListSkus;
 use App\Filament\Resources\Translations\Pages\ListTranslations;
 use App\Filament\Support\Pages\ReadOnlyRecord;
 use App\Exports\AdminTableExport;
@@ -20,6 +21,7 @@ use App\Models\Color;
 use App\Models\Language;
 use App\Models\PartnerUser;
 use App\Models\Product;
+use App\Models\Sku;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Facades\FilamentShield as Shield;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
@@ -342,6 +344,75 @@ class AdminAuthorizationTest extends TestCase
         );
 
         $this->travelBack();
+    }
+
+    public function test_skus_can_be_filtered_by_their_products_season(): void
+    {
+        $firstSeasonId = DB::table('seasons')->insertGetId([
+            'name' => 'Első szezon',
+            'code' => 'S01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $secondSeasonId = DB::table('seasons')->insertGetId([
+            'name' => 'Második szezon',
+            'code' => 'S02',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $itemMainGroupId = DB::table('item_main_groups')->insertGetId([
+            'code' => 'TST',
+            'name' => 'Teszt főcsoport',
+            'name_hu' => 'Teszt főcsoport',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $firstProduct = Product::query()->create([
+            'season_id' => $firstSeasonId,
+            'item_main_group_id' => $itemMainGroupId,
+            'model_code' => 'SEASON01',
+            'name_hu' => 'Első szezon terméke',
+        ]);
+        $secondProduct = Product::query()->create([
+            'season_id' => $secondSeasonId,
+            'item_main_group_id' => $itemMainGroupId,
+            'model_code' => 'SEASON02',
+            'name_hu' => 'Második szezon terméke',
+        ]);
+        $firstColor = Color::query()->create([
+            'product_id' => $firstProduct->getKey(),
+            'code' => '01',
+            'name_hu' => 'Első szín',
+        ]);
+        $secondColor = Color::query()->create([
+            'product_id' => $secondProduct->getKey(),
+            'code' => '02',
+            'name_hu' => 'Második szín',
+        ]);
+        $firstSku = Sku::query()->create([
+            'product_id' => $firstProduct->getKey(),
+            'color_id' => $firstColor->getKey(),
+            'sku_code' => 'SKU-SEASON-01',
+            'sku_name' => 'Első SKU',
+        ]);
+        $secondSku = Sku::query()->create([
+            'product_id' => $secondProduct->getKey(),
+            'color_id' => $secondColor->getKey(),
+            'sku_code' => 'SKU-SEASON-02',
+            'sku_name' => 'Második SKU',
+        ]);
+
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListSkus::class)
+            ->filterTable('season_id', $firstSeasonId)
+            ->assertCanSeeTableRecords([$firstSku])
+            ->assertCanNotSeeTableRecords([$secondSku]);
     }
 
     public function test_calculated_columns_can_be_filtered_and_sorted(): void
