@@ -50,6 +50,11 @@ class ProductsTable
                 TextColumn::make('sizeRange.code')
                     ->label('Méretsor'),
 
+                TextColumn::make('promised_delivery_date')
+                    ->label('Ígért szállítási határidő')
+                    ->date('Y-m-d')
+                    ->placeholder('—'),
+
                 TextColumn::make('catalog_page')
                     ->label('Katalógus oldal')
                     ->sortable(),
