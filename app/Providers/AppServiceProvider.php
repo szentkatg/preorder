@@ -52,14 +52,11 @@ class AppServiceProvider extends ServiceProvider
 
             $authorizationTarget = $arguments[0] ?? null;
 
-            if ($ability === 'delete'
-                && $authorizationTarget instanceof Role
-                && $authorizationTarget->name === $superAdminRole) {
-                return false;
-            }
-
-            if ($ability === 'deleteAny' && $authorizationTarget === Role::class) {
-                return false;
+            if ($authorizationTarget instanceof Role
+                || $authorizationTarget === Role::class
+                || $authorizationTarget instanceof User
+                || $authorizationTarget === User::class) {
+                return null;
             }
 
             return true;

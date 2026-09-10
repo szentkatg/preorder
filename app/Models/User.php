@@ -9,6 +9,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
@@ -54,6 +55,13 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        if ($panel->getId() !== 'admin'
+            || ! Schema::hasTable((string) config('permission.table_names.roles', 'roles'))) {
+            return false;
+        }
+
+        return $this->roles()
+            ->where('guard_name', $this->guard_name)
+            ->exists();
     }
 }
