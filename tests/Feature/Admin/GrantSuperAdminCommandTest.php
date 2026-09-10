@@ -26,6 +26,18 @@ class GrantSuperAdminCommandTest extends TestCase
         $this->assertTrue($user->refresh()->hasRole('super_admin'));
     }
 
+    public function test_the_bootstrap_migration_assigns_the_role_to_the_initial_admin(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'szega77@hotmail.com',
+        ]);
+
+        $migration = require database_path('migrations/2026_09_10_070000_assign_initial_super_admin_role.php');
+        $migration->up();
+
+        $this->assertTrue($user->refresh()->hasRole('super_admin'));
+    }
+
     public function test_it_can_be_run_repeatedly_without_creating_duplicate_roles(): void
     {
         User::factory()->create([
