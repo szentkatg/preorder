@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PriceLists\RelationManagers;
 
+use App\Filament\Support\AdminResourceTable;
+use App\Models\PriceListItem;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -45,7 +47,7 @@ class ItemsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        $table = $table
             ->columns([
                 TextColumn::make('season.code')
                     ->label('Szezon')
@@ -78,5 +80,11 @@ class ItemsRelationManager extends RelationManager
                     DeleteBulkAction::make(),
                 ]),
             ]);
+
+        return AdminResourceTable::configure(
+            $table,
+            PriceListItem::class,
+            withViewAction: false,
+        );
     }
 }

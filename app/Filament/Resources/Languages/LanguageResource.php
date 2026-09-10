@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Languages;
 use App\Filament\Resources\Languages\Pages\CreateLanguage;
 use App\Filament\Resources\Languages\Pages\EditLanguage;
 use App\Filament\Resources\Languages\Pages\ListLanguages;
+use App\Filament\Resources\Languages\Pages\ViewLanguage;
 use App\Filament\Resources\Languages\Schemas\LanguageForm;
 use App\Filament\Resources\Languages\Tables\LanguagesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Language;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class LanguageResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return LanguagesTable::configure($table);
+        return AdminResourceTable::configure(
+            LanguagesTable::configure($table),
+            Language::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class LanguageResource extends Resource
         return [
             'index' => ListLanguages::route('/'),
             'create' => CreateLanguage::route('/create'),
+            'view' => ViewLanguage::route('/{record}'),
             'edit' => EditLanguage::route('/{record}/edit'),
         ];
     }

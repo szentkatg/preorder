@@ -9,6 +9,7 @@ use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\Pages\ViewProduct;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Filament\Resources\Products\Tables\ProductsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Product;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +30,10 @@ class ProductResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ProductsTable::configure($table);
+        return AdminResourceTable::configure(
+            ProductsTable::configure($table),
+            Product::class,
+        );
     }
 
     public static function getRelations(): array

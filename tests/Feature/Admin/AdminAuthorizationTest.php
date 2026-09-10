@@ -6,9 +6,16 @@ use App\Filament\Pages\StockOrderProportioning;
 use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\EditAdminUser;
+use App\Filament\Resources\Brands\Pages\ListBrands;
 use App\Filament\Resources\Languages\LanguageResource;
+use App\Filament\Resources\Orders\Pages\ListOrders;
+use App\Filament\Resources\PartnerUsers\Pages\ListPartnerUsers;
 use App\Filament\Resources\Products\Pages\ViewProduct;
 use App\Filament\Resources\Products\RelationManagers\ColorsRelationManager;
+use App\Filament\Resources\Translations\Pages\ListTranslations;
+use App\Filament\Support\Pages\ReadOnlyRecord;
+use App\Exports\AdminTableExport;
+use App\Models\Brand;
 use App\Models\Color;
 use App\Models\Language;
 use App\Models\PartnerUser;
@@ -22,6 +29,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -217,13 +226,153 @@ class AdminAuthorizationTest extends TestCase
 
         $this->assertTrue(ColorsRelationManager::canViewForRecord($product, ViewProduct::class));
 
-        Livewire::test(ColorsRelationManager::class, [
+        $relationManager = Livewire::test(ColorsRelationManager::class, [
             'ownerRecord' => $product,
             'pageClass' => ViewProduct::class,
-        ])
+        ]);
+
+        $this->assertTrue($relationManager->instance()->getTable()->hasAction('exportExcel'));
+
+        foreach ($relationManager->instance()->getTable()->getColumns() as $column) {
+            $this->assertTrue($column->isSortable());
+            $this->assertTrue($column->isIndividuallySearchable());
+        }
+
+        $relationManager
             ->assertTableActionHidden('create')
             ->assertTableActionHidden('edit', $color)
             ->assertTableActionHidden('delete', $color);
+    }
+
+    public function test_every_admin_resource_has_a_read_only_page_and_standard_table_features(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $resources = collect(Filament::getPanel('admin')->getResources())
+            ->filter(fn (string $resource): bool => str_starts_with(
+                $resource,
+                'App\\Filament\\Resources\\',
+            ))
+            ->values();
+
+        $this->assertCount(26, $resources);
+
+        foreach ($resources as $resource) {
+            $this->assertTrue($resource::hasPage('view'), "Missing view page on {$resource}");
+            $this->assertTrue(
+                is_subclass_of($resource::getPages()['view']->getPage(), ReadOnlyRecord::class),
+                "The view page of {$resource} is not read-only",
+            );
+
+            $listPage = $resource::getPages()['index']->getPage();
+            $table = Livewire::test($listPage)->instance()->getTable();
+
+            $this->assertNotEmpty($table->getColumns(), "Missing columns on {$resource}");
+            $this->assertTrue($table->hasAction('view'), "Missing view action on {$resource}");
+            $this->assertTrue($table->hasAction('exportExcel'), "Missing Excel export on {$resource}");
+
+            foreach ($table->getColumns() as $column) {
+                $this->assertTrue(
+                    $column->isSortable(),
+                    "Column {$column->getName()} is not sortable on {$resource}",
+                );
+                $this->assertTrue(
+                    $column->isIndividuallySearchable(),
+                    "Column {$column->getName()} is not individually searchable on {$resource}",
+                );
+
+                $query = $resource::getEloquentQuery();
+
+                foreach ($table->getColumns() as $aggregateColumn) {
+                    $aggregateColumn->applyRelationshipAggregates($query);
+                }
+
+                $isFirstSearchConstraint = true;
+                $column->applySearchConstraint($query, '0', $isFirstSearchConstraint);
+                $column->applySort($query);
+                $query->limit(1)->get();
+            }
+        }
+    }
+
+    public function test_excel_export_uses_the_current_table_filters(): void
+    {
+        $exportedBrand = Brand::query()->create([
+            'code' => 'KEEP',
+            'name' => 'Exportálandó',
+        ]);
+        Brand::query()->create([
+            'code' => 'SKIP',
+            'name' => 'Kihagyandó',
+        ]);
+
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->travelTo(now()->setDate(2026, 9, 10)->setTime(12, 34, 56));
+
+        $component = Livewire::test(ListBrands::class)
+            ->searchTableColumns(['code' => 'KEEP']);
+        $table = $component->instance()->getTable();
+        $export = new AdminTableExport(
+            $component->instance()->getTableQueryForExport(),
+            array_values($table->getColumns()),
+        );
+
+        $this->assertContains('KEEP', $export->map($exportedBrand));
+        $this->assertStringStartsWith('PK', Excel::raw($export, ExcelWriter::XLSX));
+
+        Excel::fake();
+
+        Livewire::test(ListBrands::class)
+            ->searchTableColumns(['code' => 'KEEP'])
+            ->callTableAction('exportExcel');
+
+        Excel::assertDownloaded(
+            'brands-20260910-123456.xlsx',
+            fn (AdminTableExport $export): bool => $export->query()
+                ->pluck('code')
+                ->all() === ['KEEP'],
+        );
+
+        $this->travelBack();
+    }
+
+    public function test_calculated_columns_can_be_filtered_and_sorted(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        foreach ([
+            ListOrders::class => [
+                'total_ordered_units',
+                'total_effective_quantity',
+                'total_value',
+            ],
+            ListPartnerUsers::class => [
+                'addresses_count',
+                'partners_count',
+            ],
+            ListTranslations::class => [
+                'original_value',
+            ],
+        ] as $page => $columns) {
+            foreach ($columns as $column) {
+                Livewire::test($page)
+                    ->searchTableColumns([$column => '0'])
+                    ->sortTable($column)
+                    ->assertCountTableRecords(0);
+            }
+        }
     }
 
     public function test_custom_page_permission_controls_page_access(): void

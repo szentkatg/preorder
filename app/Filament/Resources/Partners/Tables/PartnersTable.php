@@ -2,17 +2,12 @@
 
 namespace App\Filament\Resources\Partners\Tables;
 
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\GenericTableExport;
-use App\Models\Partner;
-
 
 class PartnersTable
 {
@@ -41,15 +36,6 @@ class PartnersTable
                     ->label('Aktív')
                     ->boolean(),
             ])
-                    ->headerActions([
-                        Action::make('export')
-                            ->label('Export')
-                            ->icon('heroicon-o-arrow-down-tray')
-                            ->action(fn () => Excel::download(
-                                new GenericTableExport(Partner::class),
-                                'partners.xlsx'
-                            )),
-                    ])
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([

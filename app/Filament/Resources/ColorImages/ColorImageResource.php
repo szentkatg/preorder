@@ -5,8 +5,10 @@ namespace App\Filament\Resources\ColorImages;
 use App\Filament\Resources\ColorImages\Pages\CreateColorImage;
 use App\Filament\Resources\ColorImages\Pages\EditColorImage;
 use App\Filament\Resources\ColorImages\Pages\ListColorImages;
+use App\Filament\Resources\ColorImages\Pages\ViewColorImage;
 use App\Filament\Resources\ColorImages\Schemas\ColorImageForm;
 use App\Filament\Resources\ColorImages\Tables\ColorImagesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\ColorImage;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class ColorImageResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ColorImagesTable::configure($table);
+        return AdminResourceTable::configure(
+            ColorImagesTable::configure($table),
+            ColorImage::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class ColorImageResource extends Resource
         return [
             'index' => ListColorImages::route('/'),
             'create' => CreateColorImage::route('/create'),
+            'view' => ViewColorImage::route('/{record}'),
             'edit' => EditColorImage::route('/{record}/edit'),
         ];
     }

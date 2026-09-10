@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Translations;
 use App\Filament\Resources\Translations\Pages\CreateTranslation;
 use App\Filament\Resources\Translations\Pages\EditTranslation;
 use App\Filament\Resources\Translations\Pages\ListTranslations;
+use App\Filament\Resources\Translations\Pages\ViewTranslation;
 use App\Filament\Resources\Translations\Schemas\TranslationForm;
 use App\Filament\Resources\Translations\Tables\TranslationsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Translation;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -42,7 +44,10 @@ class TranslationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return TranslationsTable::configure($table);
+        return AdminResourceTable::configure(
+            TranslationsTable::configure($table),
+            Translation::class,
+        );
     }
 
     public static function getRelations(): array
@@ -55,6 +60,7 @@ class TranslationResource extends Resource
         return [
             'index' => ListTranslations::route('/'),
             'create' => CreateTranslation::route('/create'),
+            'view' => ViewTranslation::route('/{record}'),
             'edit' => EditTranslation::route('/{record}/edit'),
         ];
     }

@@ -5,8 +5,10 @@ namespace App\Filament\Resources\OrderSheetTypes;
 use App\Filament\Resources\OrderSheetTypes\Pages\CreateOrderSheetType;
 use App\Filament\Resources\OrderSheetTypes\Pages\EditOrderSheetType;
 use App\Filament\Resources\OrderSheetTypes\Pages\ListOrderSheetTypes;
+use App\Filament\Resources\OrderSheetTypes\Pages\ViewOrderSheetType;
 use App\Filament\Resources\OrderSheetTypes\Schemas\OrderSheetTypeForm;
 use App\Filament\Resources\OrderSheetTypes\Tables\OrderSheetTypesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\OrderSheetType;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class OrderSheetTypeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return OrderSheetTypesTable::configure($table);
+        return AdminResourceTable::configure(
+            OrderSheetTypesTable::configure($table),
+            OrderSheetType::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class OrderSheetTypeResource extends Resource
         return [
             'index' => ListOrderSheetTypes::route('/'),
             'create' => CreateOrderSheetType::route('/create'),
+            'view' => ViewOrderSheetType::route('/{record}'),
             'edit' => EditOrderSheetType::route('/{record}/edit'),
         ];
     }

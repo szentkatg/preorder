@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Catalogs;
 use App\Filament\Resources\Catalogs\Pages\CreateCatalog;
 use App\Filament\Resources\Catalogs\Pages\EditCatalog;
 use App\Filament\Resources\Catalogs\Pages\ListCatalogs;
+use App\Filament\Resources\Catalogs\Pages\ViewCatalog;
 use App\Filament\Resources\Catalogs\Schemas\CatalogForm;
 use App\Filament\Resources\Catalogs\Tables\CatalogsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Catalog;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -38,7 +40,10 @@ class CatalogResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return CatalogsTable::configure($table);
+        return AdminResourceTable::configure(
+            CatalogsTable::configure($table),
+            Catalog::class,
+        );
     }
 
     public static function getRelations(): array
@@ -51,6 +56,7 @@ class CatalogResource extends Resource
         return [
             'index' => ListCatalogs::route('/'),
             'create' => CreateCatalog::route('/create'),
+            'view' => ViewCatalog::route('/{record}'),
             'edit' => EditCatalog::route('/{record}/edit'),
         ];
     }

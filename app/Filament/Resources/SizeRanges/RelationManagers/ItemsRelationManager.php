@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\SizeRanges\RelationManagers;
 
+use App\Filament\Support\AdminResourceTable;
+use App\Models\SizeRangeItem;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -42,7 +44,7 @@ class ItemsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        $table = $table
             ->columns([
                 TextColumn::make('size.code')
                     ->label('Méret')
@@ -66,5 +68,11 @@ class ItemsRelationManager extends RelationManager
                     DeleteBulkAction::make(),
                 ]),
             ]);
+
+        return AdminResourceTable::configure(
+            $table,
+            SizeRangeItem::class,
+            withViewAction: false,
+        );
     }
 }

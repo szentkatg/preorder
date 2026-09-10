@@ -5,8 +5,10 @@ namespace App\Filament\Resources\Brands;
 use App\Filament\Resources\Brands\Pages\CreateBrand;
 use App\Filament\Resources\Brands\Pages\EditBrand;
 use App\Filament\Resources\Brands\Pages\ListBrands;
+use App\Filament\Resources\Brands\Pages\ViewBrand;
 use App\Filament\Resources\Brands\Schemas\BrandForm;
 use App\Filament\Resources\Brands\Tables\BrandsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Brand;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class BrandResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return BrandsTable::configure($table);
+        return AdminResourceTable::configure(
+            BrandsTable::configure($table),
+            Brand::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class BrandResource extends Resource
         return [
             'index' => ListBrands::route('/'),
             'create' => CreateBrand::route('/create'),
+            'view' => ViewBrand::route('/{record}'),
             'edit' => EditBrand::route('/{record}/edit'),
         ];
     }

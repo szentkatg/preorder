@@ -5,6 +5,9 @@ namespace App\Filament\Resources\Seasons;
 use App\Filament\Resources\Seasons\Pages\CreateSeason;
 use App\Filament\Resources\Seasons\Pages\EditSeason;
 use App\Filament\Resources\Seasons\Pages\ListSeasons;
+use App\Filament\Resources\Seasons\Pages\ViewSeason;
+use App\Filament\Resources\Seasons\Tables\SeasonsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Season;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
@@ -13,8 +16,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class SeasonResource extends Resource
@@ -45,19 +46,10 @@ class SeasonResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('name')
-                    ->searchable(),
-
-                TextColumn::make('code'),
-
-                TextColumn::make('deadline')
-                    ->date(),
-
-                IconColumn::make('active')
-                    ->boolean(),
-            ]);
+        return AdminResourceTable::configure(
+            SeasonsTable::configure($table),
+            Season::class,
+        );
     }
 
     public static function getRelations(): array
@@ -72,6 +64,7 @@ class SeasonResource extends Resource
         return [
             'index' => ListSeasons::route('/'),
             'create' => CreateSeason::route('/create'),
+            'view' => ViewSeason::route('/{record}'),
             'edit' => EditSeason::route('/{record}/edit'),
         ];
     }

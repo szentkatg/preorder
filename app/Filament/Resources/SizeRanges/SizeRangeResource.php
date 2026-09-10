@@ -6,8 +6,10 @@ use App\Filament\Resources\SizeRanges\Pages\CreateSizeRange;
 use App\Filament\Resources\SizeRanges\RelationManagers;
 use App\Filament\Resources\SizeRanges\Pages\EditSizeRange;
 use App\Filament\Resources\SizeRanges\Pages\ListSizeRanges;
+use App\Filament\Resources\SizeRanges\Pages\ViewSizeRange;
 use App\Filament\Resources\SizeRanges\Schemas\SizeRangeForm;
 use App\Filament\Resources\SizeRanges\Tables\SizeRangesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\SizeRange;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -30,7 +32,10 @@ class SizeRangeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return SizeRangesTable::configure($table);
+        return AdminResourceTable::configure(
+            SizeRangesTable::configure($table),
+            SizeRange::class,
+        );
     }
 
     public static function getRelations(): array
@@ -45,6 +50,7 @@ class SizeRangeResource extends Resource
         return [
             'index' => ListSizeRanges::route('/'),
             'create' => CreateSizeRange::route('/create'),
+            'view' => ViewSizeRange::route('/{record}'),
             'edit' => EditSizeRange::route('/{record}/edit'),
         ];
     }

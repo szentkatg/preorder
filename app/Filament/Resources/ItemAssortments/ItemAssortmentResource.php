@@ -5,8 +5,10 @@ namespace App\Filament\Resources\ItemAssortments;
 use App\Filament\Resources\ItemAssortments\Pages\CreateItemAssortment;
 use App\Filament\Resources\ItemAssortments\Pages\EditItemAssortment;
 use App\Filament\Resources\ItemAssortments\Pages\ListItemAssortments;
+use App\Filament\Resources\ItemAssortments\Pages\ViewItemAssortment;
 use App\Filament\Resources\ItemAssortments\Schemas\ItemAssortmentForm;
 use App\Filament\Resources\ItemAssortments\Tables\ItemAssortmentsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\ItemAssortment;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -27,7 +29,10 @@ class ItemAssortmentResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ItemAssortmentsTable::configure($table);
+        return AdminResourceTable::configure(
+            ItemAssortmentsTable::configure($table),
+            ItemAssortment::class,
+        );
     }
 
     public static function getRelations(): array
@@ -42,6 +47,7 @@ class ItemAssortmentResource extends Resource
         return [
             'index' => ListItemAssortments::route('/'),
             'create' => CreateItemAssortment::route('/create'),
+            'view' => ViewItemAssortment::route('/{record}'),
             'edit' => EditItemAssortment::route('/{record}/edit'),
         ];
     }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Orders\RelationManagers;
 
+use App\Filament\Support\AdminResourceTable;
+use App\Models\OrderItem;
 use App\Models\PriceListItem;
 use App\Models\Sku;
 use Filament\Actions\BulkActionGroup;
@@ -93,7 +95,7 @@ class ItemsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        $table = $table
             ->columns([
                 TextColumn::make('sku.sku_code')
                     ->label('Cikkszám')
@@ -142,5 +144,11 @@ class ItemsRelationManager extends RelationManager
                         ->visible(fn () => ! $this->getOwnerRecord()->isSubmitted()),
                 ]),
             ]);
+
+        return AdminResourceTable::configure(
+            $table,
+            OrderItem::class,
+            withViewAction: false,
+        );
     }
 }

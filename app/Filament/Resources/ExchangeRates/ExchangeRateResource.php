@@ -5,8 +5,10 @@ namespace App\Filament\Resources\ExchangeRates;
 use App\Filament\Resources\ExchangeRates\Pages\CreateExchangeRate;
 use App\Filament\Resources\ExchangeRates\Pages\EditExchangeRate;
 use App\Filament\Resources\ExchangeRates\Pages\ListExchangeRates;
+use App\Filament\Resources\ExchangeRates\Pages\ViewExchangeRate;
 use App\Filament\Resources\ExchangeRates\Schemas\ExchangeRateForm;
 use App\Filament\Resources\ExchangeRates\Tables\ExchangeRatesTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\ExchangeRate;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,7 +31,10 @@ class ExchangeRateResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return ExchangeRatesTable::configure($table);
+        return AdminResourceTable::configure(
+            ExchangeRatesTable::configure($table),
+            ExchangeRate::class,
+        );
     }
 
     public static function getRelations(): array
@@ -44,6 +49,7 @@ class ExchangeRateResource extends Resource
         return [
             'index' => ListExchangeRates::route('/'),
             'create' => CreateExchangeRate::route('/create'),
+            'view' => ViewExchangeRate::route('/{record}'),
             'edit' => EditExchangeRate::route('/{record}/edit'),
         ];
     }
