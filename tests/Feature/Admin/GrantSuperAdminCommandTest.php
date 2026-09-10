@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -62,5 +63,14 @@ class GrantSuperAdminCommandTest extends TestCase
         ])
             ->expectsOutputToContain('Admin user not found')
             ->assertFailed();
+    }
+
+    public function test_the_development_seed_user_receives_the_super_admin_role(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertTrue(
+            User::query()->where('email', 'test@example.com')->firstOrFail()->hasRole('super_admin'),
+        );
     }
 }

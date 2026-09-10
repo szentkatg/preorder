@@ -24,7 +24,8 @@ class RolePolicy
 
     public function update(User $user, Role $role): bool
     {
-        return $this->canManageRoles($user);
+        return $role->name !== config('filament-shield.super_admin.name', 'super_admin')
+            && $this->canManageRoles($user);
     }
 
     public function delete(User $user, Role $role): bool
