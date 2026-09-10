@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Exports\AdminTableExport;
 use App\Filament\Pages\StockOrderProportioning;
 use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
@@ -15,7 +16,6 @@ use App\Filament\Resources\Products\RelationManagers\ColorsRelationManager;
 use App\Filament\Resources\Skus\Pages\ListSkus;
 use App\Filament\Resources\Translations\Pages\ListTranslations;
 use App\Filament\Support\Pages\ReadOnlyRecord;
-use App\Exports\AdminTableExport;
 use App\Models\Brand;
 use App\Models\Color;
 use App\Models\Language;
@@ -70,6 +70,18 @@ class AdminAuthorizationTest extends TestCase
     public function test_role_resource_is_registered_in_the_admin_panel(): void
     {
         $this->assertContains(RoleResource::class, Filament::getPanel('admin')->getResources());
+    }
+
+    public function test_admin_panel_loads_the_table_scroll_enhancements(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user)
+            ->get('/admin/products')
+            ->assertOk()
+            ->assertSee('/css/admin-table-scroll.css', false)
+            ->assertSee('/js/admin-table-scroll.js', false);
     }
 
     public function test_only_users_with_an_admin_role_can_access_the_admin_panel(): void
