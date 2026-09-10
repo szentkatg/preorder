@@ -2,16 +2,22 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Filament\Pages\StockOrderProportioning;
 use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\EditAdminUser;
+use App\Filament\Resources\Languages\LanguageResource;
+use App\Models\Language;
 use App\Models\PartnerUser;
 use App\Models\User;
+use BezhanSalleh\FilamentShield\Facades\FilamentShield as Shield;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -135,5 +141,78 @@ class AdminAuthorizationTest extends TestCase
         ])->assertFormFieldIsDisabled('roles');
 
         $this->assertTrue(Gate::forUser($superAdmin)->denies('delete', $superAdmin));
+    }
+
+    public function test_resource_permissions_control_list_and_record_access(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('sales_rep', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertFalse(LanguageResource::canViewAny());
+        $this->get('/admin/languages')->assertForbidden();
+        $this->assertFalse(Gate::forUser($user)->allows('update', new Language));
+
+        $user->givePermissionTo(Permission::findOrCreate('ViewAny:Language', 'web'));
+
+        $this->assertTrue(LanguageResource::canViewAny());
+        $this->get('/admin/languages')->assertOk();
+        $this->assertFalse(Gate::forUser($user)->allows('update', new Language));
+
+        $user->givePermissionTo(Permission::findOrCreate('Update:Language', 'web'));
+
+        $this->assertTrue(Gate::forUser($user)->allows('update', new Language));
+    }
+
+    public function test_custom_page_permission_controls_page_access(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('sales_rep', 'web'));
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertFalse(StockOrderProportioning::canAccess());
+
+        $user->givePermissionTo(
+            Permission::findOrCreate('View:StockOrderProportioning', 'web'),
+        );
+
+        $this->assertTrue(StockOrderProportioning::canAccess());
+    }
+
+    public function test_every_managed_resource_and_page_has_authorization_enabled(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $resources = collect(Shield::getResources());
+        $pages = collect(Shield::getPages());
+
+        $this->assertCount(25, $resources);
+        $this->assertCount(5, $pages);
+
+        foreach ($resources as $resource) {
+            $policy = Gate::getPolicyFor($resource['modelFqcn']);
+
+            $this->assertNotNull($policy, "Missing policy for {$resource['modelFqcn']}");
+            $policyClass = $policy::class;
+
+            foreach (['viewAny', 'view', 'create', 'update', 'delete', 'deleteAny'] as $method) {
+                $this->assertTrue(
+                    method_exists($policy, $method),
+                    "Missing {$method} method on {$policyClass}",
+                );
+            }
+        }
+
+        foreach ($pages->keys() as $pageClass) {
+            $this->assertContains(
+                HasPageShield::class,
+                class_uses_recursive($pageClass),
+                "Missing page authorization on {$pageClass}",
+            );
+        }
     }
 }
