@@ -11,6 +11,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -49,6 +50,14 @@ class AdminPanelProvider extends PanelProvider
                     ->modelLabel('szerepkör')
                     ->pluralModelLabel('szerepkörök'),
             ])
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn () => view('filament.admin.table-scroll-styles'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_AFTER,
+                fn () => view('filament.admin.table-scroll-scripts'),
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
