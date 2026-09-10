@@ -2,27 +2,28 @@
 
 namespace App\Livewire\Partner;
 
+use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\SalesRepSummaryExport;
+use App\Livewire\Partner\Concerns\SetsPartnerLocale;
 use App\Models\Brand;
 use App\Models\Language;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSheetType;
+use App\Models\OrderType;
 use App\Models\PartnerAddress;
-use App\Models\PriceListItem;
 use App\Models\PartnerUser;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\Translation;
+use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\PartnerOrderMatrixExport;
-use Illuminate\Support\Facades\Mail;
-use App\Livewire\Partner\Concerns\SetsPartnerLocale;
-use App\Services\Partner\SalesRepOrderSummaryService;
-use Illuminate\Support\Facades\Log;
-
 
 class OrderSelector extends Component
 {
@@ -35,7 +36,7 @@ class OrderSelector extends Component
     protected ?Collection $filteredSalesRepOrderSummariesCache = null;
 
     protected float $requestStartedAt = 0.0;
-    
+
     public ?int $seasonId = null;
 
     public ?int $brandId = null;
@@ -44,12 +45,16 @@ class OrderSelector extends Component
 
     public ?int $orderSheetTypeId = null;
 
+    public ?int $orderTypeId = null;
+
+    public string $referenceNumber = '';
+
     public ?int $selectedOrderId = null;
-    
+
     public string $modelSearch = '';
 
     public array $modelSearchResults = [];
-    
+
     public int $modelSearchIndex = -1;
 
     protected array $selectedSummaryOrderIds = [];
@@ -99,6 +104,7 @@ class OrderSelector extends Component
         $this->brandId = session('partner_order_selector.brand_id');
         $this->partnerAddressId = session('partner_order_selector.partner_address_id');
         $this->orderSheetTypeId = session('partner_order_selector.order_sheet_type_id');
+        $this->orderTypeId = session('partner_order_selector.order_type_id');
         $this->selectedOrderId = session('partner_order_selector.order_id');
 
         $this->clearInvalidSessionSelection();
@@ -138,6 +144,7 @@ class OrderSelector extends Component
                 'partner',
                 'partnerAddress.language',
                 'orderSheetType',
+                'orderType',
                 'priceList.currency',
             ])
             ->orderBy('season_id')
@@ -187,7 +194,7 @@ class OrderSelector extends Component
             ->join('partners', 'partners.id', '=', 'partner_addresses.partner_id')
             ->select('partner_addresses.*')
             ->when($search !== '', function ($query) use ($search) {
-                $like = '%' . $search . '%';
+                $like = '%'.$search.'%';
 
                 $query->where(function ($query) use ($like) {
                     $query
@@ -287,14 +294,14 @@ class OrderSelector extends Component
     public function jumpToNextModelSearchResult(): void
     {
         $search = trim(mb_strtolower($this->modelSearch));
-    
+
         if ($search === '') {
             $this->modelSearchResults = [];
             $this->modelSearchIndex = -1;
-    
+
             return;
         }
-    
+
         if (empty($this->modelSearchResults)) {
             $this->modelSearchResults = collect($this->catalogGroups)
                 ->flatMap(function ($catalogGroup) use ($search) {
@@ -303,12 +310,12 @@ class OrderSelector extends Component
                             return collect($matrixGroup['products'] ?? [])
                                 ->filter(function ($product) use ($search) {
                                     $haystack = mb_strtolower(
-                                        ($product['model_code'] ?? '') . ' ' .
-                                        ($product['name'] ?? '') . ' ' .
-                                        ($product['name_hu'] ?? '') . ' ' .
+                                        ($product['model_code'] ?? '').' '.
+                                        ($product['name'] ?? '').' '.
+                                        ($product['name_hu'] ?? '').' '.
                                         ($product['name_en'] ?? '')
                                     );
-    
+
                                     return str_contains($haystack, $search);
                                 })
                                 ->map(function ($product) use ($catalogGroup) {
@@ -322,21 +329,21 @@ class OrderSelector extends Component
                 ->values()
                 ->all();
         }
-    
+
         if (empty($this->modelSearchResults)) {
             return;
         }
-    
+
         $this->modelSearchIndex++;
-    
+
         if ($this->modelSearchIndex >= count($this->modelSearchResults)) {
             $this->modelSearchIndex = 0;
         }
-    
+
         $result = $this->modelSearchResults[$this->modelSearchIndex];
-    
+
         $this->navigateToCatalogGroup($result['catalog_group_name']);
-    
+
         $this->dispatch('scroll-to-model', modelCode: $result['model_code']);
     }
 
@@ -372,6 +379,36 @@ class OrderSelector extends Component
             ->get();
 
         return $this->withTranslatedNames($types, 'order_sheet_type');
+    }
+
+    public function getOrderTypesProperty(): Collection
+    {
+        $types = OrderType::query()
+            ->where('active', true)
+            ->orderBy('code')
+            ->get();
+
+        return $this->withTranslatedNames($types, 'order_type');
+    }
+
+    public function getContextOrdersProperty(): Collection
+    {
+        if (
+            ! $this->seasonId
+            || ! $this->brandId
+            || ! $this->partnerAddressId
+            || ! $this->orderSheetTypeId
+        ) {
+            return collect();
+        }
+
+        return $this->accessibleOrders
+            ->where('season_id', (int) $this->seasonId)
+            ->where('partner_address_id', (int) $this->partnerAddressId)
+            ->where('brand_id', (int) $this->brandId)
+            ->where('order_sheet_type_id', (int) $this->orderSheetTypeId)
+            ->sortByDesc('created_at')
+            ->values();
     }
 
     protected function withTranslatedNames(Collection $models, string $entity): Collection
@@ -416,13 +453,13 @@ class OrderSelector extends Component
         if ($this->selectedOrderId) {
             $order = $this->accessibleOrders
                 ->first(fn (Order $order): bool => (int) $order->id === (int) $this->selectedOrderId);
-    
+
             if ($order instanceof Order) {
                 return $order;
             }
         }
-    
-        return $this->findExistingOrder();
+
+        return null;
     }
 
     public function formatAddress($address): string
@@ -446,6 +483,7 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
+        $this->resetNewOrderFields();
 
         $this->storeSelection();
     }
@@ -455,10 +493,10 @@ class OrderSelector extends Component
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
+        $this->resetNewOrderFields();
         $this->setPartnerLocale($this->selectedAddress);
         $this->storeSelection();
     }
-
 
     public function updatedAddressSearch(): void
     {
@@ -469,16 +507,15 @@ class OrderSelector extends Component
     {
         $this->selectedOrderId = null;
         $this->orderSheetTypeId = null;
+        $this->resetNewOrderFields();
 
         $this->storeSelection();
     }
 
     public function updatedOrderSheetTypeId(): void
     {
-        $order = $this->findExistingOrder();
-
-        $this->selectedOrderId = $order?->id;
-    
+        $this->selectedOrderId = null;
+        $this->resetNewOrderFields();
         $this->storeSelection();
     }
 
@@ -492,11 +529,39 @@ class OrderSelector extends Component
 
     protected function createOrder(): Order
     {
+        $this->referenceNumber = trim($this->referenceNumber);
+
         $address = PartnerAddress::query()
             ->with(['partner', 'priceList'])
             ->findOrFail($this->partnerAddressId);
 
         abort_unless($this->canUseAddress($address), 403);
+
+        $this->validate([
+            'referenceNumber' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('orders', 'reference_number')
+                    ->where(fn ($query) => $query
+                        ->where('season_id', $this->seasonId)
+                        ->where('partner_id', $address->partner_id)
+                        ->where('partner_address_id', $address->id)
+                        ->where('brand_id', $this->brandId)
+                        ->where('order_sheet_type_id', $this->orderSheetTypeId)),
+            ],
+            'orderTypeId' => [
+                'required',
+                'integer',
+                Rule::exists('order_types', 'id')
+                    ->where('active', true),
+            ],
+        ], [
+            'referenceNumber.required' => __('partner.reference_number_required'),
+            'referenceNumber.unique' => __('partner.reference_number_already_exists'),
+            'orderTypeId.required' => __('partner.order_type_required'),
+            'orderTypeId.exists' => __('partner.order_type_invalid'),
+        ]);
 
         $currencyId = $address->currency_id ?? $address->priceList?->currency_id;
 
@@ -506,6 +571,8 @@ class OrderSelector extends Component
             'partner_address_id' => $address->id,
             'brand_id' => $this->brandId,
             'order_sheet_type_id' => $this->orderSheetTypeId,
+            'reference_number' => trim($this->referenceNumber),
+            'order_type_id' => $this->orderTypeId,
             'price_list_id' => $address->price_list_id,
             'currency_id' => $currencyId,
             'language_id' => $address->language_id,
@@ -515,23 +582,21 @@ class OrderSelector extends Component
 
     public function proceed()
     {
-        $order = $this->findExistingOrder();
-    
-        if (! $order) {
-            $order = $this->createOrder();
-        }
-    
+        abort_unless($this->canProceed, 422);
+
+        $order = $this->createOrder();
+
+        $this->accessibleOrdersCache = null;
+
         $this->selectedOrderId = $order->id;
         $this->storeSelection();
-    
+
         return $this->openOrder();
     }
 
     public function getActionLabelProperty(): string
     {
-        return $this->findExistingOrder()
-            ? __('partner.open_order')
-            : __('partner.load_order_sheet');
+        return __('partner.create_order');
     }
 
     public function getCanProceedProperty(): bool
@@ -541,7 +606,21 @@ class OrderSelector extends Component
             && $this->partnerAddressId
             && $this->brandId
             && $this->orderSheetTypeId
+            && filled($this->referenceNumber)
+            && $this->orderTypeId
         );
+    }
+
+    public function openExistingOrder(int $orderId)
+    {
+        $order = $this->contextOrders->firstWhere('id', $orderId);
+
+        abort_unless($order instanceof Order, 403);
+
+        $this->selectedOrderId = (int) $order->id;
+        $this->storeSelection();
+
+        return $this->openOrder();
     }
 
     public function getCatalogGroupsProperty(): Collection
@@ -738,6 +817,22 @@ class OrderSelector extends Component
                                         )
                                     ),
                                     $search
+                                )
+                                || str_contains(
+                                    mb_strtolower(
+                                        (string) (
+                                            $summary['reference_number'] ?? ''
+                                        )
+                                    ),
+                                    $search
+                                )
+                                || str_contains(
+                                    mb_strtolower(
+                                        (string) (
+                                            $summary['order_type'] ?? ''
+                                        )
+                                    ),
+                                    $search
                                 );
                         }
                     );
@@ -767,15 +862,13 @@ class OrderSelector extends Component
             ->when(
                 $this->summaryFilledFilter === 'filled',
                 fn (Collection $summaries) => $summaries->filter(
-                    fn (array $summary): bool =>
-                        (int) ($summary['quantity'] ?? 0) > 0
+                    fn (array $summary): bool => (int) ($summary['quantity'] ?? 0) > 0
                 )
             )
             ->when(
                 $this->summaryFilledFilter === 'empty',
                 fn (Collection $summaries) => $summaries->filter(
-                    fn (array $summary): bool =>
-                        (int) ($summary['quantity'] ?? 0) === 0
+                    fn (array $summary): bool => (int) ($summary['quantity'] ?? 0) === 0
                 )
             )
             ->when(
@@ -811,6 +904,7 @@ class OrderSelector extends Component
         $this->brandId = (int) $order->brand_id;
         $this->partnerAddressId = (int) $order->partner_address_id;
         $this->orderSheetTypeId = (int) $order->order_sheet_type_id;
+        $this->orderTypeId = (int) $order->order_type_id;
 
         $this->storeSelection();
 
@@ -855,40 +949,41 @@ class OrderSelector extends Component
     public function submitSelectedOrder(): void
     {
         $order = $this->selectedOrder();
-    
+
         abort_unless($order instanceof Order, 403);
-    
+
         if ($order->isSubmitted()) {
             return;
         }
-    
+
         $order->update([
             'status' => 'submitted',
             'submitted_at' => now(),
         ]);
-    
+
         $order->refresh();
         $this->dispatch('order-summary-changed');
-    
+
         $partnerUser = auth('partner')->user();
-    
+
         if ($partnerUser?->email) {
             $export = new PartnerOrderMatrixExport($order);
-    
+
             $filename = method_exists($export, 'filename')
                 ? $export->filename()
-                : 'elorendeles-' . $order->id . '.xlsx';
-    
+                : 'elorendeles-'.$order->id.'.xlsx';
+
             $excelContent = Excel::raw($export, \Maatwebsite\Excel\Excel::XLSX);
-            
+
             $subject = implode(' | ', array_filter([
-            $order->partner?->erp_partner_code,
-            $order->partner?->name,
-            $order->partnerAddress?->name,
-            $order->brand?->name,
-            $order->orderSheetType?->translate('name'),
-        ]));
-            $subject = __('partner.order_submitted_email_subject') . ' | ' . $subject;
+                $order->partner?->erp_partner_code,
+                $order->partner?->name,
+                $order->partnerAddress?->name,
+                $order->brand?->name,
+                $order->orderSheetType?->translate('name'),
+                $order->reference_number,
+            ]));
+            $subject = __('partner.order_submitted_email_subject').' | '.$subject;
             Mail::raw(__('partner.order_submitted_email_body'), function ($message) use (
                 $partnerUser,
                 $filename,
@@ -908,13 +1003,12 @@ class OrderSelector extends Component
                     );
             });
         }
-    
+
         $this->dispatch('$refresh');
     }
 
     public function resetSelectedOrderToDraft(): void
     {
-
 
         $order = $this->selectedOrder();
 
@@ -931,7 +1025,6 @@ class OrderSelector extends Component
         $this->dispatch('order-summary-changed');
         $this->dispatch('$refresh');
     }
-
 
     public function updatedSelectedSummaryOrderIds(): void
     {
@@ -1036,7 +1129,7 @@ class OrderSelector extends Component
 
         return Excel::download(
             new SalesRepSummaryExport($this->filteredSalesRepOrderSummaries),
-            __('partner.sales_rep_export_filename') . '-' . now()->format('Ymd-His') . '.xlsx'
+            __('partner.sales_rep_export_filename').'-'.now()->format('Ymd-His').'.xlsx'
         );
     }
 
@@ -1045,24 +1138,27 @@ class OrderSelector extends Component
         if (! $this->partnerAddressId) {
             return;
         }
-    
+
         $allowedAddressIds = $this->addresses
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
-    
+
         if (! in_array((int) $this->partnerAddressId, $allowedAddressIds, true)) {
             $this->seasonId = null;
             $this->brandId = null;
             $this->partnerAddressId = null;
             $this->orderSheetTypeId = null;
+            $this->orderTypeId = null;
+            $this->referenceNumber = '';
             $this->selectedOrderId = null;
-    
+
             session()->forget([
                 'partner_order_selector.season_id',
                 'partner_order_selector.brand_id',
                 'partner_order_selector.partner_address_id',
                 'partner_order_selector.order_sheet_type_id',
+                'partner_order_selector.order_type_id',
                 'partner_order_selector.order_id',
             ]);
         }
@@ -1075,6 +1171,7 @@ class OrderSelector extends Component
             'partner_order_selector.brand_id' => $this->brandId,
             'partner_order_selector.partner_address_id' => $this->partnerAddressId,
             'partner_order_selector.order_sheet_type_id' => $this->orderSheetTypeId,
+            'partner_order_selector.order_type_id' => $this->orderTypeId,
             'partner_order_selector.order_id' => $this->selectedOrderId,
         ]);
     }
@@ -1084,7 +1181,7 @@ class OrderSelector extends Component
         if (! $this->seasonId && $this->seasons->count() === 1) {
             $this->seasonId = $this->seasons->first()->id;
         }
-    
+
         if (! $this->partnerAddressId && $this->addresses->count() === 1) {
             $this->partnerAddressId = $this->addresses->first()['id'] ?? null;
 
@@ -1092,30 +1189,22 @@ class OrderSelector extends Component
                 $this->setPartnerLocale($this->selectedAddress);
             }
         }
-    
+
         if (! $this->brandId && $this->brands->count() === 1) {
             $this->brandId = $this->brands->first()->id;
         }
-    
+
         if (! $this->orderSheetTypeId && $this->orderSheetTypes->count() === 1) {
             $this->orderSheetTypeId = $this->orderSheetTypes->first()->id;
         }
-    
-        if (
-            ! $this->selectedOrderId
-            && $this->seasonId
-            && $this->brandId
-            && $this->partnerAddressId
-            && $this->orderSheetTypeId
-        ) {
-            $order = $this->findExistingOrder();
-    
-            $this->selectedOrderId = $order?->id;
+
+        if (! $this->orderTypeId) {
+            $this->orderTypeId = (int) ($this->orderTypes
+                ->firstWhere('code', 'VRELO')?->id ?? 0) ?: null;
         }
-    
+
         $this->storeSelection();
     }
-
 
     protected function canUseAddress(PartnerAddress $address): bool
     {
@@ -1130,31 +1219,11 @@ class OrderSelector extends Component
             ->exists();
     }
 
-    protected function findExistingOrder(): ?Order
+    protected function resetNewOrderFields(): void
     {
-        if (
-            ! $this->seasonId ||
-            ! $this->brandId ||
-            ! $this->partnerAddressId ||
-            ! $this->orderSheetTypeId
-        ) {
-            return null;
-        }
-    
-        return Order::query()
-            ->with([
-                'season',
-                'brand',
-                'partner',
-                'partnerAddress.language',
-                'orderSheetType',
-                'priceList.currency',
-            ])
-            ->where('season_id', $this->seasonId)
-            ->where('partner_address_id', $this->partnerAddressId)
-            ->where('brand_id', $this->brandId)
-            ->where('order_sheet_type_id', $this->orderSheetTypeId)
-            ->first();
+        $this->referenceNumber = '';
+        $this->orderTypeId = (int) ($this->orderTypes
+            ->firstWhere('code', 'VRELO')?->id ?? 0) ?: null;
     }
 
     public function render()

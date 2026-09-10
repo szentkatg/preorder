@@ -3,7 +3,6 @@
 namespace App\Livewire\Partner;
 
 use App\Models\Brand;
-use App\Models\Order;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
 use App\Models\Product;
@@ -19,8 +18,6 @@ class ProductList extends Component
     public Brand $brand;
 
     public OrderSheetType $type;
-
-    public ?Order $order = null;
 
     public function mount(
         Season $season,
@@ -45,19 +42,15 @@ class ProductList extends Component
         $this->brand = $brand;
         $this->type = $type;
 
-        $this->order = Order::firstOrCreate(
-            [
-                'season_id' => $this->season->id,
-                'partner_id' => $this->address->partner_id,
-                'partner_address_id' => $this->address->id,
-                'brand_id' => $this->brand->id,
-                'order_sheet_type_id' => $this->type->id,
-                'status' => 'editing',
-            ],
-            [
-                'price_list_id' => $this->address->price_list_id,
-            ]
-        );
+        session([
+            'partner_order_selector.season_id' => (int) $this->season->id,
+            'partner_order_selector.partner_address_id' => (int) $this->address->id,
+            'partner_order_selector.brand_id' => (int) $this->brand->id,
+            'partner_order_selector.order_sheet_type_id' => (int) $this->type->id,
+            'partner_order_selector.order_id' => null,
+        ]);
+
+        $this->redirectRoute('partner.orders.select', navigate: true);
     }
 
     public function render()

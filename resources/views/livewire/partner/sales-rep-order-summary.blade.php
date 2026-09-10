@@ -140,6 +140,8 @@
                             <th class="bg-white px-3 py-2">{{ __('partner.season') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.brand') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.order_sheet') }}</th>
+                            <th class="whitespace-nowrap bg-white px-3 py-2">{{ __('partner.reference_number') }}</th>
+                            <th class="whitespace-nowrap bg-white px-3 py-2">{{ __('partner.order_type') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.status') }}</th>
                             <th class="bg-white px-3 py-2 text-center">{{ __('partner.currency') }}</th>
                             <th class="bg-white px-3 py-2 text-right">{{ __('partner.total_quantity') }}</th>
@@ -175,6 +177,8 @@
                                 <td class="px-3 py-2">{{ $summary['season'] }}</td>
                                 <td class="px-3 py-2">{{ $summary['brand'] }}</td>
                                 <td class="px-3 py-2">{{ $summary['type'] }}</td>
+                                <td class="whitespace-nowrap px-3 py-2">{{ $summary['reference_number'] }}</td>
+                                <td class="whitespace-nowrap px-3 py-2">{{ $summary['order_type'] }}</td>
                                 <td class="px-3 py-2">
                                     <span title="{{ $summary['status_label'] }}">{{ $summary['status_icon'] }}</span>
                                 </td>
@@ -197,7 +201,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="13" class="px-3 py-6 text-center text-gray-500">
+                                <td colspan="15" class="px-3 py-6 text-center text-gray-500">
                                     {{ __('partner.no_orders') }}
                                 </td>
                             </tr>
@@ -208,7 +212,7 @@
                         @foreach ($this->filteredSalesRepOrderSummaries->groupBy('currency') as $currency => $rows)
                             <tr class="border-t bg-gray-50 font-semibold">
                                 <td></td>
-                                <td colspan="7" class="px-3 py-2">
+                                <td colspan="9" class="px-3 py-2">
                                     {{ __('partner.total') }} – {{ $currency }}
                                 </td>
                                 <td class="px-3 py-2 text-right">

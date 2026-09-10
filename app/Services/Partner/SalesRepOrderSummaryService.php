@@ -352,17 +352,13 @@ class SalesRepOrderSummaryService
                     'order_id' => $orderId,
                     'season_id' => (int) $order->season_id,
                     'brand_id' => (int) $order->brand_id,
-                    'order_sheet_type_id' =>
-                        (int) $order->order_sheet_type_id,
+                    'order_sheet_type_id' => (int) $order->order_sheet_type_id,
 
-                    'partner_code' =>
-                        $order->partner?->erp_partner_code ?? '',
+                    'partner_code' => $order->partner?->erp_partner_code ?? '',
 
-                    'partner_name' =>
-                        $order->partner?->name ?? '',
+                    'partner_name' => $order->partner?->name ?? '',
 
-                    'address_name' =>
-                        $order->partnerAddress?->name
+                    'address_name' => $order->partnerAddress?->name
                         ?? $order->partnerAddress?->addrid
                         ?? '',
 
@@ -375,17 +371,18 @@ class SalesRepOrderSummaryService
 
                     'type' => $order->orderSheetType?->translate('name'),
 
+                    'reference_number' => $order->reference_number ?? '',
+
+                    'order_type' => $order->orderType?->translate('name'),
+
                     'status' => $order->status,
 
                     'status_label' => match ($order->status) {
-                        'submitted' =>
-                            __('partner.status_submitted'),
+                        'submitted' => __('partner.status_submitted'),
 
-                        'draft' =>
-                            __('partner.status_draft'),
+                        'draft' => __('partner.status_draft'),
 
-                        default =>
-                            __('partner.status_in_progress'),
+                        default => __('partner.status_in_progress'),
                     },
 
                     'status_icon' => match ($order->status) {
@@ -394,24 +391,19 @@ class SalesRepOrderSummaryService
                         default => '⏳',
                     },
 
-                    'currency' =>
-                        $order->priceList?->currency?->symbol
+                    'currency' => $order->priceList?->currency?->symbol
                         ?? $order->priceList?->currency?->code
                         ?? '',
 
                     'quantity' => (int) $totals['quantity'],
 
-                    'wholesale_value' =>
-                        $wholesaleValue,
+                    'wholesale_value' => $wholesaleValue,
 
-                    'retail_value' =>
-                        $retailValue,
+                    'retail_value' => $retailValue,
 
-                    'wholesale_value_huf' =>
-                        $wholesaleValue * $rateToHuf,
+                    'wholesale_value_huf' => $wholesaleValue * $rateToHuf,
 
-                    'retail_value_huf' =>
-                        $retailValue * $rateToHuf,
+                    'retail_value_huf' => $retailValue * $rateToHuf,
 
                     'rate_to_huf' => $rateToHuf,
                 ];
@@ -441,17 +433,17 @@ class SalesRepOrderSummaryService
         int $productId,
     ): string {
         return $priceListId
-            . ':'
-            . $seasonId
-            . ':'
-            . $productId;
+            .':'
+            .$seasonId
+            .':'
+            .$productId;
     }
 
     protected function exchangeRateKey(
         int $seasonId,
         int $currencyId,
     ): string {
-        return $seasonId . ':' . $currencyId;
+        return $seasonId.':'.$currencyId;
     }
 
     protected function formatAddress($address): string

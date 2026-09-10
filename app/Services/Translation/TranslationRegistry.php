@@ -3,15 +3,12 @@
 namespace App\Services\Translation;
 
 use App\Models\Brand;
-use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
 use App\Models\Language;
 use App\Models\OrderSheetType;
-use App\Models\Product;
+use App\Models\OrderType;
 use App\Models\Season;
-use App\Models\Size;
-use App\Models\SizeRange;
 use InvalidArgumentException;
 
 class TranslationRegistry
@@ -67,6 +64,16 @@ class TranslationRegistry
             'order_sheet_type' => [
                 'label' => 'Rendelési ív típusa',
                 'model' => OrderSheetType::class,
+                'code_column' => 'code',
+                'fallback_column' => 'name',
+                'fields' => [
+                    'name' => 'Név',
+                ],
+            ],
+
+            'order_type' => [
+                'label' => 'Rendeléstípus',
+                'model' => OrderType::class,
                 'code_column' => 'code',
                 'fallback_column' => 'name',
                 'fields' => [

@@ -19,6 +19,11 @@ class OrdersTable
                     ->label('#')
                     ->sortable(),
 
+                TextColumn::make('reference_number')
+                    ->label('Hivatkozási szám')
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('season.name')
                     ->label('Szezon')
                     ->sortable(),
@@ -37,21 +42,26 @@ class OrdersTable
                 TextColumn::make('orderSheetType.name')
                     ->label('Rendelőlap'),
 
+                TextColumn::make('orderType.code')
+                    ->label('Rendeléstípus')
+                    ->description(fn ($record): ?string => $record->orderType?->name)
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('priceList.code')
                     ->label('Árlista'),
 
                 TextColumn::make('currency.code')
                     ->label('Pénznem'),
 
-
                 TextColumn::make('total_ordered_units')
                     ->label('Rendelt egység')
                     ->numeric(),
-                
+
                 TextColumn::make('total_effective_quantity')
                     ->label('Tényleges db')
                     ->numeric(),
-                
+
                 TextColumn::make('total_value')
                     ->label('Érték')
                     ->numeric(2),
@@ -77,6 +87,10 @@ class OrdersTable
                 SelectFilter::make('orderSheetType')
                     ->label('Rendelőlap')
                     ->relationship('orderSheetType', 'name'),
+
+                SelectFilter::make('orderType')
+                    ->label('Rendeléstípus')
+                    ->relationship('orderType', 'name'),
 
                 SelectFilter::make('status')
                     ->label('Státusz')

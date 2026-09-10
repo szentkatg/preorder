@@ -3,13 +3,17 @@
 namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Models\Brand;
+use App\Models\Order;
 use App\Models\OrderSheetType;
+use App\Models\OrderType;
 use App\Models\PartnerAddress;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Validation\Rules\Unique;
 
 class OrderForm
 {
@@ -82,8 +86,7 @@ class OrderForm
                         }
 
                         return Brand::query()
-                            ->whereHas('partnerAddresses', fn ($query) =>
-                                $query->where('partner_addresses.id', $addressId)
+                            ->whereHas('partnerAddresses', fn ($query) => $query->where('partner_addresses.id', $addressId)
                             )
                             ->orderBy('name')
                             ->pluck('name', 'id');
@@ -104,13 +107,46 @@ class OrderForm
                         }
 
                         return OrderSheetType::query()
-                            ->whereHas('partnerAddresses', fn ($query) =>
-                                $query->where('partner_addresses.id', $addressId)
+                            ->whereHas('partnerAddresses', fn ($query) => $query->where('partner_addresses.id', $addressId)
                             )
                             ->orderBy('name')
                             ->pluck('name', 'id');
                     })
                     ->searchable()
+                    ->required()
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                TextInput::make('reference_number')
+                    ->label('Hivatkozási szám')
+                    ->required()
+                    ->maxLength(100)
+                    ->dehydrateStateUsing(
+                        fn (?string $state): ?string => filled($state)
+                            ? trim($state)
+                            : $state
+                    )
+                    ->unique(
+                        table: Order::class,
+                        column: 'reference_number',
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule
+                            ->where('season_id', $get('season_id'))
+                            ->where('partner_id', $get('partner_id'))
+                            ->where('partner_address_id', $get('partner_address_id'))
+                            ->where('brand_id', $get('brand_id'))
+                            ->where('order_sheet_type_id', $get('order_sheet_type_id')),
+                    )
+                    ->disabled(fn ($record) => $record?->isSubmitted()),
+
+                Select::make('order_type_id')
+                    ->label('Rendeléstípus')
+                    ->relationship('orderType', 'name')
+                    ->getOptionLabelFromRecordUsing(
+                        fn (OrderType $record): string => "{$record->code} – {$record->name}"
+                    )
+                    ->default(fn () => OrderType::query()->where('code', 'VRELO')->value('id'))
+                    ->searchable()
+                    ->preload()
                     ->required()
                     ->disabled(fn ($record) => $record?->isSubmitted()),
 

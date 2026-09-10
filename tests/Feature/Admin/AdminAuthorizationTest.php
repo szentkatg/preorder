@@ -482,7 +482,7 @@ class AdminAuthorizationTest extends TestCase
         $resources = collect(Shield::getResources());
         $pages = collect(Shield::getPages());
 
-        $this->assertCount(25, $resources);
+        $this->assertCount(26, $resources);
         $this->assertCount(5, $pages);
 
         foreach ($resources as $resource) {

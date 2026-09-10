@@ -4,33 +4,25 @@ namespace App\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Events\AfterSheet;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;    
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class SalesRepSummaryExport implements
-    FromCollection,
-    WithHeadings,
-    WithStyles,
-    WithColumnFormatting,
-    WithEvents,
-    ShouldAutoSize
+class SalesRepSummaryExport implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithEvents, WithHeadings, WithStyles
 {
-    
     protected int $detailRowCount = 0;
-        
+
     public function __construct(
         protected Collection $rows
     ) {}
-    
+
     public function styles(Worksheet $sheet): array
     {
         return [
@@ -45,64 +37,63 @@ class SalesRepSummaryExport implements
             ],
         ];
     }
-    
+
     public function registerEvents(): array
     {
         return [
             AfterSheet::class => function (AfterSheet $event) {
-    
+
                 $sheet = $event->sheet->getDelegate();
-    
+
                 $sheet->freezePane('A2');
-    
+
                 $summaryStartRow = $this->detailRowCount + 3;
-    
+
                 $lastRow = $sheet->getHighestRow();
-    
+
                 for ($row = $summaryStartRow; $row < $lastRow; $row++) {
-    
-                    $sheet->getStyle("A{$row}:M{$row}")
+
+                    $sheet->getStyle("A{$row}:O{$row}")
                         ->getFont()
                         ->setBold(true);
                 }
-    
-                $sheet->getStyle("A{$lastRow}:M{$lastRow}")
+
+                $sheet->getStyle("A{$lastRow}:O{$lastRow}")
                     ->getFont()
                     ->setBold(true);
-    
-                $sheet->getStyle("A{$lastRow}:M{$lastRow}")
+
+                $sheet->getStyle("A{$lastRow}:O{$lastRow}")
                     ->getFill()
                     ->setFillType(
-                        \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID
+                        Fill::FILL_SOLID
                     );
-    
-                $sheet->getStyle("A{$lastRow}:M{$lastRow}")
+
+                $sheet->getStyle("A{$lastRow}:O{$lastRow}")
                     ->getFill()
                     ->getStartColor()
                     ->setARGB('FFE5E7EB');
-    
-                $sheet->getStyle("A{$lastRow}:M{$lastRow}")
+
+                $sheet->getStyle("A{$lastRow}:O{$lastRow}")
                     ->getBorders()
                     ->getOutline()
                     ->setBorderStyle(
-                        \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK
+                        Border::BORDER_THICK
                     );
             },
         ];
     }
-    
+
     public function columnFormats(): array
     {
         return [
-            'I' => '#,##0',
-            'J' => '#,##0.00',
-            'K' => '#,##0.00',
+            'K' => '#,##0',
             'L' => '#,##0.00',
             'M' => '#,##0.00',
+            'N' => '#,##0.00',
+            'O' => '#,##0.00',
         ];
     }
-    
-    
+
     public function headings(): array
     {
         return [
@@ -112,6 +103,8 @@ class SalesRepSummaryExport implements
             __('partner.season'),
             __('partner.brand'),
             __('partner.order_sheet'),
+            __('partner.reference_number'),
+            __('partner.order_type'),
             __('partner.status'),
             __('partner.currency'),
             __('partner.total_quantity'),
@@ -123,7 +116,7 @@ class SalesRepSummaryExport implements
     }
 
     public function collection(): Collection
-    {   
+    {
 
         $detailRows = $this->rows->map(fn ($row) => [
             $row['partner_code'],
@@ -132,6 +125,8 @@ class SalesRepSummaryExport implements
             $row['season'],
             $row['brand'],
             $row['type'],
+            $row['reference_number'],
+            $row['order_type'],
             $row['status_label'],
             $row['currency'],
             $row['quantity'],
@@ -142,10 +137,12 @@ class SalesRepSummaryExport implements
         ]);
         $this->detailRowCount = $detailRows->count();
         $summaryRows = collect();
-    
+
         foreach ($this->rows->groupBy('currency') as $currency => $rows) {
             $summaryRows->push([
-                __('partner.total_for_currencyl') . ' / ' . ($currency ?: __('partner.no_currency')),
+                __('partner.total_for_currencyl').' / '.($currency ?: __('partner.no_currency')),
+                '',
+                '',
                 '',
                 '',
                 '',
@@ -160,9 +157,11 @@ class SalesRepSummaryExport implements
                 (float) $rows->sum('retail_value_huf'),
             ]);
         }
-    
+
         $summaryRows->push([
             __('partner.grand_total'),
+            '',
+            '',
             '',
             '',
             '',
@@ -176,9 +175,9 @@ class SalesRepSummaryExport implements
             (float) $this->rows->sum('wholesale_value_huf'),
             (float) $this->rows->sum('retail_value_huf'),
         ]);
-    
+
         return $detailRows
-            ->push(['', '', '', '', '', '', '', '', '', '', '', '', ''])
+            ->push(['', '', '', '', '', '', '', '', '', '', '', '', '', '', ''])
             ->merge($summaryRows);
     }
 }

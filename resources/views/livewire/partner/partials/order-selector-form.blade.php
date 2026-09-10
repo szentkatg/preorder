@@ -104,27 +104,128 @@
                 </select>
             </div>
 
-            <div class="flex items-end justify-end md:col-span-2">
-                @if ($seasonId && $partnerAddressId && $brandId && $orderSheetTypeId)
-                    @if ($this->selectedOrder)
-                        <button
-                            type="button"
-                            wire:click="openOrder"
-                            class="whitespace-nowrap rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
-                        >
-                            {{ __('partner.open_order') }}
-                        </button>
+            @if ($seasonId && $partnerAddressId && $brandId && $orderSheetTypeId)
+                <div class="md:col-span-6">
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <h2 class="text-sm font-semibold text-gray-900">
+                            {{ __('partner.existing_orders') }}
+                        </h2>
+
+                        <span class="text-xs text-gray-500">
+                            {{ trans_choice('partner.order_count', $this->contextOrders->count(), ['count' => $this->contextOrders->count()]) }}
+                        </span>
+                    </div>
+
+                    @if ($this->contextOrders->isEmpty())
+                        <div class="rounded border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                            {{ __('partner.no_existing_orders') }}
+                        </div>
                     @else
+                        <div class="overflow-x-auto rounded border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50 text-left text-gray-700">
+                                    <tr>
+                                        <th class="px-3 py-2">{{ __('partner.reference_number') }}</th>
+                                        <th class="px-3 py-2">{{ __('partner.order_type') }}</th>
+                                        <th class="px-3 py-2">{{ __('partner.status') }}</th>
+                                        <th class="px-3 py-2 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    @foreach ($this->contextOrders as $contextOrder)
+                                        <tr wire:key="context-order-{{ $contextOrder->id }}">
+                                            <td class="whitespace-nowrap px-3 py-2 font-semibold">
+                                                {{ $contextOrder->reference_number }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-2">
+                                                {{ $contextOrder->orderType?->code }}
+                                                @if ($contextOrder->orderType)
+                                                    – {{ $contextOrder->orderType->translate('name') }}
+                                                @endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-2">
+                                                {{ $contextOrder->isSubmitted()
+                                                    ? __('partner.status_submitted')
+                                                    : __('partner.status_draft') }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-2 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="openExistingOrder({{ $contextOrder->id }})"
+                                                    class="rounded bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-600"
+                                                >
+                                                    {{ __('partner.open_order') }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium">
+                        {{ __('partner.reference_number') }}
+                    </label>
+
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="referenceNumber"
+                        maxlength="100"
+                        class="w-full rounded border-gray-300 bg-yellow-100"
+                        placeholder="{{ __('partner.reference_number_placeholder') }}"
+                    >
+
+                    @error('referenceNumber')
+                        <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium">
+                        {{ __('partner.order_type') }}
+                    </label>
+
+                    <select
+                        wire:model.live="orderTypeId"
+                        class="w-full rounded border-gray-300 bg-yellow-100"
+                    >
+                        <option value="">{{ __('partner.select_order_type') }}</option>
+
+                        @foreach ($this->orderTypes as $orderType)
+                            <option value="{{ $orderType->id }}">
+                                {{ $orderType->code }} – {{ $orderType->translated_name ?? $orderType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    @error('orderTypeId')
+                        <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="flex items-end justify-end md:col-span-2">
+                    @if ($this->canProceed)
                         <button
                             type="button"
                             wire:click="proceed"
                             class="whitespace-nowrap rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
                         >
-                            {{ __('partner.load_order_sheet') }}
+                            {{ __('partner.create_order') }}
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            disabled
+                            class="whitespace-nowrap rounded-lg bg-slate-300 px-5 py-2.5 text-sm font-semibold text-white"
+                        >
+                            {{ __('partner.create_order') }}
                         </button>
                     @endif
-                @endif
-            </div>
+                </div>
+            @endif
 
         </div>
     </div>

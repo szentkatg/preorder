@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PDO;
 use Spatie\Permission\Models\Role;
@@ -40,6 +41,28 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('model_has_roles'));
         $this->assertTrue(Schema::hasTable('model_has_permissions'));
         $this->assertTrue(Schema::hasTable('role_has_permissions'));
+        $this->assertTrue(Schema::hasTable('order_types'));
+        $this->assertTrue(Schema::hasColumns('orders', [
+            'reference_number',
+            'order_type_id',
+        ]));
+        $this->assertTrue(Schema::hasColumns('order_types', [
+            'code',
+            'name',
+            'include_in_supplier_order',
+            'active',
+        ]));
+        $this->assertSame(5, DB::table('order_types')->count());
+        $this->assertTrue(
+            (bool) DB::table('order_types')
+                ->where('code', 'VRELO')
+                ->value('include_in_supplier_order')
+        );
+        $this->assertFalse(
+            (bool) DB::table('order_types')
+                ->where('code', 'TSTOCK')
+                ->value('include_in_supplier_order')
+        );
 
         $user = User::factory()->create();
         $role = Role::create([

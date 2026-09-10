@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Order extends Model
 {
@@ -13,6 +12,8 @@ class Order extends Model
         'partner_address_id',
         'brand_id',
         'order_sheet_type_id',
+        'reference_number',
+        'order_type_id',
         'price_list_id',
         'currency_id',
         'language_id',
@@ -20,6 +21,13 @@ class Order extends Model
         'notes',
         'submitted_at',
     ];
+
+    public function setReferenceNumberAttribute(mixed $value): void
+    {
+        $this->attributes['reference_number'] = is_string($value)
+            ? trim($value)
+            : $value;
+    }
 
     public function season()
     {
@@ -46,6 +54,11 @@ class Order extends Model
         return $this->belongsTo(OrderSheetType::class);
     }
 
+    public function orderType()
+    {
+        return $this->belongsTo(OrderType::class);
+    }
+
     public function priceList()
     {
         return $this->belongsTo(PriceList::class);
@@ -65,20 +78,22 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
+
     public function getTotalOrderedUnitsAttribute(): int
     {
         return $this->items->sum('quantity');
     }
-    
+
     public function getTotalEffectiveQuantityAttribute(): int
     {
         return $this->items->sum(fn ($item) => $item->effective_quantity);
     }
-    
+
     public function getTotalValueAttribute(): float
     {
         return $this->items->sum('line_total');
     }
+
     public function isSubmitted(): bool
     {
         return $this->status === 'submitted';

@@ -103,6 +103,7 @@ class SalesRepOrderSummary extends Component
                 'partner',
                 'partnerAddress.language',
                 'orderSheetType',
+                'orderType',
                 'priceList.currency',
             ])
             ->orderBy('season_id')
@@ -163,6 +164,8 @@ class SalesRepOrderSummary extends Component
                         $summary['partner_name'] ?? '',
                         $summary['address_name'] ?? '',
                         $summary['address'] ?? '',
+                        $summary['reference_number'] ?? '',
+                        $summary['order_type'] ?? '',
                     ]));
 
                     return str_contains($haystack, $search);
@@ -246,6 +249,7 @@ class SalesRepOrderSummary extends Component
             'partner_order_selector.brand_id' => (int) $order->brand_id,
             'partner_order_selector.partner_address_id' => (int) $order->partner_address_id,
             'partner_order_selector.order_sheet_type_id' => (int) $order->order_sheet_type_id,
+            'partner_order_selector.order_type_id' => (int) $order->order_type_id,
             'partner_order_selector.order_id' => (int) $order->id,
             'order_selector.open_order_id' => (int) $order->id,
         ]);
@@ -316,9 +320,9 @@ class SalesRepOrderSummary extends Component
         return Excel::download(
             new SalesRepSummaryExport($this->filteredSalesRepOrderSummaries),
             __('partner.sales_rep_export_filename')
-                . '-'
-                . now()->format('Ymd-His')
-                . '.xlsx'
+                .'-'
+                .now()->format('Ymd-His')
+                .'.xlsx'
         );
     }
 
@@ -365,6 +369,6 @@ class SalesRepOrderSummary extends Component
 
     protected function summaryCacheKey(): string
     {
-        return 'order-selector:sales-rep-summary:' . (int) auth('partner')->id();
+        return 'order-selector:sales-rep-summary:'.(int) auth('partner')->id();
     }
 }
