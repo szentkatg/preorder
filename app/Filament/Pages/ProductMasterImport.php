@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\Brand;
 use App\Models\Color;
+use App\Models\ColorImage;
 use App\Models\ItemAssortment;
 use App\Models\ItemMainGroup;
 use App\Models\OrderSheetType;
@@ -13,16 +14,18 @@ use App\Models\Size;
 use App\Models\SizeRange;
 use App\Models\Sku;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use DateTimeImmutable;
+use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use App\Models\ColorImage;
-
 
 class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 {
@@ -349,6 +352,17 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
             if ($sizeRangeCode && ! $sizeRangeCodes->contains($sizeRangeCode)) {
                 $this->addRowError($modelCode, "products {$rowNumber}. sor: nem létező size_range_code: {$sizeRangeCode}");
             }
+
+            if (array_key_exists('promised_delivery_date', $row)) {
+                try {
+                    $this->dateValue($row['promised_delivery_date']);
+                } catch (InvalidArgumentException) {
+                    $this->addRowError(
+                        $modelCode,
+                        "products {$rowNumber}. sor: hibás promised_delivery_date"
+                    );
+                }
+            }
         }
 
         foreach ($this->sheets['colors'] ?? [] as $index => $row) {
@@ -471,7 +485,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             $sizeRangeCode = $this->nullIfEmpty($row['size_range_code'] ?? null);
 
-            $product->forceFill([
+            $productData = [
                 'brand_id' => $brands->get($this->nullIfEmpty($row['brand_code'] ?? null))?->id,
                 'order_sheet_type_id' => $types->get($this->nullIfEmpty($row['order_sheet_type_code'] ?? null))?->id,
                 'season_id' => $seasons->get($this->nullIfEmpty($row['season_code'] ?? null))?->id,
@@ -485,7 +499,15 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
                 'catalog_sort' => $this->nullIfEmpty($row['catalog_sort'] ?? null),
                 'catalog_page' => $this->nullIfEmpty($row['catalog_page'] ?? null),
                 'active' => $this->boolValue($row['active'] ?? true),
-            ]);
+            ];
+
+            if (array_key_exists('promised_delivery_date', $row)) {
+                $productData['promised_delivery_date'] = $this->dateValue(
+                    $row['promised_delivery_date']
+                );
+            }
+
+            $product->forceFill($productData);
 
             $product->save();
 
@@ -790,6 +812,51 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         $value = strtolower(trim((string) $value));
 
         return in_array($value, ['1', 'true', 'yes', 'igen', 'y'], true);
+    }
+
+    protected function dateValue(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        $value = $this->nullIfEmpty($value);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            try {
+                return ExcelDate::excelToDateTimeObject((float) $value)
+                    ->format('Y-m-d');
+            } catch (\Throwable) {
+                throw new InvalidArgumentException('Érvénytelen Excel-dátum.');
+            }
+        }
+
+        foreach ([
+            '!Y-m-d',
+            '!Y.m.d',
+            '!Y.m.d.',
+            '!Y. m. d',
+            '!Y. m. d.',
+            '!d.m.Y',
+            '!d.m.Y.',
+            '!d/m/Y',
+        ] as $format) {
+            $date = DateTimeImmutable::createFromFormat($format, $value);
+            $errors = DateTimeImmutable::getLastErrors();
+
+            if (
+                $date !== false
+                && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+            ) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        throw new InvalidArgumentException('Érvénytelen dátum.');
     }
 
     protected function nullIfEmpty(mixed $value): ?string
