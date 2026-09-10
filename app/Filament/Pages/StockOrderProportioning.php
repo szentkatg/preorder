@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderSheetType;
 use App\Models\Season;
 use App\Services\Orders\StockOrderProportioningService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -24,6 +25,7 @@ class StockOrderProportioning extends Page implements
     Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon =
         'heroicon-o-calculator';

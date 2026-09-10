@@ -7,6 +7,7 @@ use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Pages\Page;
@@ -19,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class PriceListImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 

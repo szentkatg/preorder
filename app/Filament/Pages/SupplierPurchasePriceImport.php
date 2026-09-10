@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Services\Imports\SupplierPurchasePriceImportService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Pages\Page;
@@ -12,6 +13,7 @@ class SupplierPurchasePriceImport extends Page implements
     Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon =
         'heroicon-o-arrow-up-tray';

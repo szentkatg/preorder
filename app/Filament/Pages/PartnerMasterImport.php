@@ -10,6 +10,7 @@ use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PriceList;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Pages\Page;
@@ -23,6 +24,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-up-tray';
 
