@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use PDO;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class DatabaseMigrationTest extends TestCase
@@ -31,5 +33,20 @@ class DatabaseMigrationTest extends TestCase
         $this->assertFalse(Schema::hasColumn('products', 'serial_number'));
         $this->assertTrue(Schema::hasColumn('skus', 'sku_name'));
         $this->assertTrue(Schema::hasColumn('order_import_logs', 'partner_user_id'));
+        $this->assertTrue(Schema::hasTable('roles'));
+        $this->assertTrue(Schema::hasTable('permissions'));
+        $this->assertTrue(Schema::hasTable('model_has_roles'));
+        $this->assertTrue(Schema::hasTable('model_has_permissions'));
+        $this->assertTrue(Schema::hasTable('role_has_permissions'));
+
+        $user = User::factory()->create();
+        $role = Role::create([
+            'name' => 'migration_test_admin',
+            'guard_name' => 'web',
+        ]);
+
+        $user->assignRole($role);
+
+        $this->assertTrue($user->hasRole('migration_test_admin'));
     }
 }
