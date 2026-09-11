@@ -45,6 +45,7 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumns('orders', [
             'reference_number',
             'order_type_id',
+            'sordid',
         ]));
         $this->assertTrue(Schema::hasColumns('order_types', [
             'code',

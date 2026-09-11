@@ -150,6 +150,10 @@ class OrderForm
                     ->required()
                     ->disabled(fn ($record) => $record?->isSubmitted()),
 
+                TextInput::make('sordid')
+                    ->label('ERP rendelésazonosító')
+                    ->integer(),
+
                 Select::make('price_list_id')
                     ->label('Árlista')
                     ->relationship('priceList', 'code')

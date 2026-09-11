@@ -48,6 +48,11 @@ class OrdersTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('sordid')
+                    ->label('ERP rendelésazonosító')
+                    ->numeric()
+                    ->sortable(),
+
                 TextColumn::make('priceList.code')
                     ->label('Árlista'),
 

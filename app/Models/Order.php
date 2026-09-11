@@ -14,6 +14,7 @@ class Order extends Model
         'order_sheet_type_id',
         'reference_number',
         'order_type_id',
+        'sordid',
         'price_list_id',
         'currency_id',
         'language_id',
