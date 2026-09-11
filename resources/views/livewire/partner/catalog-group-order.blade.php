@@ -854,6 +854,13 @@
                                 {{ $fileResult['filename'] ?? '' }}
                             </div>
 
+                            @if (! empty($fileResult['reference_number']))
+                                <div>
+                                    <strong>{{ __('partner.reference_number') }}:</strong>
+                                    {{ $fileResult['reference_number'] }}
+                                </div>
+                            @endif
+
                             @if (! empty($fileResult['address_code']))
                                 <div>
                                     <strong>Címkód:</strong>

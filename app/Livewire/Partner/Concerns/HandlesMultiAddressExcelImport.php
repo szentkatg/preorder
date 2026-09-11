@@ -3,16 +3,19 @@
 namespace App\Livewire\Partner\Concerns;
 
 use App\Imports\PartnerOrderMatrixImport;
+use App\Models\Brand;
 use App\Models\Order;
 use App\Models\OrderImportLog;
+use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
+use App\Models\Season;
+use App\Models\Translation;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Throwable;
-
 
 trait HandlesMultiAddressExcelImport
 {
@@ -30,17 +33,11 @@ trait HandlesMultiAddressExcelImport
             ];
 
             $notification = Notification::make()
-                ->title($errorCount === 0 ? __('partner.import_finished') : __('partner.import_finished_with_errors'))
-                ->body($message);
-            
-            if ($errorCount === 0) {
-                $notification->success();
-            } else {
-                $notification
-                    ->warning()
-                    ->persistent();
-            }
-            
+                ->title(__('partner.import_finished_with_errors'))
+                ->body($message)
+                ->warning()
+                ->persistent();
+
             $notification->send();
 
             return;
@@ -60,20 +57,28 @@ trait HandlesMultiAddressExcelImport
             $originalName = method_exists($file, 'getClientOriginalName')
                 ? $file->getClientOriginalName()
                 : 'excel';
+            $header = null;
 
             try {
                 $header = $this->readExcelHeader($path);
-                
+
                 if ($header['address_code'] === '') {
                     throw new \RuntimeException(__('partner.import_missing_address_code'));
                 }
-                
+
+                if ($header['reference_number'] === '') {
+                    throw new \RuntimeException(__('partner.import_missing_reference_number'));
+                }
+
                 $targetOrder = $this->resolveImportOrder($header);
-                
+
                 $addressCode = $header['address_code'];
 
                 if (! $targetOrder) {
-                    throw new \RuntimeException(__('partner.import_order_not_found_for_address', ['address' => $addressCode]));
+                    throw new \RuntimeException(__('partner.import_order_not_found_for_reference', [
+                        'address' => $addressCode,
+                        'reference' => $header['reference_number'],
+                    ]));
                 }
 
                 if ($this->isSubmittedOrder($targetOrder)) {
@@ -95,6 +100,7 @@ trait HandlesMultiAddressExcelImport
                 $results[] = [
                     'filename' => $originalName,
                     'address_code' => $addressCode,
+                    'reference_number' => $header['reference_number'],
                     'success' => true,
                     'message' => __('partner.import_file_successful'),
                     'stats' => $stats,
@@ -116,11 +122,12 @@ trait HandlesMultiAddressExcelImport
                     'warnings' => [],
                 ];
 
-                $this->writeImportLog(null, $originalName, null, 'failed', $stats, $exception->getMessage());
+                $this->writeImportLog(null, $originalName, $header['address_code'] ?? null, 'failed', $stats, $exception->getMessage());
 
                 $results[] = [
                     'filename' => $originalName,
-                    'address_code' => null,
+                    'address_code' => $header['address_code'] ?? null,
+                    'reference_number' => $header['reference_number'] ?? null,
                     'success' => false,
                     'message' => $exception->getMessage(),
                     'stats' => $stats,
@@ -146,15 +153,15 @@ trait HandlesMultiAddressExcelImport
         $notification = Notification::make()
             ->title($errorCount === 0 ? __('partner.import_finished') : __('partner.import_finished_with_errors'))
             ->body($message);
-        
+
         if ($errorCount === 0) {
             $notification->success();
-            } else {
-                $notification
-                    ->warning()
-                    ->persistent();
-            }
-        
+        } else {
+            $notification
+                ->warning()
+                ->persistent();
+        }
+
         $notification->send();
     }
 
@@ -162,72 +169,81 @@ trait HandlesMultiAddressExcelImport
     {
         $spreadsheet = IOFactory::load($path);
         $sheet = $spreadsheet->getActiveSheet();
-    
+
         return [
             'address_code' => trim((string) $sheet->getCell('C3')->getFormattedValue()),
             'season' => trim((string) $sheet->getCell('C5')->getFormattedValue()),
             'brand' => trim((string) $sheet->getCell('C6')->getFormattedValue()),
             'order_sheet_type' => trim((string) $sheet->getCell('C7')->getFormattedValue()),
+            'reference_number' => trim((string) $sheet->getCell('F1')->getFormattedValue()),
         ];
     }
 
     protected function resolveImportOrder(array $header): ?Order
     {
         $this->order->loadMissing(['partner', 'partnerAddress']);
-    
+
         $partnerAddress = PartnerAddress::query()
             ->where('partner_id', $this->order->partner_id)
             ->where('addrid', $header['address_code'])
             ->first();
-    
+
         if (! $partnerAddress) {
             return null;
         }
-    
-        $season = \App\Models\Season::query()
+
+        $partnerUser = auth('partner')->user();
+
+        if (! $partnerUser || ! $partnerUser->canAccessAddress($partnerAddress)) {
+            throw new \RuntimeException(__('partner.import_address_not_allowed', [
+                'address' => $header['address_code'],
+            ]));
+        }
+
+        $season = Season::query()
             ->where('code', $header['season'])
             ->orWhere('name', $header['season'])
             ->first();
-    
+
         if (! $season) {
             return null;
         }
-    
-        $brand = \App\Models\Brand::query()
+
+        $brand = Brand::query()
             ->where('code', $header['brand'])
             ->orWhere('name', $header['brand'])
             ->first();
-    
+
         if (! $brand) {
             return null;
         }
-    
-        $orderSheetType = \App\Models\OrderSheetType::query()
+
+        $orderSheetType = OrderSheetType::query()
             ->where('code', $header['order_sheet_type'])
             ->orWhere('name', $header['order_sheet_type'])
             ->orWhere('name_hu', $header['order_sheet_type'])
             ->orWhere('name_en', $header['order_sheet_type'])
             ->orWhereIn(
                 'code',
-                \App\Models\Translation::query()
+                Translation::query()
                     ->where('entity', 'order_sheet_type')
                     ->where('field', 'name')
                     ->where('value', $header['order_sheet_type'])
                     ->select('entity_code')
             )
             ->first();
-    
+
         if (! $orderSheetType) {
             return null;
         }
-    
+
         return Order::query()
             ->where('partner_id', $this->order->partner_id)
             ->where('partner_address_id', $partnerAddress->id)
             ->where('season_id', $season->id)
             ->where('brand_id', $brand->id)
             ->where('order_sheet_type_id', $orderSheetType->id)
-            ->where('price_list_id', $this->order->price_list_id)
+            ->where('reference_number', $header['reference_number'])
             ->first();
     }
 
