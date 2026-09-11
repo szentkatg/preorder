@@ -28,10 +28,25 @@ class PartnerOrderMatrixImport implements ToCollection
 
     protected array $warnings = [];
 
+    protected array $existingQuantitiesBySkuId = [];
+
+    protected array $previewQuantitiesBySkuId = [];
+
     public function __construct(
-        protected Order $order
+        protected Order $order,
+        protected bool $previewOnly = false,
     ) {
         $this->order->loadMissing(['priceList']);
+
+        if ($this->previewOnly) {
+            $this->existingQuantitiesBySkuId = OrderItem::query()
+                ->where('order_id', $this->order->id)
+                ->pluck('quantity', 'sku_id')
+                ->map(fn ($quantity) => (int) $quantity)
+                ->all();
+
+            $this->previewQuantitiesBySkuId = $this->existingQuantitiesBySkuId;
+        }
     }
 
     public function collection(Collection $rows): void
@@ -92,7 +107,7 @@ class PartnerOrderMatrixImport implements ToCollection
     {
         $changedCount = $this->createdCount + $this->updatedCount + $this->deletedCount;
 
-        return [
+        $stats = [
             'created' => $this->createdCount,
             'updated' => $this->updatedCount,
             'deleted' => $this->deletedCount,
@@ -103,6 +118,21 @@ class PartnerOrderMatrixImport implements ToCollection
             'rows_with_meta' => $this->rowsWithMetaCount,
             'warnings' => $this->warnings,
         ];
+
+        if ($this->previewOnly) {
+            $existingTotals = $this->calculateTotals($this->existingQuantitiesBySkuId);
+            $newTotals = $this->calculateTotals($this->previewQuantitiesBySkuId);
+
+            $stats = array_merge($stats, [
+                'preview' => true,
+                'existing_quantity' => $existingTotals['quantity'],
+                'existing_value' => $existingTotals['value'],
+                'new_quantity' => $newTotals['quantity'],
+                'new_value' => $newTotals['value'],
+            ]);
+        }
+
+        return $stats;
     }
 
     protected function parseImportMeta(mixed $value, int $excelRowNumber): ?array
@@ -185,6 +215,17 @@ class PartnerOrderMatrixImport implements ToCollection
         }
 
         if ((int) $quantity === 0) {
+            if ($this->previewOnly) {
+                if (array_key_exists($skuId, $this->previewQuantitiesBySkuId)) {
+                    unset($this->previewQuantitiesBySkuId[$skuId]);
+                    $this->deletedCount++;
+                } else {
+                    $this->unchangedCount++;
+                }
+
+                return;
+            }
+
             $deleted = OrderItem::query()
                 ->where('order_id', $this->order->id)
                 ->where('sku_id', $skuId)
@@ -195,6 +236,12 @@ class PartnerOrderMatrixImport implements ToCollection
             } else {
                 $this->unchangedCount++;
             }
+
+            return;
+        }
+
+        if ($this->previewOnly) {
+            $this->applyPreviewQuantityBySkuId($skuId, $quantity, $excelRowNumber, $columnIndex, $value);
 
             return;
         }
@@ -263,6 +310,47 @@ class PartnerOrderMatrixImport implements ToCollection
         }
     }
 
+    protected function applyPreviewQuantityBySkuId(
+        int $skuId,
+        int $quantity,
+        int $excelRowNumber,
+        int $columnIndex,
+        mixed $value
+    ): void {
+        $skuExists = Sku::query()
+            ->whereKey($skuId)
+            ->exists();
+
+        if (! $skuExists) {
+            $this->invalidCount++;
+            $this->warnings[] = [
+                'row' => $excelRowNumber,
+                'column' => $columnIndex,
+                'sku_id' => $skuId,
+                'value' => $value,
+                'message' => 'Nem található SKU.',
+            ];
+
+            return;
+        }
+
+        $existingQuantity = $this->previewQuantitiesBySkuId[$skuId] ?? null;
+
+        if ($existingQuantity !== null && (int) $existingQuantity === $quantity) {
+            $this->unchangedCount++;
+
+            return;
+        }
+
+        if ($existingQuantity !== null) {
+            $this->updatedCount++;
+        } else {
+            $this->createdCount++;
+        }
+
+        $this->previewQuantitiesBySkuId[$skuId] = $quantity;
+    }
+
     protected function parseQuantity(mixed $value): ?int
     {
         if ($this->isEmptyImportValue($value) || $value === '-') {
@@ -291,12 +379,11 @@ class PartnerOrderMatrixImport implements ToCollection
         int $productId,
         ?int $priceListId,
         ?int $seasonId
-    ): float
-    {
+    ): float {
         if (! $priceListId || ! $seasonId) {
             return 0;
         }
-    
+
         return (float) (
             PriceListItem::query()
                 ->where('price_list_id', $priceListId)
@@ -304,6 +391,62 @@ class PartnerOrderMatrixImport implements ToCollection
                 ->where('product_id', $productId)
                 ->value('net_price') ?? 0
         );
+    }
+
+    protected function calculateTotals(array $quantitiesBySkuId): array
+    {
+        $skuIds = array_keys(array_filter(
+            $quantitiesBySkuId,
+            fn ($quantity) => (int) $quantity > 0
+        ));
+
+        if ($skuIds === []) {
+            return [
+                'quantity' => 0,
+                'value' => 0.0,
+            ];
+        }
+
+        $skus = Sku::query()
+            ->with('assortmentComponents')
+            ->whereIn('id', $skuIds)
+            ->get()
+            ->keyBy('id');
+
+        $totalQuantity = 0;
+        $totalValue = 0.0;
+
+        foreach ($quantitiesBySkuId as $skuId => $quantity) {
+            $quantity = (int) $quantity;
+
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            $sku = $skus->get((int) $skuId);
+
+            if (! $sku) {
+                continue;
+            }
+
+            $assortmentContent = (int) $sku->assortmentComponents->sum('quantity');
+            $effectiveQuantity = $assortmentContent > 0
+                ? $quantity * $assortmentContent
+                : $quantity;
+            $unitPrice = $this->getProductPrice(
+                (int) $sku->product_id,
+                $this->order->price_list_id,
+                $this->order->season_id
+            );
+
+            $totalQuantity += $effectiveQuantity;
+            $totalValue += $effectiveQuantity * $unitPrice;
+        }
+
+        return [
+            'quantity' => $totalQuantity,
+            'value' => $totalValue,
+        ];
     }
 
     protected function isSubmittedOrder(Order $order): bool

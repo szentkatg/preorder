@@ -811,15 +811,98 @@
     
                 <button
                     type="button"
-                    wire:click="importExcelFiles"
+                    wire:click="previewExcelImports"
                     wire:loading.attr="disabled"
                     class="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                 >
-                    {{ __('partner.start_import') }}
+                    {{ __('partner.preview_import') }}
                 </button>
             </div>
         @endif
     </div>
+
+    @if (! empty($importPreviews))
+        <div
+            wire:key="import-previews-{{ md5(($importPreviews['message'] ?? '') . count($importPreviews['files'] ?? [])) }}"
+            class="mt-4 rounded-lg border border-orange-300 bg-orange-50 p-4 text-orange-950"
+        >
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold">{{ __('partner.import_preview') }}</div>
+                    <div class="text-sm">{{ $importPreviews['message'] ?? '' }}</div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        wire:click="selectAllImportPreviews"
+                        class="inline-flex items-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-semibold text-orange-900 hover:bg-orange-100"
+                    >
+                        {{ __('partner.select_all') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="clearSelectedImportPreviews"
+                        class="inline-flex items-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-semibold text-orange-900 hover:bg-orange-100"
+                    >
+                        {{ __('partner.clear_selection') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="importSelectedExcelFiles"
+                        wire:loading.attr="disabled"
+                        class="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                    >
+                        {{ __('partner.import_selected') }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-lg border border-orange-200 bg-white">
+                <table class="min-w-full divide-y divide-orange-200 text-sm">
+                    <thead class="bg-orange-100 text-left text-xs font-semibold uppercase tracking-wide text-orange-950">
+                        <tr>
+                            <th class="px-3 py-2"></th>
+                            <th class="px-3 py-2">{{ __('partner.file') }}</th>
+                            <th class="px-3 py-2">{{ __('partner.reference_number') }}</th>
+                            <th class="px-3 py-2">{{ __('partner.address_code') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('partner.existing_order_quantity') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('partner.existing_order_value') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('partner.changed_rows') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('partner.new_order_quantity') }}</th>
+                            <th class="px-3 py-2 text-right">{{ __('partner.new_order_value') }}</th>
+                            <th class="px-3 py-2">{{ __('partner.status') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-orange-100">
+                        @foreach (($importPreviews['files'] ?? []) as $filePreview)
+                            <tr class="{{ ($filePreview['success'] ?? false) ? '' : 'bg-red-50 text-red-800' }}">
+                                <td class="px-3 py-2">
+                                    @if ($filePreview['success'] ?? false)
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="selectedImportPreviewKeys"
+                                            value="{{ $filePreview['key'] }}"
+                                            class="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                                        />
+                                    @endif
+                                </td>
+                                <td class="px-3 py-2 font-medium">{{ $filePreview['filename'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $filePreview['reference_number'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $filePreview['address_code'] ?? '' }}</td>
+                                <td class="px-3 py-2 text-right">{{ number_format((int) ($filePreview['stats']['existing_quantity'] ?? 0), 0, ',', ' ') }}</td>
+                                <td class="px-3 py-2 text-right">{{ number_format((float) ($filePreview['stats']['existing_value'] ?? 0), 0, ',', ' ') }}</td>
+                                <td class="px-3 py-2 text-right">{{ number_format((int) ($filePreview['stats']['changed'] ?? 0), 0, ',', ' ') }}</td>
+                                <td class="px-3 py-2 text-right">{{ number_format((int) ($filePreview['stats']['new_quantity'] ?? 0), 0, ',', ' ') }}</td>
+                                <td class="px-3 py-2 text-right">{{ number_format((float) ($filePreview['stats']['new_value'] ?? 0), 0, ',', ' ') }}</td>
+                                <td class="px-3 py-2">{{ $filePreview['message'] ?? '' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
     
         @if (! empty($importResults))
             <div

@@ -21,71 +21,44 @@ trait HandlesMultiAddressExcelImport
 {
     public array $importResults = [];
 
-    public function importExcelFiles(): void
+    public array $importPreviews = [];
+
+    public array $selectedImportPreviewKeys = [];
+
+    public function updatedExcelFiles(): void
     {
-        if ($this->isSubmittedOrder($this->order)) {
-            $message = __('partner.import_order_already_submitted');
+        $this->importResults = [];
+        $this->importPreviews = [];
+        $this->selectedImportPreviewKeys = [];
+    }
 
-            $this->importResults = [
-                'success' => false,
-                'message' => $message,
-                'files' => [],
-            ];
-
-            $notification = Notification::make()
-                ->title(__('partner.import_finished_with_errors'))
-                ->body($message)
-                ->warning()
-                ->persistent();
-
-            $notification->send();
-
+    public function previewExcelImports(): void
+    {
+        if (! $this->canStartExcelImport()) {
             return;
         }
 
-        $this->validate([
-            'excelFiles' => ['required', 'array', 'min:1'],
-            'excelFiles.*' => ['file', 'mimes:xlsx,xls'],
-        ]);
+        $this->validateExcelImportFiles();
 
-        $results = [];
-        $successCount = 0;
+        $previews = [];
+        $selectedKeys = [];
+        $readyCount = 0;
         $errorCount = 0;
 
-        foreach (Arr::wrap($this->excelFiles) as $file) {
+        foreach (Arr::wrap($this->excelFiles) as $index => $file) {
+            $key = $this->importPreviewKey((int) $index);
             $path = $file->getRealPath();
-            $originalName = method_exists($file, 'getClientOriginalName')
-                ? $file->getClientOriginalName()
-                : 'excel';
+            $originalName = $this->originalImportFilename($file);
             $header = null;
 
             try {
-                $header = $this->readExcelHeader($path);
-
-                if ($header['address_code'] === '') {
-                    throw new \RuntimeException(__('partner.import_missing_address_code'));
-                }
-
-                if ($header['reference_number'] === '') {
-                    throw new \RuntimeException(__('partner.import_missing_reference_number'));
-                }
-
-                $targetOrder = $this->resolveImportOrder($header);
-
-                $addressCode = $header['address_code'];
-
-                if (! $targetOrder) {
-                    throw new \RuntimeException(__('partner.import_order_not_found_for_reference', [
-                        'address' => $addressCode,
-                        'reference' => $header['reference_number'],
-                    ]));
-                }
+                ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] = $this->prepareImportFile($path);
 
                 if ($this->isSubmittedOrder($targetOrder)) {
                     throw new \RuntimeException(__('partner.import_target_order_already_submitted', ['address' => $addressCode]));
                 }
 
-                $import = new PartnerOrderMatrixImport($targetOrder);
+                $import = new PartnerOrderMatrixImport($targetOrder, previewOnly: true);
 
                 Excel::import($import, $path);
 
@@ -95,50 +68,245 @@ trait HandlesMultiAddressExcelImport
                     throw new \RuntimeException(__('partner.import_no_import_map_found'));
                 }
 
-                $this->writeImportLog($targetOrder, $originalName, $addressCode, 'success', $stats, null);
-
-                $results[] = [
+                $previews[] = [
+                    'key' => $key,
+                    'index' => (int) $index,
                     'filename' => $originalName,
                     'address_code' => $addressCode,
                     'reference_number' => $header['reference_number'],
                     'success' => true,
-                    'message' => __('partner.import_file_successful'),
+                    'message' => __('partner.import_preview_ready'),
                     'stats' => $stats,
                 ];
 
-                $successCount++;
+                $selectedKeys[] = $key;
+                $readyCount++;
             } catch (Throwable $exception) {
                 $errorCount++;
 
-                $stats = [
-                    'created' => 0,
-                    'updated' => 0,
-                    'deleted' => 0,
-                    'unchanged' => 0,
-                    'invalid' => 0,
-                    'changed' => 0,
-                    'mapped_cells' => 0,
-                    'rows_with_meta' => 0,
-                    'warnings' => [],
-                ];
-
-                $this->writeImportLog(null, $originalName, $header['address_code'] ?? null, 'failed', $stats, $exception->getMessage());
-
-                $results[] = [
+                $previews[] = [
+                    'key' => $key,
+                    'index' => (int) $index,
                     'filename' => $originalName,
                     'address_code' => $header['address_code'] ?? null,
                     'reference_number' => $header['reference_number'] ?? null,
                     'success' => false,
                     'message' => $exception->getMessage(),
-                    'stats' => $stats,
+                    'stats' => $this->emptyImportStats(),
                 ];
             }
         }
 
+        $message = __('partner.import_preview_summary', [
+            'ready' => $readyCount,
+            'failed' => $errorCount,
+        ]);
+
+        $this->importPreviews = [
+            'success' => $errorCount === 0,
+            'message' => $message,
+            'files' => $previews,
+        ];
+        $this->selectedImportPreviewKeys = $selectedKeys;
+        $this->importResults = [];
+
+        $notification = Notification::make()
+            ->title(__('partner.import_preview'))
+            ->body($message);
+
+        if ($errorCount === 0) {
+            $notification->success();
+        } else {
+            $notification
+                ->warning()
+                ->persistent();
+        }
+
+        $notification->send();
+    }
+
+    public function selectAllImportPreviews(): void
+    {
+        $this->selectedImportPreviewKeys = collect($this->importPreviews['files'] ?? [])
+            ->filter(fn (array $preview) => (bool) ($preview['success'] ?? false))
+            ->pluck('key')
+            ->values()
+            ->all();
+    }
+
+    public function clearSelectedImportPreviews(): void
+    {
+        $this->selectedImportPreviewKeys = [];
+    }
+
+    public function importSelectedExcelFiles(): void
+    {
+        if (! $this->canStartExcelImport()) {
+            return;
+        }
+
+        $this->validateExcelImportFiles();
+
+        $selectedKeys = array_flip($this->selectedImportPreviewKeys);
+
+        if ($selectedKeys === []) {
+            $message = __('partner.no_import_selected');
+
+            Notification::make()
+                ->title(__('partner.import_failed'))
+                ->body($message)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $results = [];
+        $successCount = 0;
+        $errorCount = 0;
+
+        foreach (Arr::wrap($this->excelFiles) as $index => $file) {
+            if (! isset($selectedKeys[$this->importPreviewKey((int) $index)])) {
+                continue;
+            }
+
+            $result = $this->importExcelFile($file);
+            $results[] = $result;
+
+            if ($result['success'] ?? false) {
+                $successCount++;
+            } else {
+                $errorCount++;
+            }
+        }
+
         $this->reset('excelFiles');
+        $this->importPreviews = [];
+        $this->selectedImportPreviewKeys = [];
 
         $this->refreshAfterExcelImport();
 
+        $this->finishExcelImport($results, $successCount, $errorCount);
+    }
+
+    public function importExcelFiles(): void
+    {
+        if (! $this->canStartExcelImport()) {
+            return;
+        }
+
+        $this->validateExcelImportFiles();
+
+        $results = [];
+        $successCount = 0;
+        $errorCount = 0;
+
+        foreach (Arr::wrap($this->excelFiles) as $file) {
+            $result = $this->importExcelFile($file);
+            $results[] = $result;
+
+            if ($result['success'] ?? false) {
+                $successCount++;
+            } else {
+                $errorCount++;
+            }
+        }
+
+        $this->reset('excelFiles');
+        $this->importPreviews = [];
+        $this->selectedImportPreviewKeys = [];
+
+        $this->refreshAfterExcelImport();
+
+        $this->finishExcelImport($results, $successCount, $errorCount);
+    }
+
+    protected function canStartExcelImport(): bool
+    {
+        if (! $this->isSubmittedOrder($this->order)) {
+            return true;
+        }
+
+        $message = __('partner.import_order_already_submitted');
+
+        $this->importResults = [
+            'success' => false,
+            'message' => $message,
+            'files' => [],
+        ];
+        $this->importPreviews = [];
+        $this->selectedImportPreviewKeys = [];
+
+        $notification = Notification::make()
+            ->title(__('partner.import_finished_with_errors'))
+            ->body($message)
+            ->warning()
+            ->persistent();
+
+        $notification->send();
+
+        return false;
+    }
+
+    protected function validateExcelImportFiles(): void
+    {
+        $this->validate([
+            'excelFiles' => ['required', 'array', 'min:1'],
+            'excelFiles.*' => ['file', 'mimes:xlsx,xls'],
+        ]);
+    }
+
+    protected function importExcelFile(mixed $file): array
+    {
+        $path = $file->getRealPath();
+        $originalName = $this->originalImportFilename($file);
+        $header = null;
+
+        try {
+            ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] = $this->prepareImportFile($path);
+
+            if ($this->isSubmittedOrder($targetOrder)) {
+                throw new \RuntimeException(__('partner.import_target_order_already_submitted', ['address' => $addressCode]));
+            }
+
+            $import = new PartnerOrderMatrixImport($targetOrder);
+
+            Excel::import($import, $path);
+
+            $stats = $import->stats();
+
+            if (($stats['rows_with_meta'] ?? 0) < 1) {
+                throw new \RuntimeException(__('partner.import_no_import_map_found'));
+            }
+
+            $this->writeImportLog($targetOrder, $originalName, $addressCode, 'success', $stats, null);
+
+            return [
+                'filename' => $originalName,
+                'address_code' => $addressCode,
+                'reference_number' => $header['reference_number'],
+                'success' => true,
+                'message' => __('partner.import_file_successful'),
+                'stats' => $stats,
+            ];
+        } catch (Throwable $exception) {
+            $stats = $this->emptyImportStats();
+
+            $this->writeImportLog(null, $originalName, $header['address_code'] ?? null, 'failed', $stats, $exception->getMessage());
+
+            return [
+                'filename' => $originalName,
+                'address_code' => $header['address_code'] ?? null,
+                'reference_number' => $header['reference_number'] ?? null,
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'stats' => $stats,
+            ];
+        }
+    }
+
+    protected function finishExcelImport(array $results, int $successCount, int $errorCount): void
+    {
         $message = __('partner.import_finished_summary', [
             'success' => $successCount,
             'failed' => $errorCount,
@@ -163,6 +331,62 @@ trait HandlesMultiAddressExcelImport
         }
 
         $notification->send();
+    }
+
+    protected function prepareImportFile(string $path): array
+    {
+        $header = $this->readExcelHeader($path);
+
+        if ($header['address_code'] === '') {
+            throw new \RuntimeException(__('partner.import_missing_address_code'));
+        }
+
+        if ($header['reference_number'] === '') {
+            throw new \RuntimeException(__('partner.import_missing_reference_number'));
+        }
+
+        $targetOrder = $this->resolveImportOrder($header);
+        $addressCode = $header['address_code'];
+
+        if (! $targetOrder) {
+            throw new \RuntimeException(__('partner.import_order_not_found_for_reference', [
+                'address' => $addressCode,
+                'reference' => $header['reference_number'],
+            ]));
+        }
+
+        return [
+            'header' => $header,
+            'targetOrder' => $targetOrder,
+            'addressCode' => $addressCode,
+        ];
+    }
+
+    protected function importPreviewKey(int $index): string
+    {
+        return 'file-'.$index;
+    }
+
+    protected function originalImportFilename(mixed $file): string
+    {
+        return method_exists($file, 'getClientOriginalName')
+            ? $file->getClientOriginalName()
+            : 'excel';
+    }
+
+    protected function emptyImportStats(): array
+    {
+        return [
+            'created' => 0,
+            'updated' => 0,
+            'deleted' => 0,
+            'unchanged' => 0,
+            'invalid' => 0,
+            'changed' => 0,
+            'mapped_cells' => 0,
+            'rows_with_meta' => 0,
+            'warnings' => [],
+        ];
     }
 
     protected function readExcelHeader(string $path): array
