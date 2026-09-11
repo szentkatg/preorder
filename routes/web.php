@@ -12,6 +12,7 @@ use App\Livewire\Partner\OrderSummary;
 use App\Livewire\Partner\PartnerOrderCoverage;
 use App\Livewire\Partner\ProductList;
 use App\Livewire\Partner\SeasonShow;
+use App\Livewire\Partner\SharedCatalogGroupOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -62,6 +63,11 @@ Route::prefix('partner')
 
         Route::get('/reset-password/{token}', ResetPassword::class)
             ->name('password.reset');
+
+        Route::get(
+            '/shared-orders/{shareLink:token}/catalog-groups/{catalogGroupName}',
+            SharedCatalogGroupOrder::class
+        )->name('shared-catalog-group-order');
 
         Route::middleware('auth:partner')
             ->group(function () {

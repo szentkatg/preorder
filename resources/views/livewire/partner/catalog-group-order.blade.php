@@ -380,13 +380,19 @@
                 </button>
             @endif
     
-            <button
-                type="button"
-                wire:click="backToCatalogGroups"
-                class="font-semibold text-blue-600 hover:underline"
-            >
-                {{ __('partner.catalog_groups') }}
-            </button>
+            @if (! $sharedMode)
+                <button
+                    type="button"
+                    wire:click="backToCatalogGroups"
+                    class="font-semibold text-blue-600 hover:underline"
+                >
+                    {{ __('partner.catalog_groups') }}
+                </button>
+            @else
+                <span class="font-semibold text-gray-700">
+                    {{ __('partner.shared_order_sheet') }}
+                </span>
+            @endif
     
             @if($nextCatalogGroup)
                 <button
@@ -443,7 +449,7 @@
                 </div>
             </div>
 
-            @if(! $order->isSubmitted())
+            @if(! $sharedMode && ! $order->isSubmitted())
                 @php
                     $summary = $this->getOrderSummary();
                 
@@ -466,6 +472,136 @@
             @endif
     
         </div>
+
+        @if ($sharedMode)
+            <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                {{ __('partner.shared_order_sheet_description') }}
+            </div>
+        @elseif (! $order->isSubmitted())
+            <div class="mb-4 rounded-lg border bg-white p-4 text-sm shadow-sm">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="font-semibold">{{ __('partner.share_order_sheet') }}</div>
+                        <div class="text-gray-600">{{ __('partner.share_order_sheet_description') }}</div>
+                    </div>
+
+                    <button
+                        type="button"
+                        wire:click="$toggle('showSharePanel')"
+                        class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                    >
+                        {{ $showSharePanel ? __('partner.hide_share_panel') : __('partner.show_share_panel') }}
+                    </button>
+                </div>
+
+                @if ($showSharePanel)
+                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-end">
+                        <label class="block">
+                            <span class="mb-1 block text-xs font-semibold text-gray-600">
+                                {{ __('partner.share_price_list') }}
+                            </span>
+                            <select
+                                wire:model="sharePriceListId"
+                                class="w-full rounded border-gray-300 text-sm"
+                            >
+                                @foreach ($this->sharePriceListOptions() as $priceListId => $priceListLabel)
+                                    <option value="{{ $priceListId }}">{{ $priceListLabel }}</option>
+                                @endforeach
+                            </select>
+                            @error('sharePriceListId')
+                                <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
+                            @enderror
+                        </label>
+
+                        <label class="block">
+                            <span class="mb-1 block text-xs font-semibold text-gray-600">
+                                {{ __('partner.share_expires_in_days') }}
+                            </span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                wire:model="shareExpiresInDays"
+                                class="w-full rounded border-gray-300 text-sm"
+                            />
+                            @error('shareExpiresInDays')
+                                <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
+                            @enderror
+                        </label>
+
+                        <button
+                            type="button"
+                            wire:click="generateShareLink"
+                            wire:loading.attr="disabled"
+                            class="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {{ __('partner.generate_share_link') }}
+                        </button>
+                    </div>
+
+                    @if ($generatedShareUrl)
+                        <div class="mt-3 rounded border border-green-200 bg-green-50 p-3 text-green-900">
+                            <div class="mb-1 font-semibold">{{ __('partner.generated_share_link') }}</div>
+                            <input
+                                type="text"
+                                readonly
+                                value="{{ $generatedShareUrl }}"
+                                class="w-full rounded border-green-300 bg-white text-sm"
+                                onclick="this.select()"
+                            />
+                        </div>
+                    @endif
+
+                    @php
+                        $activeShareLinks = $this->activeShareLinks();
+                    @endphp
+
+                    @if (! empty($activeShareLinks))
+                        <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                    <tr>
+                                        <th class="px-3 py-2">{{ __('partner.share_link') }}</th>
+                                        <th class="px-3 py-2">{{ __('partner.share_price_list') }}</th>
+                                        <th class="px-3 py-2">{{ __('partner.expires_at') }}</th>
+                                        <th class="px-3 py-2">{{ __('partner.last_accessed_at') }}</th>
+                                        <th class="px-3 py-2 text-right">{{ __('partner.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    @foreach ($activeShareLinks as $activeShareLink)
+                                        <tr>
+                                            <td class="px-3 py-2">
+                                                <input
+                                                    type="text"
+                                                    readonly
+                                                    value="{{ $activeShareLink['url'] }}"
+                                                    class="w-96 rounded border-gray-300 text-xs"
+                                                    onclick="this.select()"
+                                                />
+                                            </td>
+                                            <td class="px-3 py-2">{{ $activeShareLink['price_list'] }}</td>
+                                            <td class="px-3 py-2">{{ $activeShareLink['expires_at'] ?? '-' }}</td>
+                                            <td class="px-3 py-2">{{ $activeShareLink['last_accessed_at'] ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="revokeShareLink({{ $activeShareLink['id'] }})"
+                                                    wire:confirm="{{ __('partner.confirm_revoke_share_link') }}"
+                                                    class="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                                                >
+                                                    {{ __('partner.revoke_share_link') }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                @endif
+            </div>
+        @endif
         
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h1 class="text-2xl font-bold">
@@ -777,47 +913,50 @@
         >
             {{ __('partner.save') }}
         </button>
-        <button
-            type="button"
-            wire:click="exportExcel"
-            class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-        >
-            {{ __('partner.excel_export') }}
-        </button>
-    
-        <label
-            for="excelFiles"
-            class="inline-flex cursor-pointer items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-        >
-            {{ __('partner.select_import_files') }}
-        </label>
-    
-        <input
-            id="excelFiles"
-            type="file"
-            wire:model="excelFiles"
-            multiple
-            accept=".xlsx,.xls"
-            class="hidden"
-        />
-    
-        @if (! empty($excelFiles))
-            <div class="flex items-start gap-3">
-                <div class="text-sm text-gray-700">
-                    @foreach ($excelFiles as $file)
-                        <div>{{ $file->getClientOriginalName() }}</div>
-                    @endforeach
+
+        @if (! $sharedMode)
+            <button
+                type="button"
+                wire:click="exportExcel"
+                class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+            >
+                {{ __('partner.excel_export') }}
+            </button>
+
+            <label
+                for="excelFiles"
+                class="inline-flex cursor-pointer items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+                {{ __('partner.select_import_files') }}
+            </label>
+
+            <input
+                id="excelFiles"
+                type="file"
+                wire:model="excelFiles"
+                multiple
+                accept=".xlsx,.xls"
+                class="hidden"
+            />
+
+            @if (! empty($excelFiles))
+                <div class="flex items-start gap-3">
+                    <div class="text-sm text-gray-700">
+                        @foreach ($excelFiles as $file)
+                            <div>{{ $file->getClientOriginalName() }}</div>
+                        @endforeach
+                    </div>
+
+                    <button
+                        type="button"
+                        wire:click="previewExcelImports"
+                        wire:loading.attr="disabled"
+                        class="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                    >
+                        {{ __('partner.preview_import') }}
+                    </button>
                 </div>
-    
-                <button
-                    type="button"
-                    wire:click="previewExcelImports"
-                    wire:loading.attr="disabled"
-                    class="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
-                >
-                    {{ __('partner.preview_import') }}
-                </button>
-            </div>
+            @endif
         @endif
     </div>
 

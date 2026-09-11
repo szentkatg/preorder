@@ -42,6 +42,7 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('model_has_permissions'));
         $this->assertTrue(Schema::hasTable('role_has_permissions'));
         $this->assertTrue(Schema::hasTable('order_types'));
+        $this->assertTrue(Schema::hasTable('order_share_links'));
         $this->assertTrue(Schema::hasColumns('orders', [
             'reference_number',
             'order_type_id',
@@ -52,6 +53,15 @@ class DatabaseMigrationTest extends TestCase
             'name',
             'include_in_supplier_order',
             'active',
+        ]));
+        $this->assertTrue(Schema::hasColumns('order_share_links', [
+            'order_id',
+            'token',
+            'price_list_id',
+            'created_by_partner_user_id',
+            'expires_at',
+            'last_accessed_at',
+            'revoked_at',
         ]));
         $this->assertSame(5, DB::table('order_types')->count());
         $this->assertTrue(

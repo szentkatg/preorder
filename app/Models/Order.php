@@ -80,6 +80,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function shareLinks()
+    {
+        return $this->hasMany(OrderShareLink::class);
+    }
+
     public function getTotalOrderedUnitsAttribute(): int
     {
         return $this->items->sum('quantity');
