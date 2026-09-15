@@ -130,6 +130,23 @@ class AdminAuthorizationTest extends TestCase
             ->assertOk();
     }
 
+    public function test_admin_users_can_open_their_own_profile_page(): void
+    {
+        $adminUser = User::factory()->create();
+        $adminUser->assignRole(Role::findOrCreate('test_admin', 'web'));
+
+        $this->assertTrue(Filament::getPanel('admin')->hasProfile());
+
+        $this->actingAs($adminUser)
+            ->get('/admin/admin-users')
+            ->assertForbidden();
+
+        $this->actingAs($adminUser)
+            ->get('/admin/profile')
+            ->assertOk()
+            ->assertSee($adminUser->name);
+    }
+
     public function test_super_admin_can_create_an_admin_user_with_a_role(): void
     {
         $superAdmin = User::factory()->create();
