@@ -67,6 +67,16 @@ class SupplierImporter
                 $supplier->short_name = $shortName;
             }
 
+            if (array_key_exists('country_code', $row)) {
+                $countryCode = $this->spreadsheetHelper->nullIfEmpty(
+                    $row['country_code'] ?? null
+                );
+
+                $supplier->country_code = $countryCode === null
+                    ? null
+                    : mb_strtoupper($countryCode);
+            }
+
             $activeRaw = $row['active'] ?? null;
             $activeIsEmpty =
                 $activeRaw === null

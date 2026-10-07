@@ -22,6 +22,15 @@ class SupplierForm
                     ->label('Címkód')
                     ->maxLength(20),
 
+                TextInput::make('country_code')
+                    ->label('Országkód')
+                    ->helperText('ISO 3166-1 alpha-2 kód, pl. CN, VN, TR.')
+                    ->maxLength(2)
+                    ->dehydrateStateUsing(
+                        fn (?string $state): ?string =>
+                            filled($state) ? mb_strtoupper(trim($state)) : null
+                    ),
+
                 TextInput::make('short_name')
                     ->label('Rövid név')
                     ->required()

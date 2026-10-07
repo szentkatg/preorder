@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -39,6 +40,11 @@ class ProductForm
 
                 TextInput::make('name_en')
                     ->label('Név EN'),
+                Textarea::make('material_composition')
+                    ->label('Anyagösszetétel')
+                    ->rows(3)
+                    ->columnSpanFull(),
+
                 Select::make('brand_id')
                     ->label('Márka')
                     ->relationship('brand', 'name')

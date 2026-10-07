@@ -43,6 +43,12 @@ class ProductsTable
                     ->label('Név')
                     ->searchable(),
 
+                TextColumn::make('material_composition')
+                    ->label('Anyagösszetétel')
+                    ->searchable()
+                    ->limit(40)
+                    ->toggleable(),
+
                 TextColumn::make('itemMainGroup.code')
                     ->label('Főcsoport')
                     ->sortable(),

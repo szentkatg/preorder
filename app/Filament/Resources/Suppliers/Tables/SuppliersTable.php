@@ -30,6 +30,11 @@ class SuppliersTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('country_code')
+                    ->label('Ország')
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('short_name')
                     ->label('Rövid név')
                     ->searchable()

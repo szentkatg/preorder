@@ -187,6 +187,18 @@ class SupplierPurchasePriceValidator
                     . "({$erpPartnerCode})";
             }
 
+            if (array_key_exists('country_code', $row)) {
+                $countryCode = $this->spreadsheetHelper->nullIfEmpty(
+                    $row['country_code'] ?? null
+                );
+
+                if ($countryCode !== null && mb_strlen($countryCode) !== 2) {
+                    $errors[] =
+                        "suppliers {$rowNumber}. sor: a country_code "
+                        . "pontosan 2 karakter legyen: {$countryCode}";
+                }
+            }
+
             if (! $this->isValidOptionalBoolean($row['active'] ?? null)) {
                 $active = trim((string) ($row['active'] ?? ''));
 

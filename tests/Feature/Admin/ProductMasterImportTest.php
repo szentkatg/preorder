@@ -43,6 +43,7 @@ class ProductMasterImportTest extends TestCase
             'model_code' => 'TEST001',
             'size_range_code' => null,
             'promised_delivery_date' => '2027. 01. 15.',
+            'material_composition' => '100% pamut',
         ];
 
         $page = $this->importPage();
@@ -54,9 +55,11 @@ class ProductMasterImportTest extends TestCase
         $product = Product::query()->where('model_code', 'TEST001')->firstOrFail();
 
         $this->assertSame('2027-01-15', $product->promised_delivery_date);
+        $this->assertSame('100% pamut', $product->material_composition);
 
         $rowWithoutDate = $row;
         unset($rowWithoutDate['promised_delivery_date']);
+        unset($rowWithoutDate['material_composition']);
         $rowWithoutDate['name_hu'] = 'Frissített teszt termék';
 
         $page->importProductRows([$rowWithoutDate]);
@@ -65,6 +68,7 @@ class ProductMasterImportTest extends TestCase
             '2027-01-15',
             $product->refresh()->promised_delivery_date,
         );
+        $this->assertSame('100% pamut', $product->material_composition);
 
         $invalidRow = $row;
         $invalidRow['promised_delivery_date'] = '2027-02-31';

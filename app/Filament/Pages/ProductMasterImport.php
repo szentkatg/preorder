@@ -507,6 +507,12 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
                 );
             }
 
+            if (array_key_exists('material_composition', $row)) {
+                $productData['material_composition'] = $this->nullIfEmpty(
+                    $row['material_composition']
+                );
+            }
+
             $product->forceFill($productData);
 
             $product->save();
