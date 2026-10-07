@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
 use App\Models\PricingCalculationRow;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -17,25 +18,56 @@ class PricingCalculationRowsTable
         return $table
             ->columns([
                 TextColumn::make('pricingProject.name')->label('Árprojekt'),
-                TextColumn::make('product.catalog_group_name_hu')->label('Katalógus csoport'),
-                TextColumn::make('product.itemMainGroup.name_hu')->label('Főcsoport'),
+                TextColumn::make('product.catalog_group_name_hu')
+                    ->label('Katalógus csoport')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('product.itemMainGroup.name_hu')
+                    ->label('Főcsoport')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('product.model_code')->label('Modell kód'),
-                TextColumn::make('product.name_hu')->label('Modell név'),
-                TextColumn::make('product.material_composition')->label('Anyagösszetétel'),
+                TextColumn::make('product.name_hu')
+                    ->label('Modell név')
+                    ->toggleable(),
+                TextColumn::make('product.material_composition')
+                    ->label('Anyagösszetétel')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('color.name_hu')->label('Szín'),
                 TextColumn::make('supplier.short_name')->label('Beszállító'),
-                TextColumn::make('supplier.country_code')->label('Besz. ország'),
+                TextColumn::make('supplier.country_code')
+                    ->label('Besz. ország')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('purchase_price')->label('Besz. ár')->numeric(decimalPlaces: 4),
                 TextColumn::make('purchaseCurrency.code')->label('Besz. deviza'),
-                TextColumn::make('exchange_rate')->label('Árfolyam')->numeric(decimalPlaces: 4),
-                TextColumn::make('shipping_cost_percent')->label('Száll. %')->numeric(decimalPlaces: 2),
-                TextColumn::make('customs_percent')->label('Vám %')->numeric(decimalPlaces: 2),
-                TextColumn::make('candidate_count')->label('Vizsgált aktív árak'),
-                TextColumn::make('priceList.code')->label('Árlista'),
-                TextColumn::make('price_type')->label('Ártípus')->badge(),
-                TextColumn::make('currency.code')->label('Pénznem'),
+                TextColumn::make('exchange_rate')
+                    ->label('Árfolyam')
+                    ->numeric(decimalPlaces: 4)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('shipping_cost_percent')
+                    ->label('Száll. %')
+                    ->numeric(decimalPlaces: 2)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('customs_percent')
+                    ->label('Vám %')
+                    ->numeric(decimalPlaces: 2)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('candidate_count')
+                    ->label('Vizsgált aktív árak')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('priceList.code')
+                    ->label('Árlista')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('price_type')
+                    ->label('Ártípus')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('currency.code')
+                    ->label('Pénznem')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('calculated_price')->label('Kalkulált ár')->numeric(decimalPlaces: 2),
-                TextColumn::make('manual_price')->label('Manuális ár')->numeric(decimalPlaces: 2),
+                TextColumn::make('manual_price')
+                    ->label('Manuális ár')
+                    ->numeric(decimalPlaces: 2)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('final_price')->label('Végleges ár')->numeric(decimalPlaces: 2),
                 TextColumn::make('status')->label('Státusz')->badge(),
             ])
@@ -68,9 +100,26 @@ class PricingCalculationRowsTable
                     ]),
             ])
             ->defaultSort('updated_at', 'desc')
+            ->reorderableColumns()
+            ->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
-            ->recordActions([EditAction::make()])
+            ->recordActions([
+                Action::make('calculationDetails')
+                    ->label('Részletek')
+                    ->icon('heroicon-o-document-magnifying-glass')
+                    ->modalHeading('Kalkuláció részletei')
+                    ->modalWidth('7xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Bezárás')
+                    ->modalContent(
+                        fn (PricingCalculationRow $record) => view(
+                            'filament.pricing.calculation-details',
+                            ['record' => $record]
+                        )
+                    ),
+                EditAction::make(),
+            ])
             ->toolbarActions([
                 BulkActionGroup::make([DeleteBulkAction::make()]),
             ]);

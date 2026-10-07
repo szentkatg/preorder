@@ -53,4 +53,9 @@ class PricingProject extends Model
     {
         return $this->hasMany(PricingCalculationRow::class);
     }
+
+    public function calculationErrors(): HasMany
+    {
+        return $this->hasMany(PricingCalculationError::class);
+    }
 }

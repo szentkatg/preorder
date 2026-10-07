@@ -35,7 +35,8 @@ class EditPricingProject extends EditRecord
                             ', kihagyott csoport: ' . $result['skipped'] .
                             ', aktív beszerzési ár nélküli termék: ' .
                             $result['products_without_active_purchase_price'] .
-                            ', hibák: ' . count($result['errors'])
+                            ', hibák: ' . count($result['errors']) .
+                            ', futás azonosító: ' . $result['run_id']
                         )
                         ->success()
                         ->send();

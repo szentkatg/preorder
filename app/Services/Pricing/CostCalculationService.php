@@ -3,11 +3,13 @@
 namespace App\Services\Pricing;
 
 use App\Models\Currency;
+use App\Models\PricingCalculationError;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
 use App\Models\Product;
 use App\Models\ProductPurchasePrice;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -19,6 +21,7 @@ class CostCalculationService
 
     /**
      * @return array{
+     *     run_id: string,
      *     created: int,
      *     updated: int,
      *     skipped: int,
@@ -30,6 +33,7 @@ class CostCalculationService
     public function recalculate(PricingProject $project): array
     {
         $project->loadMissing('season');
+        $runId = (string) Str::uuid();
 
         $hufCurrency = Currency::query()
             ->where('code', 'HUF')
@@ -39,10 +43,15 @@ class CostCalculationService
             throw new RuntimeException('Hiányzó HUF pénznem.');
         }
 
-        $activeProductCount = Product::query()
+        $productsWithoutActivePurchasePrice = Product::query()
             ->where('season_id', $project->season_id)
             ->where('active', true)
-            ->count();
+            ->whereDoesntHave(
+                'purchasePrices',
+                fn ($query) => $query->where('active', true)
+            )
+            ->with('itemMainGroup')
+            ->get();
 
         $purchasePrices = ProductPurchasePrice::query()
             ->where('active', true)
@@ -68,23 +77,36 @@ class CostCalculationService
             );
 
         $result = [
+            'run_id' => $runId,
             'created' => 0,
             'updated' => 0,
             'skipped' => 0,
             'candidate_groups' => $purchasePriceGroups->count(),
-            'products_without_active_purchase_price' => max(
-                0,
-                $activeProductCount - $purchasePrices
-                    ->pluck('product_id')
-                    ->unique()
-                    ->count()
-            ),
+            'products_without_active_purchase_price' =>
+                $productsWithoutActivePurchasePrice->count(),
             'errors' => [],
         ];
 
-        DB::transaction(function () use ($purchasePriceGroups, $project, $hufCurrency, &$result): void {
+        DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $hufCurrency, $runId, &$result): void {
+            foreach ($productsWithoutActivePurchasePrice as $product) {
+                PricingCalculationError::query()->create([
+                    'run_id' => $runId,
+                    'pricing_project_id' => $project->id,
+                    'price_type' => PricingCalculationRow::TYPE_COST,
+                    'product_id' => $product->id,
+                    'severity' => PricingCalculationError::SEVERITY_WARNING,
+                    'message' => 'Nincs aktív beszerzési ár a termékhez.',
+                    'context' => [
+                        'model_code' => $product->model_code,
+                        'product_name' => $product->name_hu,
+                        'item_main_group' => $product->itemMainGroup?->name_hu,
+                    ],
+                ]);
+            }
+
             foreach ($purchasePriceGroups as $purchasePrices) {
                 $candidates = [];
+                $candidateErrors = [];
 
                 foreach ($purchasePrices as $purchasePrice) {
                     try {
@@ -96,14 +118,46 @@ class CostCalculationService
                             'calculation' => $calculation,
                         ];
                     } catch (Throwable $exception) {
-                        $result['errors'][] = $this->candidateErrorMessage(
-                            $purchasePrice,
-                            $exception
-                        );
+                        $message = $this->candidateErrorMessage($purchasePrice, $exception);
+
+                        $candidateErrors[] = [
+                            'purchase_price' => $purchasePrice,
+                            'message' => $message,
+                            'exception' => $exception,
+                        ];
+
+                        $result['errors'][] = $message;
                     }
                 }
 
                 if ($candidates === []) {
+                    foreach ($candidateErrors as $candidateError) {
+                        /** @var ProductPurchasePrice $failedPurchasePrice */
+                        $failedPurchasePrice = $candidateError['purchase_price'];
+
+                        PricingCalculationError::query()->create([
+                            'run_id' => $runId,
+                            'pricing_project_id' => $project->id,
+                            'price_type' => PricingCalculationRow::TYPE_COST,
+                            'product_id' => $failedPurchasePrice->product_id,
+                            'color_id' => $failedPurchasePrice->color_id,
+                            'product_purchase_price_id' => $failedPurchasePrice->getKey(),
+                            'supplier_id' => $failedPurchasePrice->supplier_id,
+                            'severity' => PricingCalculationError::SEVERITY_ERROR,
+                            'message' => $candidateError['message'],
+                            'context' => [
+                                'model_code' => $failedPurchasePrice->product?->model_code,
+                                'color_code' => $failedPurchasePrice->color?->code,
+                                'supplier_code' => $failedPurchasePrice->supplier?->erp_partner_code,
+                                'supplier_name' => $failedPurchasePrice->supplier?->short_name
+                                    ?: $failedPurchasePrice->supplier?->name,
+                                'currency' => $failedPurchasePrice->currency?->code,
+                                'purchase_price' => $failedPurchasePrice->purchase_price,
+                                'exception' => $candidateError['exception']->getMessage(),
+                            ],
+                        ]);
+                    }
+
                     $result['skipped']++;
 
                     continue;
