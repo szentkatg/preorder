@@ -3,6 +3,35 @@
     $snapshot = $record->calculation_snapshot ?? [];
     $selected = $snapshot['selected_purchase_price'] ?? [];
     $candidates = $snapshot['compared_candidates'] ?? [];
+    $selectedPurchasePriceId = $selected['id'] ?? null;
+
+    $costBreakdown = function (array $data): array {
+        $purchasePrice = (float) ($data['purchase_price'] ?? 0);
+        $exchangeRate = (float) ($data['exchange_rate'] ?? 0);
+        $shippingPercent = (float) ($data['shipping_cost_percent'] ?? 0);
+        $customsPercent = (float) ($data['customs_percent'] ?? 0);
+
+        $baseHuf = $purchasePrice * $exchangeRate;
+        $shippingAmount = $baseHuf * ($shippingPercent / 100);
+        $afterShipping = $baseHuf + $shippingAmount;
+        $customsAmount = $afterShipping * ($customsPercent / 100);
+        $landedCost = $afterShipping + $customsAmount;
+
+        return [
+            'base_huf' => $baseHuf,
+            'shipping_amount' => $shippingAmount,
+            'after_shipping' => $afterShipping,
+            'customs_amount' => $customsAmount,
+            'landed_cost' => $landedCost,
+        ];
+    };
+
+    $selectedBreakdown = $costBreakdown([
+        'purchase_price' => $record->purchase_price,
+        'exchange_rate' => $record->exchange_rate,
+        'shipping_cost_percent' => $record->shipping_cost_percent,
+        'customs_percent' => $record->customs_percent,
+    ]);
 @endphp
 
 <div class="space-y-6 text-sm">
@@ -40,34 +69,101 @@
     </div>
 
     <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+        <h3 class="mb-3 font-semibold">Kiválasztott ár költségelemekre bontva</h3>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table class="min-w-full border-collapse text-sm">
+                <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                    <tr>
+                        <th class="border-b border-r border-gray-200 px-4 py-3 text-left dark:border-gray-700">Költségelem</th>
+                        <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Számítás alapja</th>
+                        <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">%</th>
+                        <th class="border-b border-gray-200 px-4 py-3 text-right dark:border-gray-700">Érték HUF</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr>
+                        <td class="border-r border-gray-200 px-4 py-3 font-medium dark:border-gray-700">Beszerzési ár HUF-ban</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">
+                            {{ number_format((float) $record->purchase_price, 4, ',', ' ') }}
+                            ×
+                            {{ number_format((float) $record->exchange_rate, 4, ',', ' ') }}
+                        </td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right text-gray-500 dark:border-gray-700">-</td>
+                        <td class="px-4 py-3 text-right font-semibold">{{ number_format($selectedBreakdown['base_huf'], 2, ',', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="border-r border-gray-200 px-4 py-3 font-medium dark:border-gray-700">Szállítási költség</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format($selectedBreakdown['base_huf'], 2, ',', ' ') }}</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) $record->shipping_cost_percent, 2, ',', ' ') }}%</td>
+                        <td class="px-4 py-3 text-right font-semibold">{{ number_format($selectedBreakdown['shipping_amount'], 2, ',', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="border-r border-gray-200 px-4 py-3 font-medium dark:border-gray-700">Vám</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format($selectedBreakdown['after_shipping'], 2, ',', ' ') }}</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) $record->customs_percent, 2, ',', ' ') }}%</td>
+                        <td class="px-4 py-3 text-right font-semibold">{{ number_format($selectedBreakdown['customs_amount'], 2, ',', ' ') }}</td>
+                    </tr>
+                    <tr class="bg-gray-50 dark:bg-gray-900">
+                        <td class="border-r border-gray-200 px-4 py-3 font-semibold dark:border-gray-700">Bekerülési érték</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right text-gray-500 dark:border-gray-700">-</td>
+                        <td class="border-r border-gray-200 px-4 py-3 text-right text-gray-500 dark:border-gray-700">-</td>
+                        <td class="px-4 py-3 text-right text-base font-bold">{{ number_format($selectedBreakdown['landed_cost'], 2, ',', ' ') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <h3 class="mb-3 font-semibold">Összehasonlított aktív beszerzési árak</h3>
 
         @if (count($candidates) > 0)
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
-                    <thead>
-                        <tr class="border-b border-gray-200 dark:border-gray-700">
-                            <th class="px-2 py-2">Beszállító</th>
-                            <th class="px-2 py-2">Ország</th>
-                            <th class="px-2 py-2 text-right">Besz. ár</th>
-                            <th class="px-2 py-2">Deviza</th>
-                            <th class="px-2 py-2 text-right">Árfolyam</th>
-                            <th class="px-2 py-2 text-right">Száll. %</th>
-                            <th class="px-2 py-2 text-right">Vám %</th>
-                            <th class="px-2 py-2 text-right">Bekerülési HUF</th>
+            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table class="min-w-full border-collapse text-left text-xs">
+                    <thead class="bg-gray-50 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                        <tr>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 dark:border-gray-700">Beszállító</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 dark:border-gray-700">Ország</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Besz. ár</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 dark:border-gray-700">Deviza</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Árfolyam</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Alap HUF</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Száll. %</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Száll. HUF</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Vám %</th>
+                            <th class="border-b border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">Vám HUF</th>
+                            <th class="border-b border-gray-200 px-4 py-3 text-right dark:border-gray-700">Bekerülési HUF</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         @foreach ($candidates as $candidate)
-                            <tr class="border-b border-gray-100 dark:border-gray-800">
-                                <td class="px-2 py-2">{{ $candidate['supplier_name'] ?? $candidate['supplier_code'] ?? '-' }}</td>
-                                <td class="px-2 py-2">{{ $candidate['supplier_country_code'] ?? '-' }}</td>
-                                <td class="px-2 py-2 text-right">{{ number_format((float) ($candidate['purchase_price'] ?? 0), 4, ',', ' ') }}</td>
-                                <td class="px-2 py-2">{{ $candidate['currency'] ?? '-' }}</td>
-                                <td class="px-2 py-2 text-right">{{ number_format((float) ($candidate['exchange_rate'] ?? 0), 4, ',', ' ') }}</td>
-                                <td class="px-2 py-2 text-right">{{ number_format((float) ($candidate['shipping_cost_percent'] ?? 0), 2, ',', ' ') }}%</td>
-                                <td class="px-2 py-2 text-right">{{ number_format((float) ($candidate['customs_percent'] ?? 0), 2, ',', ' ') }}%</td>
-                                <td class="px-2 py-2 text-right font-semibold">{{ number_format((float) ($candidate['landed_cost_huf'] ?? 0), 2, ',', ' ') }}</td>
+                            @php
+                                $breakdown = $costBreakdown($candidate);
+                                $isSelected = $selectedPurchasePriceId !== null
+                                    && (int) ($candidate['product_purchase_price_id'] ?? 0) === (int) $selectedPurchasePriceId;
+                            @endphp
+                            <tr @class([
+                                'bg-blue-50 dark:bg-blue-950/30' => $isSelected,
+                            ])>
+                                <td class="border-r border-gray-200 px-4 py-3 font-medium dark:border-gray-700">
+                                    {{ $candidate['supplier_name'] ?? $candidate['supplier_code'] ?? '-' }}
+                                    @if ($isSelected)
+                                        <span class="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                                            kiválasztva
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="border-r border-gray-200 px-4 py-3 dark:border-gray-700">{{ $candidate['supplier_country_code'] ?? '-' }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) ($candidate['purchase_price'] ?? 0), 4, ',', ' ') }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 dark:border-gray-700">{{ $candidate['currency'] ?? '-' }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) ($candidate['exchange_rate'] ?? 0), 4, ',', ' ') }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format($breakdown['base_huf'], 2, ',', ' ') }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) ($candidate['shipping_cost_percent'] ?? 0), 2, ',', ' ') }}%</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format($breakdown['shipping_amount'], 2, ',', ' ') }}</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format((float) ($candidate['customs_percent'] ?? 0), 2, ',', ' ') }}%</td>
+                                <td class="border-r border-gray-200 px-4 py-3 text-right dark:border-gray-700">{{ number_format($breakdown['customs_amount'], 2, ',', ' ') }}</td>
+                                <td class="px-4 py-3 text-right font-semibold">{{ number_format((float) ($candidate['landed_cost_huf'] ?? $breakdown['landed_cost']), 2, ',', ' ') }}</td>
                             </tr>
                         @endforeach
                     </tbody>

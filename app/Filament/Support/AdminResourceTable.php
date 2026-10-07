@@ -76,6 +76,10 @@ class AdminResourceTable
      */
     private static function configureColumn(Column $column, string $modelClass): void
     {
+        if (! $column->isToggleable()) {
+            $column->toggleable();
+        }
+
         $column
             ->sortable()
             ->searchable(isIndividual: true);
