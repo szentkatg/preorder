@@ -49,6 +49,17 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('pricing_parameters'));
         $this->assertTrue(Schema::hasTable('pricing_rounding_rules'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));
+        $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', [
+            'product_purchase_price_id',
+            'supplier_id',
+            'purchase_currency_id',
+            'purchase_price',
+            'exchange_rate',
+            'shipping_cost_percent',
+            'customs_percent',
+            'candidate_count',
+            'calculation_snapshot',
+        ]));
         $this->assertTrue(Schema::hasColumns('orders', [
             'reference_number',
             'order_type_id',

@@ -33,6 +33,45 @@ class PricingCalculationRowForm
                     ->searchable()
                     ->preload(),
 
+                Select::make('supplier_id')
+                    ->label('Beszállító')
+                    ->relationship('supplier', 'short_name')
+                    ->searchable()
+                    ->preload()
+                    ->disabled(),
+
+                Select::make('purchase_currency_id')
+                    ->label('Beszerzési deviza')
+                    ->relationship('purchaseCurrency', 'code')
+                    ->searchable()
+                    ->preload()
+                    ->disabled(),
+
+                TextInput::make('purchase_price')
+                    ->label('Beszerzési ár')
+                    ->numeric()
+                    ->disabled(),
+
+                TextInput::make('exchange_rate')
+                    ->label('Árfolyam')
+                    ->numeric()
+                    ->disabled(),
+
+                TextInput::make('shipping_cost_percent')
+                    ->label('Szállítási költség %')
+                    ->numeric()
+                    ->disabled(),
+
+                TextInput::make('customs_percent')
+                    ->label('Vám %')
+                    ->numeric()
+                    ->disabled(),
+
+                TextInput::make('candidate_count')
+                    ->label('Vizsgált aktív beszerzési árak')
+                    ->numeric()
+                    ->disabled(),
+
                 Select::make('price_list_id')
                     ->label('Árlista')
                     ->relationship('priceList', 'code')
@@ -58,7 +97,8 @@ class PricingCalculationRowForm
 
                 TextInput::make('calculated_price')
                     ->label('Kalkulált ár')
-                    ->numeric(),
+                    ->numeric()
+                    ->disabled(),
 
                 TextInput::make('manual_price')
                     ->label('Manuális ár')

@@ -6,6 +6,7 @@ use App\Filament\Resources\PricingProjects\Pages\CreatePricingProject;
 use App\Filament\Resources\PricingProjects\Pages\EditPricingProject;
 use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
 use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
+use App\Filament\Resources\PricingProjects\RelationManagers\CalculationRowsRelationManager;
 use App\Filament\Resources\PricingProjects\Schemas\PricingProjectForm;
 use App\Filament\Resources\PricingProjects\Tables\PricingProjectsTable;
 use App\Filament\Support\AdminResourceTable;
@@ -41,6 +42,13 @@ class PricingProjectResource extends Resource
             PricingProjectsTable::configure($table),
             PricingProject::class,
         );
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            CalculationRowsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

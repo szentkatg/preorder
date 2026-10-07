@@ -31,9 +31,17 @@ class PricingCalculationRow extends Model
         'pricing_project_id',
         'product_id',
         'color_id',
+        'product_purchase_price_id',
+        'supplier_id',
+        'purchase_currency_id',
         'price_list_id',
         'price_type',
         'currency_id',
+        'purchase_price',
+        'exchange_rate',
+        'shipping_cost_percent',
+        'customs_percent',
+        'candidate_count',
         'calculated_price',
         'manual_price',
         'final_price',
@@ -51,6 +59,10 @@ class PricingCalculationRow extends Model
             'calculated_price' => 'decimal:4',
             'manual_price' => 'decimal:4',
             'final_price' => 'decimal:4',
+            'purchase_price' => 'decimal:4',
+            'exchange_rate' => 'decimal:6',
+            'shipping_cost_percent' => 'decimal:4',
+            'customs_percent' => 'decimal:4',
             'calculation_snapshot' => 'array',
             'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -85,6 +97,29 @@ class PricingCalculationRow extends Model
     public function color(): BelongsTo
     {
         return $this->belongsTo(Color::class);
+    }
+
+    public function purchasePrice(): BelongsTo
+    {
+        return $this->belongsTo(
+            ProductPurchasePrice::class,
+            'product_purchase_price_id',
+            'product_purchase_price_id'
+        );
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(
+            Supplier::class,
+            'supplier_id',
+            'supplier_id'
+        );
+    }
+
+    public function purchaseCurrency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class, 'purchase_currency_id');
     }
 
     public function priceList(): BelongsTo
