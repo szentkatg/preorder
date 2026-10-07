@@ -32,6 +32,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('size_range_items'));
         $this->assertTrue(Schema::hasColumn('partners', 'sales_rep_erp_partner_code'));
         $this->assertFalse(Schema::hasColumn('products', 'serial_number'));
+        $this->assertTrue(Schema::hasColumn('products', 'material_composition'));
+        $this->assertTrue(Schema::hasColumn('suppliers', 'country_code'));
         $this->assertTrue(Schema::hasColumn('skus', 'sku_name'));
         $this->assertTrue(Schema::hasColumn('price_list_items', 'product_id'));
         $this->assertFalse(Schema::hasColumn('price_list_items', 'sku_id'));
@@ -43,6 +45,10 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('role_has_permissions'));
         $this->assertTrue(Schema::hasTable('order_types'));
         $this->assertTrue(Schema::hasTable('order_share_links'));
+        $this->assertTrue(Schema::hasTable('pricing_projects'));
+        $this->assertTrue(Schema::hasTable('pricing_parameters'));
+        $this->assertTrue(Schema::hasTable('pricing_rounding_rules'));
+        $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));
         $this->assertTrue(Schema::hasColumns('orders', [
             'reference_number',
             'order_type_id',

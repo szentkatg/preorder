@@ -290,7 +290,7 @@ class AdminAuthorizationTest extends TestCase
             ))
             ->values();
 
-        $this->assertCount(26, $resources);
+        $this->assertCount(30, $resources);
 
         foreach ($resources as $resource) {
             $this->assertTrue($resource::hasPage('view'), "Missing view page on {$resource}");
@@ -499,7 +499,7 @@ class AdminAuthorizationTest extends TestCase
         $resources = collect(Shield::getResources());
         $pages = collect(Shield::getPages());
 
-        $this->assertCount(26, $resources);
+        $this->assertCount(30, $resources);
         $this->assertCount(5, $pages);
 
         foreach ($resources as $resource) {

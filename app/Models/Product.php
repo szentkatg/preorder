@@ -18,6 +18,7 @@ class Product extends Model
         'model_code',
         'name_hu',
         'name_en',
+        'material_composition',
         'brand_id',
         'order_sheet_type_id',
         'catalog_group_name_hu',

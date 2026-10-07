@@ -15,6 +15,7 @@ class Supplier extends Model
         'addrid',
         'name',
         'short_name',
+        'country_code',
         'active',
     ];
 
