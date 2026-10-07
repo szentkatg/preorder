@@ -22,13 +22,16 @@
 
     <style>
         [data-pricing-resizable-columns] .fi-ta-table {
-            table-layout: fixed;
+            width: max-content;
+            min-width: 100%;
+            table-layout: auto;
         }
 
         [data-pricing-resizable-columns] .fi-ta-table th,
         [data-pricing-resizable-columns] .fi-ta-table td {
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         [data-pricing-resizable-columns] .fi-ta-table th {

@@ -7,7 +7,6 @@ use App\Models\PricingParameter;
 use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\PricingParameterAdjustmentService;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -54,10 +53,28 @@ class PricingCalculationRowsTable
                 TextColumn::make('shipping_cost_percent')
                     ->label('Száll. %')
                     ->numeric(decimalPlaces: 2)
+                    ->tooltip('Kattintás: szállítási költség % paraméter módosítása')
+                    ->action(
+                        self::parameterAction(
+                            'editShippingCostPercentFromCell',
+                            'Szállítás % módosítása',
+                            PricingParameter::TYPE_SHIPPING_COST_PERCENT,
+                            'shipping_cost_percent'
+                        )
+                    )
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('customs_percent')
                     ->label('Vám %')
                     ->numeric(decimalPlaces: 2)
+                    ->tooltip('Kattintás: vám % paraméter módosítása')
+                    ->action(
+                        self::parameterAction(
+                            'editCustomsPercentFromCell',
+                            'Vám % módosítása',
+                            PricingParameter::TYPE_CUSTOMS_PERCENT,
+                            'customs_percent'
+                        )
+                    )
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('candidate_count')
                     ->label('Vizsgált aktív árak')
@@ -127,22 +144,24 @@ class PricingCalculationRowsTable
                             ['record' => $record]
                         )
                     ),
-                ActionGroup::make([
-                    self::parameterAction(
-                        'updateShippingCostPercent',
-                        'Szállítás % módosítása',
-                        PricingParameter::TYPE_SHIPPING_COST_PERCENT,
-                        'shipping_cost_percent'
+                self::parameterAction(
+                    'updateShippingCostPercent',
+                    'Szállítás %',
+                    PricingParameter::TYPE_SHIPPING_COST_PERCENT,
+                    'shipping_cost_percent'
+                )
+                    ->icon('heroicon-o-truck')
+                    ->visible(
+                        fn (PricingCalculationRow $record): bool =>
+                            $record->price_type === PricingCalculationRow::TYPE_COST
                     ),
-                    self::parameterAction(
-                        'updateCustomsPercent',
-                        'Vám % módosítása',
-                        PricingParameter::TYPE_CUSTOMS_PERCENT,
-                        'customs_percent'
-                    ),
-                ])
-                    ->label('Paraméter')
-                    ->icon('heroicon-o-adjustments-horizontal')
+                self::parameterAction(
+                    'updateCustomsPercent',
+                    'Vám %',
+                    PricingParameter::TYPE_CUSTOMS_PERCENT,
+                    'customs_percent'
+                )
+                    ->icon('heroicon-o-receipt-percent')
                     ->visible(
                         fn (PricingCalculationRow $record): bool =>
                             $record->price_type === PricingCalculationRow::TYPE_COST
