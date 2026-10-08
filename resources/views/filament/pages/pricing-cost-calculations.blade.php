@@ -15,6 +15,69 @@
             </button>
         </div>
 
+        @php($pendingAdjustment = $this->pendingParameterAdjustment)
+        @php($selectedAffectedRows = $pendingAdjustment['scope_counts'][$this->pendingParameterScope] ?? null)
+
+        @if ($pendingAdjustment)
+            <div class="pricing-inline-parameter-panel">
+                <div class="pricing-inline-parameter-text">
+                    <div class="pricing-inline-parameter-title">
+                        Paraméter módosítás megerősítése
+                    </div>
+
+                    <div class="pricing-inline-parameter-summary">
+                        <span class="pricing-inline-parameter-pill">
+                            {{ $pendingAdjustment['parameter_label'] ?? 'Paraméter' }}:
+                            {{ number_format((float) ($pendingAdjustment['value'] ?? 0), 2, ',', ' ') }}%
+                        </span>
+
+                        @if (filled($pendingAdjustment['model_code'] ?? null))
+                            <span>Modell: {{ $pendingAdjustment['model_code'] }}</span>
+                        @endif
+
+                        @if (filled($pendingAdjustment['supplier_name'] ?? null))
+                            <span>Beszállító: {{ $pendingAdjustment['supplier_name'] }}</span>
+                        @endif
+
+                        @if ($selectedAffectedRows !== null)
+                            <span class="pricing-inline-parameter-impact">
+                                A kiválasztott szűkítés várhatóan {{ number_format((int) $selectedAffectedRows, 0, ',', ' ') }} sort érint.
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="pricing-inline-parameter-actions">
+                    <label class="pricing-inline-parameter-field">
+                        <span>Érvényesítés szintje</span>
+                        <select wire:model.live="pendingParameterScope">
+                            @foreach (($pendingAdjustment['scope_options'] ?? []) as $scope => $label)
+                                <option value="{{ $scope }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <button
+                        type="button"
+                        class="pricing-inline-parameter-save"
+                        wire:click="confirmPendingParameterAdjustment"
+                        wire:loading.attr="disabled"
+                    >
+                        Mentés és újraszámítás
+                    </button>
+
+                    <button
+                        type="button"
+                        class="pricing-inline-parameter-cancel"
+                        wire:click="cancelPendingParameterAdjustment"
+                        wire:loading.attr="disabled"
+                    >
+                        Mégse
+                    </button>
+                </div>
+            </div>
+        @endif
+
         <div data-pricing-resizable-columns>
             {{ $this->table }}
         </div>
@@ -69,6 +132,111 @@
         body.pricing-column-resize-active {
             cursor: col-resize;
             user-select: none;
+        }
+
+        .pricing-inline-parameter-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: end;
+            justify-content: space-between;
+            padding: 1rem;
+            color: rgb(113 63 18);
+            background: rgb(255 251 235);
+            border: 1px solid rgb(252 211 77);
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+        }
+
+        .pricing-inline-parameter-text {
+            min-width: 18rem;
+        }
+
+        .pricing-inline-parameter-title {
+            font-weight: 700;
+        }
+
+        .pricing-inline-parameter-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+            margin-top: 0.35rem;
+            font-size: 0.875rem;
+        }
+
+        .pricing-inline-parameter-pill {
+            font-weight: 700;
+        }
+
+        .pricing-inline-parameter-impact {
+            font-weight: 700;
+            color: rgb(146 64 14);
+        }
+
+        .pricing-inline-parameter-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: end;
+        }
+
+        .pricing-inline-parameter-field {
+            display: grid;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .pricing-inline-parameter-field select {
+            min-width: 16rem;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: rgb(17 24 39);
+            background: white;
+            border: 1px solid rgb(217 119 6);
+            border-radius: 0.5rem;
+        }
+
+        .pricing-inline-parameter-save,
+        .pricing-inline-parameter-cancel {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+        }
+
+        .pricing-inline-parameter-save {
+            color: white;
+            background: rgb(37 99 235);
+        }
+
+        .pricing-inline-parameter-save:disabled,
+        .pricing-inline-parameter-cancel:disabled {
+            opacity: 0.6;
+        }
+
+        .pricing-inline-parameter-cancel {
+            color: rgb(55 65 81);
+            background: white;
+            border: 1px solid rgb(209 213 219);
+        }
+
+        .dark .pricing-inline-parameter-panel {
+            color: rgb(254 243 199);
+            background: rgb(69 26 3 / 0.45);
+            border-color: rgb(180 83 9);
+        }
+
+        .dark .pricing-inline-parameter-field select,
+        .dark .pricing-inline-parameter-cancel {
+            color: rgb(229 231 235);
+            background: rgb(17 24 39);
+            border-color: rgb(75 85 99);
+        }
+
+        .dark .pricing-inline-parameter-impact {
+            color: rgb(252 211 77);
         }
     </style>
 

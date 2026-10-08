@@ -15,6 +15,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use InvalidArgumentException;
@@ -28,10 +29,10 @@ class PricingCalculationRowsTable
                 TextColumn::make('pricingProject.name')->label('Árprojekt'),
                 TextColumn::make('product.catalog_group_name_hu')
                     ->label('Katalógus csoport')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 TextColumn::make('product.itemMainGroup.name_hu')
                     ->label('Főcsoport')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 TextColumn::make('product.model_code')->label('Modell kód'),
                 TextColumn::make('product.name_hu')
                     ->label('Modell név')
@@ -50,31 +51,53 @@ class PricingCalculationRowsTable
                     ->label('Árfolyam')
                     ->numeric(decimalPlaces: 4)
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('shipping_cost_percent')
+                TextInputColumn::make('shipping_cost_percent')
                     ->label('Száll. %')
-                    ->numeric(decimalPlaces: 2)
-                    ->tooltip('Kattintás: szállítási költség % paraméter módosítása')
-                    ->action(
-                        self::parameterAction(
-                            'editShippingCostPercentFromCell',
-                            'Szállítás % módosítása',
-                            PricingParameter::TYPE_SHIPPING_COST_PERCENT,
-                            'shipping_cost_percent'
-                        )
+                    ->type('number')
+                    ->inputMode('decimal')
+                    ->step('0.01')
+                    ->suffix('%', true)
+                    ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
+                    ->rules(['required', 'numeric', 'min:0'])
+                    ->disabled(
+                        fn (PricingCalculationRow $record): bool =>
+                            $record->price_type !== PricingCalculationRow::TYPE_COST
                     )
+                    ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
+                        if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
+                            $livewire->startInlineCostPercentParameterAdjustment(
+                                (int) $record->getKey(),
+                                PricingParameter::TYPE_SHIPPING_COST_PERCENT,
+                                $state,
+                            );
+                        }
+
+                        return $state;
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('customs_percent')
+                TextInputColumn::make('customs_percent')
                     ->label('Vám %')
-                    ->numeric(decimalPlaces: 2)
-                    ->tooltip('Kattintás: vám % paraméter módosítása')
-                    ->action(
-                        self::parameterAction(
-                            'editCustomsPercentFromCell',
-                            'Vám % módosítása',
-                            PricingParameter::TYPE_CUSTOMS_PERCENT,
-                            'customs_percent'
-                        )
+                    ->type('number')
+                    ->inputMode('decimal')
+                    ->step('0.01')
+                    ->suffix('%', true)
+                    ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
+                    ->rules(['required', 'numeric', 'min:0'])
+                    ->disabled(
+                        fn (PricingCalculationRow $record): bool =>
+                            $record->price_type !== PricingCalculationRow::TYPE_COST
                     )
+                    ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
+                        if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
+                            $livewire->startInlineCostPercentParameterAdjustment(
+                                (int) $record->getKey(),
+                                PricingParameter::TYPE_CUSTOMS_PERCENT,
+                                $state,
+                            );
+                        }
+
+                        return $state;
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('candidate_count')
                     ->label('Vizsgált aktív árak')
@@ -271,7 +294,66 @@ class PricingCalculationRowsTable
                 'Modell - ' . ($record->product?->model_code ?: $record->product_id);
         }
 
+        return self::appendParameterScopeCounts(
+            $options,
+            self::parameterScopeCounts($record, array_keys($options)),
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $scopeTypes
+     * @return array<string, int>
+     */
+    private static function parameterScopeCounts(PricingCalculationRow $record, array $scopeTypes): array
+    {
+        $counts = [];
+
+        foreach ($scopeTypes as $scopeType) {
+            $counts[$scopeType] = self::parameterScopeAffectedRowCount($record, $scopeType);
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @param  array<string, string>  $options
+     * @param  array<string, int>  $counts
+     * @return array<string, string>
+     */
+    private static function appendParameterScopeCounts(array $options, array $counts): array
+    {
+        foreach ($options as $scopeType => $label) {
+            if (array_key_exists($scopeType, $counts)) {
+                $options[$scopeType] = $label . ' (' . $counts[$scopeType] . ' sor)';
+            }
+        }
+
         return $options;
+    }
+
+    private static function parameterScopeAffectedRowCount(PricingCalculationRow $record, string $scopeType): int
+    {
+        $record->loadMissing(['product', 'supplier']);
+
+        $query = PricingCalculationRow::query()
+            ->where('pricing_project_id', $record->pricing_project_id)
+            ->where('price_type', PricingCalculationRow::TYPE_COST);
+
+        match ($scopeType) {
+            PricingParameter::SCOPE_GLOBAL => null,
+            PricingParameter::SCOPE_SUPPLIER_COUNTRY => $query->whereHas(
+                'supplier',
+                fn ($supplierQuery) => $supplierQuery->where('country_code', $record->supplier?->country_code)
+            ),
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP => $query->whereHas(
+                'product',
+                fn ($productQuery) => $productQuery->where('item_main_group_id', $record->product?->item_main_group_id)
+            ),
+            PricingParameter::SCOPE_PRODUCT => $query->where('product_id', $record->product_id),
+            default => null,
+        };
+
+        return $query->count();
     }
 
     private static function defaultParameterScope(PricingCalculationRow $record): string
