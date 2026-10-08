@@ -147,37 +147,17 @@
 </style>
 
 <div class="pricing-calculation-details space-y-6 text-sm">
-    <div class="grid gap-4 md:grid-cols-2">
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <h3 class="mb-3 font-semibold">Kiválasztott beszerzési ár</h3>
-            <dl class="grid grid-cols-2 gap-2">
-                <dt class="text-gray-500">Beszállító</dt>
-                <dd>{{ $record->supplier?->short_name ?: $record->supplier?->name ?: '-' }}</dd>
-                <dt class="text-gray-500">Beszerzési ár</dt>
-                <dd>{{ number_format((float) $record->purchase_price, 4, ',', ' ') }} {{ $record->purchaseCurrency?->code }}</dd>
-                <dt class="text-gray-500">Árfolyam</dt>
-                <dd>{{ number_format((float) $record->exchange_rate, 4, ',', ' ') }}</dd>
-                <dt class="text-gray-500">Szállítás %</dt>
-                <dd>{{ number_format((float) $record->shipping_cost_percent, 2, ',', ' ') }}%</dd>
-                <dt class="text-gray-500">Vám %</dt>
-                <dd>{{ number_format((float) $record->customs_percent, 2, ',', ' ') }}%</dd>
-                <dt class="text-gray-500">Bekerülési érték</dt>
-                <dd class="font-semibold">{{ number_format((float) $record->calculated_price, 2, ',', ' ') }} {{ $record->currency?->code }}</dd>
-            </dl>
-        </div>
-
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <h3 class="mb-3 font-semibold">Számítás</h3>
-            <p class="font-mono text-xs">
-                {{ $snapshot['formula'] ?? 'purchase_price * exchange_rate * (1 + shipping_cost_percent / 100) * (1 + customs_percent / 100)' }}
-            </p>
-            <p class="mt-3 text-gray-600 dark:text-gray-300">
-                {{ $snapshot['selection_rule'] ?? 'Több aktív beszerzési ár esetén a legalacsonyabb HUF bekerülési érték kerül kiválasztásra.' }}
-            </p>
-            <p class="mt-3 text-gray-500">
-                Kalkulálva: {{ $snapshot['calculated_at'] ?? '-' }}
-            </p>
-        </div>
+    <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+        <h3 class="mb-3 font-semibold">Számítás</h3>
+        <p class="font-mono text-xs">
+            {{ $snapshot['formula'] ?? 'purchase_price * exchange_rate * (1 + shipping_cost_percent / 100) * (1 + customs_percent / 100)' }}
+        </p>
+        <p class="mt-3 text-gray-600 dark:text-gray-300">
+            {{ $snapshot['selection_rule'] ?? 'Több aktív beszerzési ár esetén a legalacsonyabb HUF bekerülési érték kerül kiválasztásra.' }}
+        </p>
+        <p class="mt-3 text-gray-500">
+            Kalkulálva: {{ $snapshot['calculated_at'] ?? '-' }}
+        </p>
     </div>
 
     <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
