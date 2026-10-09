@@ -90,6 +90,10 @@
             table-layout: auto;
         }
 
+        [data-pricing-resizable-columns] {
+            max-width: 100%;
+        }
+
         [data-pricing-resizable-columns] .fi-ta-table th,
         [data-pricing-resizable-columns] .fi-ta-table td {
             overflow: hidden;
@@ -250,22 +254,80 @@
 
             window.__pricingCostColumnResizingBooted = true;
 
-            const storageKey = 'pricing-cost-calculation-column-widths-v1';
+            const storageKey = 'pricing-cost-calculation-column-widths-v2-user-{{ auth()->id() ?? 'guest' }}';
+            const serverWidths = @js($this->pricingColumnWidths);
             const minimumWidth = 72;
+            let mutationObserver = null;
+            let observedTableContainer = null;
+            let initialiseTimer = null;
+            let suppressMutationObserverUntil = 0;
+            let currentWidths = null;
 
             function loadWidths() {
+                if (currentWidths !== null) {
+                    return currentWidths;
+                }
+
                 try {
-                    return JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+                    const localWidths = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+
+                    currentWidths = Object.keys(serverWidths || {}).length
+                        ? { ...serverWidths }
+                        : localWidths;
+
+                    return currentWidths;
                 } catch (error) {
-                    return {};
+                    currentWidths = { ...(serverWidths || {}) };
+
+                    return currentWidths;
                 }
             }
 
             function saveWidths(widths) {
+                currentWidths = { ...widths };
                 window.localStorage.setItem(storageKey, JSON.stringify(widths));
             }
 
+            function livewireComponent() {
+                const root = document
+                    .querySelector('[data-pricing-resizable-columns]')
+                    ?.closest('[wire\\:id]');
+
+                if (! root || ! window.Livewire) {
+                    return null;
+                }
+
+                return window.Livewire.find(root.getAttribute('wire:id'));
+            }
+
+            function saveWidthsForUser(widths) {
+                saveWidths(widths);
+                livewireComponent()?.call('savePricingColumnWidths', widths);
+            }
+
+            function resetWidthsForUser() {
+                currentWidths = {};
+                window.localStorage.removeItem(storageKey);
+                livewireComponent()?.call('resetPricingColumnWidths');
+            }
+
             function columnKey(header, index) {
+                const classKey = Array.from(header.classList)
+                    .find((className) => className.startsWith('fi-ta-header-cell-'));
+
+                if (classKey) {
+                    return classKey.replace('fi-ta-header-cell-', '');
+                }
+
+                const ariaLabel = header.querySelector('[aria-label]')?.getAttribute('aria-label');
+
+                if (ariaLabel) {
+                    return ariaLabel
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .toLowerCase();
+                }
+
                 const label = header.innerText
                     .replace(/\s+/g, ' ')
                     .trim()
@@ -284,6 +346,7 @@
 
                     cell.style.width = `${width}px`;
                     cell.style.minWidth = `${width}px`;
+                    cell.dataset.pricingColumnWidth = `${width}`;
                 });
 
                 window.dispatchEvent(new Event('resize'));
@@ -293,28 +356,42 @@
                 table.querySelectorAll('th, td').forEach((cell) => {
                     cell.style.width = '';
                     cell.style.minWidth = '';
+                    delete cell.dataset.pricingColumnWidth;
                 });
 
                 window.dispatchEvent(new Event('resize'));
+            }
+
+            function removeExistingResizers(table) {
+                table
+                    .querySelectorAll('[data-pricing-column-resizer]')
+                    .forEach((resizer) => resizer.remove());
             }
 
             function initialiseTable(table) {
                 const widths = loadWidths();
                 const headers = Array.from(table.querySelectorAll('thead th'));
 
+                removeExistingResizers(table);
+
                 headers.forEach((header, index) => {
                     const key = columnKey(header, index);
+
+                    if (! key) {
+                        return;
+                    }
 
                     if (widths[key]) {
                         applyWidth(table, index, widths[key]);
                     }
 
-                    if (header.querySelector('[data-pricing-column-resizer]')) {
+                    if (! header.classList.contains('fi-ta-header-cell')) {
                         return;
                     }
 
                     const resizer = document.createElement('span');
                     resizer.dataset.pricingColumnResizer = 'true';
+                    resizer.dataset.pricingColumnKey = key;
                     resizer.setAttribute('aria-hidden', 'true');
                     header.append(resizer);
 
@@ -337,13 +414,17 @@
 
                             widths[key] = nextWidth;
                             applyWidth(table, index, nextWidth);
+                            saveWidths(widths);
                         };
 
                         const onUp = (upEvent) => {
-                            resizer.releasePointerCapture(upEvent.pointerId);
+                            if (resizer.hasPointerCapture(upEvent.pointerId)) {
+                                resizer.releasePointerCapture(upEvent.pointerId);
+                            }
+
                             resizer.classList.remove('is-resizing');
                             document.body.classList.remove('pricing-column-resize-active');
-                            saveWidths(widths);
+                            saveWidthsForUser(widths);
 
                             resizer.removeEventListener('pointermove', onMove);
                             resizer.removeEventListener('pointerup', onUp);
@@ -357,7 +438,23 @@
                 });
             }
 
+            function scheduleInitialisePricingColumnResizing(delay = 50) {
+                window.clearTimeout(initialiseTimer);
+                initialiseTimer = window.setTimeout(initialisePricingColumnResizing, delay);
+            }
+
+            function closeColumnManagerModalIfOpen() {
+                window.setTimeout(() => {
+                    const closeButton = Array.from(document.querySelectorAll('.fi-modal-close-btn'))
+                        .find((button) => button.getClientRects().length > 0);
+
+                    closeButton?.click();
+                }, 100);
+            }
+
             function initialisePricingColumnResizing() {
+                suppressMutationObserverUntil = Date.now() + 150;
+
                 document
                     .querySelectorAll('[data-pricing-resizable-columns] .fi-ta-table')
                     .forEach(initialiseTable);
@@ -371,22 +468,45 @@
 
                         button.dataset.pricingResetReady = 'true';
                         button.addEventListener('click', () => {
-                            window.localStorage.removeItem(storageKey);
+                            resetWidthsForUser();
 
                             document
                                 .querySelectorAll('[data-pricing-resizable-columns] .fi-ta-table')
                                 .forEach(clearWidths);
                         });
                     });
+
+                const tableContainer = document.querySelector('[data-pricing-resizable-columns]');
+
+                if (tableContainer && tableContainer !== observedTableContainer) {
+                    mutationObserver?.disconnect();
+                    observedTableContainer = tableContainer;
+                    mutationObserver = new MutationObserver(() => {
+                        if (Date.now() < suppressMutationObserverUntil) {
+                            return;
+                        }
+
+                        scheduleInitialisePricingColumnResizing(80);
+                    });
+                    mutationObserver.observe(tableContainer, {
+                        childList: true,
+                        subtree: true,
+                    });
+                }
             }
 
             window.__pricingCostColumnResizingInit = initialisePricingColumnResizing;
 
             document.addEventListener('DOMContentLoaded', initialisePricingColumnResizing);
-            document.addEventListener('livewire:navigated', () => setTimeout(initialisePricingColumnResizing, 50));
+            document.addEventListener('livewire:navigated', () => scheduleInitialisePricingColumnResizing(50));
+            document.addEventListener('apply-table-column-manager', () => {
+                closeColumnManagerModalIfOpen();
+                scheduleInitialisePricingColumnResizing(120);
+            });
+            document.addEventListener('reset-table-column-manager', () => scheduleInitialisePricingColumnResizing(120));
 
             if (window.Livewire) {
-                window.Livewire.hook('morph.updated', () => setTimeout(initialisePricingColumnResizing, 50));
+                window.Livewire.hook('morph.updated', () => scheduleInitialisePricingColumnResizing(50));
             }
 
             initialisePricingColumnResizing();

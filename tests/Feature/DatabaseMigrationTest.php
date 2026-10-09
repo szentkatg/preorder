@@ -50,6 +50,12 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('pricing_rounding_rules'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_errors'));
+        $this->assertTrue(Schema::hasTable('admin_ui_preferences'));
+        $this->assertTrue(Schema::hasColumns('admin_ui_preferences', [
+            'user_id',
+            'preference_key',
+            'value',
+        ]));
         $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', [
             'product_purchase_price_id',
             'supplier_id',
