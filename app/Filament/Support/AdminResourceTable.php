@@ -6,6 +6,7 @@ use App\Exports\AdminTableExport;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PartnerUser;
+use App\Models\PricingCalculationRow;
 use App\Models\Translation;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -28,8 +29,7 @@ class AdminResourceTable
         Table $table,
         string $modelClass,
         bool $withViewAction = true,
-    ): Table
-    {
+    ): Table {
         foreach ($table->getColumns() as $column) {
             self::configureColumn($column, $modelClass);
         }
@@ -90,6 +90,25 @@ class AdminResourceTable
 
         if ($modelClass === OrderItem::class) {
             self::configureOrderItemCalculatedColumn($column);
+        }
+
+        if (($modelClass === PricingCalculationRow::class)
+            && (($column->getName() === 'calculation_multiplier')
+                || (($column->getName() === 'multiplier')
+                    && ($column->getExtraAttributes()['data-pricing-derived-multiplier'] ?? false)))) {
+            $expression = $column->getName() === 'calculation_multiplier'
+                ? 'multiplier' : PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL;
+            $column
+                ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw(
+                    $expression.' '.($direction === 'desc' ? 'desc' : 'asc'),
+                ))
+                ->searchable(
+                    query: fn (Builder $query, string $search): Builder => $query->whereRaw(
+                        'CAST(ROUND(('.$expression.'), 6) AS CHAR) LIKE ?',
+                        ['%'.str_replace(',', '.', $search).'%'],
+                    ),
+                    isIndividual: true,
+                );
         }
 
         if ($modelClass === PartnerUser::class) {

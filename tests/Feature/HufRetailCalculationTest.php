@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exports\AdminTableExport;
 use App\Filament\Pages\PricingCostCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Models\AdminUiPreference;
@@ -254,6 +255,87 @@ class HufRetailCalculationTest extends TestCase
         $this->assertStringContainsString('Kerekítés előtti bruttó kisker ár', $html);
         $this->assertStringContainsString('2 162,0000', $html);
         $this->assertStringContainsString('1 990,0000', $html);
+    }
+
+    public function test_manual_price_refreshes_multiplier_and_colored_direction_without_changing_the_formula(): void
+    {
+        $this->calculate();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $originalSnapshot = $this->retail()->calculation_snapshot;
+
+        foreach ([2490 => ['up', 'success'], 1490 => ['down', 'danger'], 1990 => [null, null]] as $price => [$direction, $color]) {
+            $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, (string) $price)
+                ->assertHasNoErrors();
+            $row = $this->retail();
+            $this->assertEqualsWithDelta($price / 460, $row->effective_multiplier, 0.0000001);
+            $this->assertSame($direction, $row->finalPriceDifferenceDirection());
+            $this->assertSame('4.700000', $row->multiplier);
+            $this->assertSame($originalSnapshot, $row->calculation_snapshot);
+            $this->assertSame('4.700000', $this->multiplier->fresh()->value);
+            $column = $page->instance()->getTable()->getColumn('multiplier')->record($row);
+            $this->assertSame($color, $column->getColor($row->effective_multiplier));
+            $this->assertSame($color, $column->getIconColor($row->effective_multiplier));
+            $this->assertSame($direction === null ? null : 'heroicon-o-arrow-'.$direction, $column->getIcon($row->effective_multiplier));
+            $this->assertStringContainsString('pricing-retail-manual-'.($direction ?? 'equal'), $page->html());
+        }
+
+        $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, null)->assertHasNoErrors();
+        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $this->assertNull($this->retail()->finalPriceDifferenceDirection());
+        $this->assertSame('1990.0000', $this->retail()->final_price);
+    }
+
+    public function test_effective_multiplier_can_be_sorted_filtered_and_exported(): void
+    {
+        $this->calculate();
+        app(RetailPriceReviewService::class)->setManualPrice($this->retail(), 2490);
+        $other = $this->retail()->replicate();
+        $other->color_id = Color::create(['product_id' => $this->cost->product_id, 'code' => 'BR', 'name_hu' => 'Barna', 'active' => true])->id;
+        $other->manual_price = 1490;
+        $other->save();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $page->sortTable('multiplier', 'asc')->assertCanSeeTableRecords([$other, $this->retail()], inOrder: true);
+        $page->sortTable('multiplier', 'desc')->assertCanSeeTableRecords([$this->retail(), $other], inOrder: true);
+        $page->searchTableColumns(['multiplier' => '5,413043'])
+            ->assertCanSeeTableRecords([$this->retail()])->assertCanNotSeeTableRecords([$other]);
+
+        $column = $page->instance()->getTable()->getColumn('multiplier');
+        $export = new AdminTableExport(PricingCalculationRow::query(), [$column]);
+        $this->assertSame(['Kisker szorzó'], $export->headings());
+        $this->assertEqualsWithDelta(2490 / 460, $export->map($this->retail())[0], 0.0000001);
+        $original = $page->instance()->getTable()->getColumn('calculation_multiplier');
+        $this->assertSame('4.700000', (new AdminTableExport(PricingCalculationRow::query(), [$original]))->map($this->retail())[0]);
+    }
+
+    public function test_retained_price_uses_current_cost_for_its_multiplier_and_accepting_calculation_resets_it(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->approveCurrentPrice($this->retail());
+        $this->cost->update(['calculated_price' => 1000]);
+        $this->calculate();
+        $row = $this->retail();
+        $this->assertSame('1990.0000', $row->retained_price);
+        $this->assertSame(1.99, $row->effective_multiplier);
+        $this->assertSame('down', $row->finalPriceDifferenceDirection());
+        $review->acceptCalculatedPrice($row);
+        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $this->assertNull($this->retail()->finalPriceDifferenceDirection());
+    }
+
+    public function test_effective_multiplier_handles_missing_or_zero_cost_without_division_by_zero(): void
+    {
+        $this->calculate();
+        foreach ([null, 0, -1] as $base) {
+            $row = $this->retail();
+            $row->update(['manual_price' => 2490, 'base_price' => $base]);
+            $this->assertNull($row->effective_multiplier);
+            $this->assertNull(PricingCalculationRow::whereKey($row->id)
+                ->selectRaw(PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL.' AS sql_multiplier')->firstOrFail()->sql_multiplier);
+        }
     }
 
     public function test_rounding_boundary_and_direction_are_respected(): void

@@ -30,6 +30,21 @@ A szorzó a bruttó kisker árat képezi; külön áfa-szorzót ebben a lépésb
   előtti ár, a kalkulált, a manuális és a végleges ár, valamint a státusz.
 - A Manuális HUF mező közvetlenül szerkeszthető. Az üres érték visszaállítja
   a kalkulált árat. A manuális módosítás új jóváhagyást igényel.
+- A **Kisker szorzó** manuális vagy megtartott ár mellett az adott ár és a
+  mentett bekerülési érték hányadosát mutatja, legfeljebb hat tizedesjeggyel.
+  Például `2490 / 460 = 5,413043`. Felülírás nélkül az eredeti kalkulációs
+  szorzó látszik. Törölt manuális ár / elfogadott új kalkuláció után ez visszaáll.
+  A **Kalkulációs szorzó** külön, bekapcsolható oszlop; a részletek és a tooltip
+  is megőrzik az eredeti értéket. Az árképzési paraméter és snapshot nem változik.
+- A manuális mező, a kijelzett szorzó és a végleges ár egységes piros lefelé /
+  zöld felfelé jelzést kap: az összehasonlítás a kalkulált, **kerekített** árhoz
+  történik. Azonos árnál nincs eltérésjelzés. A megtartott jóváhagyott ár szorzója
+  újraszámítás után az új bekerülési értékből következik, de az ár nem íródik felül.
+- A kijelzett szorzó szerint lehet szűrni, rendezni, és ez az érték kerül Excelbe is.
+- A táblázat ikon-, beviteli és akciócellái is kompaktak: a sormagasság a
+  szöveghez/beviteli mezőhöz igazodik. A közös stílus a bekerülési táblázatot is érinti.
+  A Kisker szorzó oszlop korábbi azonosítója megmarad, így a mentett láthatóság,
+  sorrend és oszlopszélesség nem vész el.
 - A végleges ár piros lefelé / zöld felfelé nyila jelzi az eltérést a kalkulálttól.
 - Újraszámításkor a manuális és már átnézett / jóváhagyott végleges árak megmaradnak.
   Ha a kalkulált eredmény változik, a **Felülvizsgálandó** jelzés bekapcsol.
@@ -88,6 +103,35 @@ Későbbi, külön jóváhagyott élesítéskor az éles ágba integrálás utá
 ```bash
 git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan migrate --force
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## Kompakt sorok és manuális szorzó frissítésének telepítése
+
+Ehhez a megjelenítési frissítéshez **nem kell migráció**, Composer install,
+frontend build, kézi feltöltés, új jogosultság vagy .env módosítás.
+A megjelenített szorzó számított adat, nem új adatbázismező.
+
+Ellenőrzés: 29 kapcsolódó teszt, 224 assertion sikeres. A teljes csomagból
+68/70 teszt sikeres; a két korábbról ismert admin-resource darabszám-elvárás hibázik.
+A valódi Filament táblázat helyi böngészős megjelenítésében a sorok kb. 57 px-ről
+29 px-re csökkentek, a beviteli mező 24 px magas. A világos/sötét témát és a
+piros/zöld nyilakat ellenőriztük.
+
+A `feature/pricing-module` worktree-ben:
+
+```powershell
+git add -- app/Models/PricingCalculationRow.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Support/AdminResourceTable.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/retail-calculation-details.blade.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Compact retail rows and show manual price multiplier"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanelen csak későbbi, külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan optimize:clear
 /opt/alt/php83/usr/bin/php artisan optimize
 ```

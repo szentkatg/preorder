@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PricingCalculationRow extends Model
 {
+    // Keep the displayed multiplier sortable/searchable without changing the stored calculation input.
+    public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN manual_price IS NULL AND retained_price IS NULL THEN multiplier WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price) / NULLIF(base_price, 0)) ELSE NULL END';
+
     public const TYPE_COST = 'cost';
 
     public const TYPE_RETAIL = 'retail';
@@ -161,6 +164,30 @@ class PricingCalculationRow extends Model
     public function hasManualOverride(): bool
     {
         return $this->manual_price !== null;
+    }
+
+    public function getEffectiveMultiplierAttribute(): ?float
+    {
+        $override = $this->manual_price ?? $this->retained_price;
+
+        if ($override === null) {
+            return $this->multiplier === null ? null : (float) $this->multiplier;
+        }
+
+        return $this->base_price !== null && (float) $this->base_price > 0
+            ? (float) $override / (float) $this->base_price
+            : null;
+    }
+
+    public function finalPriceDifferenceDirection(): ?string
+    {
+        if ($this->final_price === null || $this->calculated_price === null) {
+            return null;
+        }
+
+        return (float) $this->final_price < (float) $this->calculated_price
+            ? 'down'
+            : ((float) $this->final_price > (float) $this->calculated_price ? 'up' : null);
     }
 
     public function priceDifferenceDirection(): ?string

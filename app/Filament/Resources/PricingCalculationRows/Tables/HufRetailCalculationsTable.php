@@ -30,11 +30,27 @@ class HufRetailCalculationsTable
             TextColumn::make('color.name_hu')->label('Szín'),
             TextColumn::make('base_price')->label('Bekerülési HUF')->formatStateUsing(fn ($state) => self::formatPrice($state)),
             TextColumn::make('multiplier')->label('Kisker szorzó')
-                ->formatStateUsing(fn ($state) => rtrim(rtrim((string) $state, '0'), '.')),
+                ->getStateUsing(fn (PricingCalculationRow $record) => $record->effective_multiplier)
+                ->extraAttributes(['data-pricing-derived-multiplier' => true])
+                ->formatStateUsing(fn ($state) => self::formatMultiplier($state))
+                ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
+                ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
+                ->color(fn (PricingCalculationRow $record) => self::differenceColor($record))
+                ->tooltip(fn (PricingCalculationRow $record) => 'Kalkulációs szorzó: '.self::formatMultiplier($record->multiplier)
+                    .'. Manuális vagy megtartott árnál: végleges ár / bekerülési érték. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
+            TextColumn::make('calculation_multiplier')->label('Kalkulációs szorzó')
+                ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier)
+                ->formatStateUsing(fn ($state) => self::formatMultiplier($state))
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('unrounded_price')->label('Kerekítés előtti HUF')->formatStateUsing(fn ($state) => self::formatPrice($state)),
             TextColumn::make('pricingRoundingRule.name')->label('Kerekítési szabály')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('calculated_price')->label('Kalkulált kisker HUF')->formatStateUsing(fn ($state) => self::formatPrice($state)),
             TextInputColumn::make('manual_price')->label('Manuális HUF')->type('text')->inputMode('decimal')
+                ->extraInputAttributes(fn (PricingCalculationRow $record) => [
+                    'class' => 'pricing-retail-manual-input pricing-retail-manual-'.($record->manual_price === null ? 'equal' : ($record->finalPriceDifferenceDirection() ?? 'equal')),
+                ])
+                ->suffixIcon(fn (PricingCalculationRow $record) => $record->manual_price === null ? null : self::differenceIcon($record), true)
+                ->suffixIconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->manual_price === null ? null : rtrim(rtrim($record->manual_price, '0'), '.'))
                 ->rules(['nullable', 'numeric', 'gt:0', 'max:99999999999.9999'])
                 ->tooltip('Írd át a manuális árat. Az üres mező visszaállítja a kalkulált árat. A módosítás után új jóváhagyás szükséges.')
@@ -46,16 +62,9 @@ class HufRetailCalculationsTable
                     return $updated->manual_price === null ? null : rtrim(rtrim($updated->manual_price, '0'), '.');
                 }),
             TextColumn::make('final_price')->label('Végleges kisker HUF')->formatStateUsing(fn ($state) => self::formatPrice($state))
-                ->icon(fn (PricingCalculationRow $record) => match (true) {
-                    (float) $record->final_price < (float) $record->calculated_price => 'heroicon-o-arrow-down',
-                    (float) $record->final_price > (float) $record->calculated_price => 'heroicon-o-arrow-up',
-                    default => null,
-                })
-                ->color(fn (PricingCalculationRow $record) => match (true) {
-                    (float) $record->final_price < (float) $record->calculated_price => 'danger',
-                    (float) $record->final_price > (float) $record->calculated_price => 'success',
-                    default => null,
-                }),
+                ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
+                ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
+                ->color(fn (PricingCalculationRow $record) => self::differenceColor($record)),
             IconColumn::make('requires_review')->label('Felülvizsgálandó')->boolean(),
             TextColumn::make('status')->label('Státusz')->badge()->formatStateUsing(fn ($state) => match ($state) {
                 PricingCalculationRow::STATUS_CALCULATED => 'Kalkulált ár',
@@ -104,6 +113,29 @@ class HufRetailCalculationsTable
     private static function formatPrice(mixed $state): string
     {
         return rtrim(rtrim(number_format((float) $state, 4, ',', ' '), '0'), ',');
+    }
+
+    private static function formatMultiplier(mixed $state): string
+    {
+        return $state === null ? '-' : rtrim(rtrim(number_format((float) $state, 6, ',', ''), '0'), ',');
+    }
+
+    private static function differenceIcon(PricingCalculationRow $record): ?string
+    {
+        return match ($record->finalPriceDifferenceDirection()) {
+            'down' => 'heroicon-o-arrow-down',
+            'up' => 'heroicon-o-arrow-up',
+            default => null,
+        };
+    }
+
+    private static function differenceColor(PricingCalculationRow $record): ?string
+    {
+        return match ($record->finalPriceDifferenceDirection()) {
+            'down' => 'danger',
+            'up' => 'success',
+            default => null,
+        };
     }
 
     private static function canEdit(PricingCalculationRow $record): bool

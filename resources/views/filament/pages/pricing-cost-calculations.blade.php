@@ -118,8 +118,44 @@
         }
 
         [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text,
-        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text-input {
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text-input,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-icon {
             padding-block: 0;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-input-wrp,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-btn {
+            min-height: 0;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-input {
+            height: 1.5rem;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-icon .fi-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        [data-pricing-resizable-columns] .pricing-retail-manual-input {
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        [data-pricing-resizable-columns] .pricing-retail-manual-down {
+            color: rgb(185 28 28);
+        }
+
+        [data-pricing-resizable-columns] .pricing-retail-manual-up {
+            color: rgb(21 128 61);
+        }
+
+        .dark [data-pricing-resizable-columns] .pricing-retail-manual-down {
+            color: rgb(248 113 113);
+        }
+
+        .dark [data-pricing-resizable-columns] .pricing-retail-manual-up {
+            color: rgb(74 222 128);
         }
 
         [data-pricing-resizable-columns] .fi-ta-cell .fi-input,

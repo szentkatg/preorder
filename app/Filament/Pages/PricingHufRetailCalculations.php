@@ -51,7 +51,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'HUF bruttó kisker árak: végleges bekerülési érték × kisker szorzó, majd kerekítés és korrekció. A piros lefelé / zöld felfelé nyíl a végleges ár eltérését jelzi a kalkulálttól.';
+        return 'HUF bruttó kisker árak: végleges bekerülési érték × kalkulációs szorzó, majd kerekítés és korrekció. Manuális árnál a Kisker szorzó az ár / bekerülési érték alapján frissül. A piros lefelé / zöld felfelé nyíl a végleges ár eltérését jelzi a kalkulálttól.';
     }
 
     protected function pricingPreferencePrefix(): string

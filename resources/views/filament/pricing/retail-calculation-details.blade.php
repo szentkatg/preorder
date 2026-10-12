@@ -35,6 +35,7 @@
                 <tr><td>Kerekítés utáni korrekció</td><td>Hozzáadás / levonás</td><td class="numeric">{{ number_format((float) ($rounding['adjustment'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
                 <tr class="retail-total"><td>Kalkulált bruttó kisker ár</td><td>Kerekített érték + korrekció</td><td class="numeric">{{ number_format((float) $record->calculated_price, 4, ',', ' ') }} HUF</td></tr>
                 <tr><td>Manuális ár</td><td>Felhasználói eltérés</td><td class="numeric">{{ $record->manual_price === null ? '-' : number_format((float) $record->manual_price, 4, ',', ' ') . ' HUF' }}</td></tr>
+                <tr><td>Érvényes kisker szorzó</td><td>Manuális / megtartott árnál: végleges ár ÷ bekerülési érték; egyébként a kalkulációs szorzó</td><td class="numeric">{{ $record->effective_multiplier === null ? '-' : rtrim(rtrim(number_format($record->effective_multiplier, 6, ',', ''), '0'), ',') }}</td></tr>
                 <tr><td>Korábban jóváhagyott, megtartott ár</td><td>Újraszámításkor megőrizve</td><td class="numeric">{{ $record->retained_price === null ? '-' : number_format((float) $record->retained_price, 4, ',', ' ') . ' HUF' }}</td></tr>
                 <tr class="retail-total"><td>Végleges bruttó kisker ár</td><td>Manuális → megtartott → kalkulált</td><td class="numeric">{{ number_format((float) $record->final_price, 4, ',', ' ') }} HUF</td></tr>
             </tbody>
