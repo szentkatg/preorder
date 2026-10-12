@@ -60,7 +60,7 @@ class HufRetailCalculationTest extends TestCase
             'model_code' => 'B10024W27', 'name_hu' => 'Teszt táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt árprojekt', 'status' => 'active', 'active' => true]);
         $this->list = PriceList::create(['code' => 'RETAIL-HUF', 'name_hu' => 'HUF kisker', 'type' => 'retail',
-            'season_id' => $season->id, 'currency_id' => $currency->id, 'active' => true]);
+            'currency_id' => $currency->id, 'active' => true]);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id,
             'product_id' => $product->id, 'price_type' => 'cost', 'currency_id' => $currency->id,
             'calculated_price' => 460, 'calculation_snapshot' => ['test_source' => true]]);
@@ -175,12 +175,43 @@ class HufRetailCalculationTest extends TestCase
         $this->assertStringContainsString('azonos szintű', $result['errors'][0]);
     }
 
-    public function test_wrong_season_or_currency_price_list_is_rejected(): void
+    public function test_wrong_currency_price_list_is_rejected(): void
     {
         $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'name_hu' => 'Euró', 'active' => true]);
         $this->list->update(['currency_id' => $eur->id]);
         $this->expectException(DomainException::class);
         $this->calculate();
+    }
+
+    public function test_same_list_can_be_used_in_two_season_projects_without_mixing_calculations(): void
+    {
+        $this->calculate();
+        $season = Season::create(['code' => 'S28', 'name' => 'Második szezon', 'active' => true]);
+        $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Második árprojekt', 'status' => 'active', 'active' => true]);
+        $product = $this->cost->product->replicate();
+        $product->season_id = $season->id;
+        $product->model_code = 'B10024W28';
+        $product->save();
+        $cost = $this->cost->replicate();
+        $cost->pricing_project_id = $project->id;
+        $cost->product_id = $product->id;
+        $cost->calculated_price = 1000;
+        $cost->save();
+        foreach ([$this->multiplier, $this->rounding] as $input) {
+            $copy = $input->replicate();
+            $copy->pricing_project_id = $project->id;
+            $copy->save();
+        }
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingHufRetailCalculations::class)
+            ->callAction('calculateHufRetail', ['pricing_project_id' => $project->id, 'price_list_id' => $this->list->id])
+            ->assertHasNoErrors();
+
+        $this->assertSame('1990.0000', $this->retail()->final_price);
+        $this->assertSame('4990.0000', PricingCalculationRow::where('pricing_project_id', $project->id)
+            ->where('price_type', 'retail')->where('price_list_id', $this->list->id)->firstOrFail()->final_price);
+        $this->assertSame(1, PriceList::count());
     }
 
     public function test_read_only_user_can_view_but_cannot_change_prices(): void

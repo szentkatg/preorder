@@ -17,7 +17,6 @@ class PriceListsTable
             ->columns([
                 TextColumn::make('code')->searchable()->sortable(),
                 TextColumn::make('name_hu')->label('Név HU')->searchable(),
-                TextColumn::make('season.name')->label('Szezon'),
                 TextColumn::make('currency.code')->label('Pénznem'),
                 IconColumn::make('active')->boolean(),
             ])

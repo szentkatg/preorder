@@ -3,8 +3,9 @@
 Az **Árképzés → HUF kisker árak** munkafelület az árprojekt szezonjának
 mentett, végleges HUF bekerülési értékeiből számol. Az árprojekt megtekintő
 és szerkesztő oldaláról is indítható. Egy kiválasztott vagy az összes aktív,
-HUF pénznemű kisker árlistára futtatható; az árlista szezonjának egyeznie kell
-az árprojekttel (a szezon nélküli árlista is használható).
+HUF pénznemű kisker árlistára futtatható. Az árlistatörzs szezonfüggetlen;
+a kalkuláció szezonját az árprojekt határozza meg. Ugyanaz az árlista
+több szezonban is használható, a publikált árak szezonja a tételekhez tartozik.
 
 ## Előkészítés
 

@@ -2,12 +2,11 @@
 
 namespace App\Filament\Resources\PriceLists\Schemas;
 
+use App\Models\PriceList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use App\Models\PriceList;
-use Illuminate\Database\Eloquent\Builder;
 
 class PriceListForm
 {
@@ -15,7 +14,14 @@ class PriceListForm
     {
         return $schema
             ->components([
-                TextInput::make('code')->required(),
+                TextInput::make('code')
+                    ->label('Kód')
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true)
+                    ->validationMessages([
+                        'unique' => 'Ez az árlistakód már létezik. Használd a meglévő árlistát, vagy adj meg másik kódot.',
+                    ]),
 
                 TextInput::make('name_hu')
                     ->label('Név HU')
@@ -39,12 +45,6 @@ class PriceListForm
                         }
                     }),
 
-                Select::make('season_id')
-                    ->label('Szezon')
-                    ->relationship('season', 'name')
-                    ->searchable()
-                    ->preload(),
-                
                 Select::make('currency_id')
                     ->label('Pénznem')
                     ->relationship('currency', 'code')

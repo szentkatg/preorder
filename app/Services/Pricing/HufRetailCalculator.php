@@ -28,9 +28,8 @@ class HufRetailCalculator
             throw new DomainException('Az árprojekt aktív termékéhez tartozó HUF bekerülési érték szükséges.');
         }
 
-        if (! $priceList->active || $priceList->type !== 'retail' || $priceList->currency?->code !== 'HUF'
-            || ($priceList->season_id !== null && $priceList->season_id != $project->season_id)) {
-            throw new DomainException('A szezonhoz tartozó aktív HUF kisker árlista szükséges.');
+        if (! $priceList->active || $priceList->type !== 'retail' || $priceList->currency?->code !== 'HUF') {
+            throw new DomainException('Aktív HUF kisker árlista szükséges.');
         }
 
         if ($cost->final_price === null || (float) $cost->final_price <= 0) {

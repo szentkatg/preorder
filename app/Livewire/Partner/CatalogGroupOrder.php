@@ -924,13 +924,7 @@ class CatalogGroupOrder extends Component
 
     protected function sharePriceListQuery()
     {
-        return PriceList::query()
-            ->where('active', true)
-            ->where(function ($query): void {
-                $query
-                    ->whereNull('season_id')
-                    ->orWhere('season_id', $this->order->season_id);
-            });
+        return PriceList::query()->where('active', true);
     }
 
     public function generateShareLink(): void

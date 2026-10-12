@@ -11,16 +11,10 @@ class PriceList extends Model
         'name_hu',
         'name_en',
         'type',
-        'season_id',
         'currency_id',
         'retail_price_list_id',
         'active',
     ];
-
-    public function season()
-    {
-        return $this->belongsTo(Season::class);
-    }
 
     public function currency()
     {
@@ -50,6 +44,6 @@ class PriceList extends Model
 
     public function __toString(): string
     {
-        return $this->code . ' - ' . $this->name_hu;
+        return $this->code.' - '.$this->name_hu;
     }
 }

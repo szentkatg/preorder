@@ -40,7 +40,6 @@ class CalculateHufRetailAction
 
                         return PriceList::query()->where('active', true)->where('type', 'retail')
                             ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))
-                            ->where(fn ($query) => $query->whereNull('season_id')->orWhere('season_id', $project->season_id))
                             ->orderBy('code')->get()->mapWithKeys(fn ($list) => [$list->id => $list->code.' – '.$list->name_hu])->all();
                     })->searchable(),
             ])

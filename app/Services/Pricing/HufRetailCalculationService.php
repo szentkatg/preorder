@@ -31,12 +31,11 @@ class HufRetailCalculationService
 
         $lists = PriceList::query()->where('active', true)->where('type', 'retail')
             ->where('currency_id', $huf->id)
-            ->where(fn ($query) => $query->whereNull('season_id')->orWhere('season_id', $project->season_id))
             ->when($priceList, fn ($query) => $query->whereKey($priceList->id))
             ->with('currency')->get();
 
         if ($lists->isEmpty()) {
-            throw new DomainException('Nincs a szezonhoz tartozó aktív HUF kisker árlista.');
+            throw new DomainException('Nincs aktív HUF kisker árlista.');
         }
 
         $result = ['run_id' => (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0, 'requires_review' => 0, 'errors' => []];
