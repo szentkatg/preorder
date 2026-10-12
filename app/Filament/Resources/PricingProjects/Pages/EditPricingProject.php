@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\PricingProjects\Pages;
 
-use App\Services\Pricing\CostCalculationService;
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
+use App\Filament\Support\Actions\CalculateHufRetailAction;
+use App\Services\Pricing\CostCalculationService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
@@ -30,18 +31,19 @@ class EditPricingProject extends EditRecord
                     Notification::make()
                         ->title('Bekerülési érték kalkuláció kész')
                         ->body(
-                            'Létrehozva: ' . $result['created'] .
-                            ', frissítve: ' . $result['updated'] .
-                            ', kihagyott csoport: ' . $result['skipped'] .
-                            ', aktív beszerzési ár nélküli termék: ' .
-                            $result['products_without_active_purchase_price'] .
-                            ', hibák: ' . count($result['errors']) .
-                            ', futás azonosító: ' . $result['run_id']
+                            'Létrehozva: '.$result['created'].
+                            ', frissítve: '.$result['updated'].
+                            ', kihagyott csoport: '.$result['skipped'].
+                            ', aktív beszerzési ár nélküli termék: '.
+                            $result['products_without_active_purchase_price'].
+                            ', hibák: '.count($result['errors']).
+                            ', futás azonosító: '.$result['run_id']
                         )
                         ->success()
                         ->send();
                 }),
 
+            CalculateHufRetailAction::make(fn () => $this->record),
             DeleteAction::make(),
         ];
     }

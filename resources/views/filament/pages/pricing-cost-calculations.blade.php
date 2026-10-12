@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <div class="space-y-4">
         <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-            Ez a munkafelület a bekerülési érték kalkuláció áttekintésére szolgál.
+            {{ $this->pricingWorkspaceDescription() }}
             A jobb felső oszlopkezelővel ki/be kapcsolhatók és átrendezhetők az oszlopok,
             az oszlopszélességek a fejléc jobb szélén húzással állíthatók,
             a soroknál pedig a <span class="font-semibold">Részletek</span> gomb mutatja a teljes számítási hátteret.
@@ -15,8 +15,8 @@
             </button>
         </div>
 
-        @php($pendingAdjustment = $this->pendingParameterAdjustment)
-        @php($selectedAffectedRows = $pendingAdjustment['scope_counts'][$this->pendingParameterScope] ?? null)
+        @php($pendingAdjustment = $this->pendingParameterAdjustment ?? null)
+        @php($selectedAffectedRows = $pendingAdjustment['scope_counts'][$this->pendingParameterScope ?? ''] ?? null)
 
         @if ($pendingAdjustment)
             <div class="pricing-inline-parameter-panel">
@@ -78,7 +78,11 @@
             </div>
         @endif
 
-        <div data-pricing-resizable-columns>
+        <div
+            data-pricing-resizable-columns
+            data-pricing-storage-key="{{ $this->pricingColumnStorageKey() }}"
+            data-pricing-server-widths="{{ json_encode($this->pricingColumnWidths) }}"
+        >
             {{ $this->table }}
         </div>
     </div>
@@ -325,8 +329,8 @@
 
             window.__pricingCostColumnResizingBooted = true;
 
-            const storageKey = 'pricing-cost-calculation-column-widths-v2-user-{{ auth()->id() ?? 'guest' }}';
-            const serverWidths = @js($this->pricingColumnWidths);
+            let storageKey = null;
+            let serverWidths = {};
             const minimumWidth = 72;
             let mutationObserver = null;
             let observedTableContainer = null;
@@ -580,6 +584,25 @@
             function initialisePricingColumnResizing() {
                 suppressMutationObserverUntil = Date.now() + 150;
 
+                const tableContainer = document.querySelector('[data-pricing-resizable-columns]');
+
+                if (! tableContainer) {
+                    return;
+                }
+
+                // Livewire navigation can move between cost and retail workspaces
+                // without reloading this script. Each page has its own layout.
+                if (storageKey !== tableContainer.dataset.pricingStorageKey) {
+                    storageKey = tableContainer.dataset.pricingStorageKey;
+                    currentWidths = null;
+
+                    try {
+                        serverWidths = JSON.parse(tableContainer.dataset.pricingServerWidths || '{}');
+                    } catch (error) {
+                        serverWidths = {};
+                    }
+                }
+
                 document
                     .querySelectorAll('[data-pricing-resizable-columns] .fi-ta-table')
                     .forEach(initialiseTable);
@@ -603,8 +626,6 @@
                                 });
                         });
                     });
-
-                const tableContainer = document.querySelector('[data-pricing-resizable-columns]');
 
                 if (tableContainer && tableContainer !== observedTableContainer) {
                     mutationObserver?.disconnect();

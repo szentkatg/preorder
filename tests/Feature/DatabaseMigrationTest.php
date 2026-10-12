@@ -66,6 +66,12 @@ class DatabaseMigrationTest extends TestCase
             'customs_percent',
             'candidate_count',
             'calculation_snapshot',
+            'base_price',
+            'multiplier',
+            'unrounded_price',
+            'pricing_rounding_rule_id',
+            'retained_price',
+            'requires_review',
         ]));
         $this->assertTrue(Schema::hasColumns('pricing_calculation_errors', [
             'run_id',

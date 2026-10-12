@@ -53,8 +53,7 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('shipping_cost_percent')
                     ->getStateUsing(
-                        fn (PricingCalculationRow $record): ?string =>
-                            self::formatPercentInput($record->shipping_cost_percent)
+                        fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->shipping_cost_percent)
                     )
                     ->label('Száll. %')
                     ->type('text')
@@ -65,8 +64,7 @@ class PricingCalculationRowsTable
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
-                        fn (PricingCalculationRow $record): bool =>
-                            $record->price_type !== PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => $record->price_type !== PricingCalculationRow::TYPE_COST
                     )
                     ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
                         if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
@@ -82,8 +80,7 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('customs_percent')
                     ->getStateUsing(
-                        fn (PricingCalculationRow $record): ?string =>
-                            self::formatPercentInput($record->customs_percent)
+                        fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->customs_percent)
                     )
                     ->label('Vám %')
                     ->type('text')
@@ -94,8 +91,7 @@ class PricingCalculationRowsTable
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
-                        fn (PricingCalculationRow $record): bool =>
-                            $record->price_type !== PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => $record->price_type !== PricingCalculationRow::TYPE_COST
                     )
                     ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
                         if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
@@ -173,7 +169,9 @@ class PricingCalculationRowsTable
                     ->modalCancelActionLabel('Bezárás')
                     ->modalContent(
                         fn (PricingCalculationRow $record) => view(
-                            'filament.pricing.calculation-details',
+                            $record->price_type === PricingCalculationRow::TYPE_RETAIL
+                                ? 'filament.pricing.retail-calculation-details'
+                                : 'filament.pricing.calculation-details',
                             ['record' => $record]
                         )
                     ),
@@ -185,8 +183,7 @@ class PricingCalculationRowsTable
                 )
                     ->icon('heroicon-o-truck')
                     ->visible(
-                        fn (PricingCalculationRow $record): bool =>
-                            $record->price_type === PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => $record->price_type === PricingCalculationRow::TYPE_COST
                     ),
                 self::parameterAction(
                     'updateCustomsPercent',
@@ -196,8 +193,7 @@ class PricingCalculationRowsTable
                 )
                     ->icon('heroicon-o-receipt-percent')
                     ->visible(
-                        fn (PricingCalculationRow $record): bool =>
-                            $record->price_type === PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => $record->price_type === PricingCalculationRow::TYPE_COST
                     ),
                 EditAction::make(),
             ])
@@ -240,8 +236,7 @@ class PricingCalculationRowsTable
                 Select::make('scope_type')
                     ->label('Milyen szinten legyen érvényes?')
                     ->options(
-                        fn (PricingCalculationRow $record): array =>
-                            self::parameterScopeOptions($record)
+                        fn (PricingCalculationRow $record): array => self::parameterScopeOptions($record)
                     )
                     ->required(),
 
@@ -269,11 +264,11 @@ class PricingCalculationRowsTable
                     Notification::make()
                         ->title('Paraméter mentve és újraszámolva')
                         ->body(
-                            self::parameterScopeLabel($parameter) .
-                            ' | Frissítve: ' . $result['updated'] .
-                            ', létrehozva: ' . $result['created'] .
-                            ', kihagyott: ' . $result['skipped'] .
-                            ', futás: ' . $result['run_id']
+                            self::parameterScopeLabel($parameter).
+                            ' | Frissítve: '.$result['updated'].
+                            ', létrehozva: '.$result['created'].
+                            ', kihagyott: '.$result['skipped'].
+                            ', futás: '.$result['run_id']
                         )
                         ->success()
                         ->send();
@@ -300,12 +295,12 @@ class PricingCalculationRowsTable
 
         if (filled($record->supplier?->country_code)) {
             $options[PricingParameter::SCOPE_SUPPLIER_COUNTRY] =
-                'Beszállító ország - ' . $record->supplier->country_code;
+                'Beszállító ország - '.$record->supplier->country_code;
         }
 
         if (filled($record->product?->item_main_group_id)) {
             $options[PricingParameter::SCOPE_ITEM_MAIN_GROUP] =
-                'Főcsoport - ' . (
+                'Főcsoport - '.(
                     $record->product->itemMainGroup?->name_hu
                     ?: $record->product->itemMainGroup?->code
                     ?: $record->product->item_main_group_id
@@ -314,7 +309,7 @@ class PricingCalculationRowsTable
 
         if (filled($record->product_id)) {
             $options[PricingParameter::SCOPE_PRODUCT] =
-                'Modell - ' . ($record->product?->model_code ?: $record->product_id);
+                'Modell - '.($record->product?->model_code ?: $record->product_id);
         }
 
         return self::appendParameterScopeCounts(
@@ -347,7 +342,7 @@ class PricingCalculationRowsTable
     {
         foreach ($options as $scopeType => $label) {
             if (array_key_exists($scopeType, $counts)) {
-                $options[$scopeType] = $label . ' (' . $counts[$scopeType] . ' sor)';
+                $options[$scopeType] = $label.' ('.$counts[$scopeType].' sor)';
             }
         }
 
@@ -391,12 +386,9 @@ class PricingCalculationRowsTable
     private static function parameterScopeLabel(PricingParameter $parameter): string
     {
         return match ($parameter->scope_type) {
-            PricingParameter::SCOPE_SUPPLIER_COUNTRY =>
-                'Beszállító ország: ' . $parameter->supplier_country_code,
-            PricingParameter::SCOPE_ITEM_MAIN_GROUP =>
-                'Főcsoport ID: ' . $parameter->item_main_group_id,
-            PricingParameter::SCOPE_PRODUCT =>
-                'Modell ID: ' . $parameter->product_id,
+            PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország: '.$parameter->supplier_country_code,
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport ID: '.$parameter->item_main_group_id,
+            PricingParameter::SCOPE_PRODUCT => 'Modell ID: '.$parameter->product_id,
             default => 'Globális paraméter',
         };
     }

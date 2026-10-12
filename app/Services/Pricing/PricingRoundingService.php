@@ -3,9 +3,33 @@
 namespace App\Services\Pricing;
 
 use App\Models\PricingRoundingRule;
+use DomainException;
 
 class PricingRoundingService
 {
+    public function resolve(int $projectId, string $priceType, int $priceListId, int $currencyId): ?PricingRoundingRule
+    {
+        $rules = PricingRoundingRule::query()
+            ->where('pricing_project_id', $projectId)
+            ->where('price_type', $priceType)
+            ->where('active', true)
+            ->where(fn ($query) => $query->whereNull('price_list_id')->orWhere('price_list_id', $priceListId))
+            ->where(fn ($query) => $query->whereNull('currency_id')->orWhere('currency_id', $currencyId))
+            ->get()
+            ->sortByDesc(fn (PricingRoundingRule $rule): int => ($rule->price_list_id !== null ? 2 : 0) + ($rule->currency_id !== null ? 1 : 0)
+            )->values();
+
+        if ($rules->count() > 1) {
+            $weight = fn (PricingRoundingRule $rule): int => ($rule->price_list_id !== null ? 2 : 0) + ($rule->currency_id !== null ? 1 : 0);
+
+            if ($weight($rules[0]) === $weight($rules[1])) {
+                throw new DomainException('Több azonos szintű aktív kerekítési szabály van. Csak egy maradjon aktív.');
+            }
+        }
+
+        return $rules->first();
+    }
+
     public function apply(float $value, ?PricingRoundingRule $rule): float
     {
         if (! $rule) {

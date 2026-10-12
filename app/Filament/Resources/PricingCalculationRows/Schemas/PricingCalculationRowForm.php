@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PricingCalculationRows\Schemas;
 use App\Models\PricingCalculationRow;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class PricingCalculationRowForm
@@ -14,6 +15,7 @@ class PricingCalculationRowForm
         return $schema
             ->components([
                 Select::make('pricing_project_id')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Árprojekt')
                     ->relationship('pricingProject', 'name')
                     ->searchable()
@@ -21,6 +23,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('product_id')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Modell')
                     ->relationship('product', 'model_code')
                     ->searchable()
@@ -28,6 +31,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('color_id')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Szín')
                     ->relationship('color', 'name_hu')
                     ->searchable()
@@ -73,12 +77,14 @@ class PricingCalculationRowForm
                     ->disabled(),
 
                 Select::make('price_list_id')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Árlista')
                     ->relationship('priceList', 'code')
                     ->searchable()
                     ->preload(),
 
                 Select::make('price_type')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Ártípus')
                     ->options([
                         PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
@@ -89,6 +95,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('currency_id')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
                     ->label('Pénznem')
                     ->relationship('currency', 'code')
                     ->searchable()
@@ -100,11 +107,23 @@ class PricingCalculationRowForm
                     ->numeric()
                     ->disabled(),
 
+                TextInput::make('base_price')->label('Számítás alapja')->numeric()->disabled(),
+                TextInput::make('multiplier')->label('Kisker szorzó')->numeric()->disabled(),
+                TextInput::make('unrounded_price')->label('Kerekítés előtti ár')->numeric()->disabled(),
+                Select::make('pricing_rounding_rule_id')->label('Kalkuláció kerekítési szabálya')
+                    ->relationship('pricingRoundingRule', 'name')->disabled(),
+                TextInput::make('retained_price')->label('Korábban jóváhagyott, megtartott ár')->numeric()->disabled(),
+                Toggle::make('requires_review')->label('Felülvizsgálat szükséges')->disabled(),
+
                 TextInput::make('manual_price')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedRetail($record) ? 'A HUF kisker árak munkafelületen szerkeszthető.' : null)
                     ->label('Manuális ár')
                     ->numeric(),
 
                 Select::make('status')
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedRetail($record) ? 'A HUF kisker árak munkafelület Jóváhagyás műveletével állítható.' : null)
                     ->label('Státusz')
                     ->options([
                         PricingCalculationRow::STATUS_CALCULATED => 'Kalkulált ár',
@@ -118,5 +137,11 @@ class PricingCalculationRowForm
                     ->required(),
             ])
             ->columns(2);
+    }
+
+    private static function isManagedRetail(?PricingCalculationRow $record): bool
+    {
+        return $record?->exists && $record->price_type === PricingCalculationRow::TYPE_RETAIL
+            && $record->currency?->code === 'HUF';
     }
 }

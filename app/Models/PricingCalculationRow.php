@@ -42,6 +42,12 @@ class PricingCalculationRow extends Model
         'shipping_cost_percent',
         'customs_percent',
         'candidate_count',
+        'base_price',
+        'multiplier',
+        'unrounded_price',
+        'pricing_rounding_rule_id',
+        'retained_price',
+        'requires_review',
         'calculated_price',
         'manual_price',
         'final_price',
@@ -63,6 +69,11 @@ class PricingCalculationRow extends Model
             'exchange_rate' => 'decimal:6',
             'shipping_cost_percent' => 'decimal:4',
             'customs_percent' => 'decimal:4',
+            'base_price' => 'decimal:4',
+            'multiplier' => 'decimal:6',
+            'unrounded_price' => 'decimal:4',
+            'retained_price' => 'decimal:4',
+            'requires_review' => 'boolean',
             'calculation_snapshot' => 'array',
             'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -80,7 +91,7 @@ class PricingCalculationRow extends Model
                 ? (int) $row->price_list_id
                 : 0;
 
-            $row->final_price = $row->manual_price ?? $row->calculated_price;
+            $row->final_price = $row->manual_price ?? $row->retained_price ?? $row->calculated_price;
         });
     }
 
@@ -130,6 +141,11 @@ class PricingCalculationRow extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class);
+    }
+
+    public function pricingRoundingRule(): BelongsTo
+    {
+        return $this->belongsTo(PricingRoundingRule::class);
     }
 
     public function reviewer(): BelongsTo

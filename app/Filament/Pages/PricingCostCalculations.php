@@ -4,7 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Filament\Support\AdminResourceTable;
-use App\Models\AdminUiPreference;
+use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Services\Pricing\CostCalculationService;
@@ -12,8 +12,8 @@ use App\Services\Pricing\PricingParameterAdjustmentService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
@@ -21,7 +21,11 @@ use InvalidArgumentException;
 class PricingCostCalculations extends Page implements HasTable
 {
     use HasPageShield;
-    use InteractsWithTable;
+    use HasPricingTablePreferences, InteractsWithTable {
+        HasPricingTablePreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
+        HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
+        HasPricingTablePreferences::persistHasReorderedTableColumns insteadof InteractsWithTable;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon =
         'heroicon-o-calculator';
@@ -43,54 +47,9 @@ class PricingCostCalculations extends Page implements HasTable
 
     public ?string $pendingParameterScope = null;
 
-    /**
-     * @var array<string, int>
-     */
-    public array $pricingColumnWidths = [];
-
     public function mount(): void
     {
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
-    }
-
-    /**
-     * @param  array<string, mixed>  $widths
-     */
-    public function savePricingColumnWidths(array $widths): void
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return;
-        }
-
-        $this->pricingColumnWidths = $this->sanitizePricingColumnWidths($widths);
-
-        AdminUiPreference::query()->updateOrCreate(
-            [
-                'user_id' => $userId,
-                'preference_key' => $this->pricingColumnWidthPreferenceKey(),
-            ],
-            [
-                'value' => $this->pricingColumnWidths,
-            ],
-        );
-    }
-
-    public function resetPricingColumnWidths(): void
-    {
-        $userId = auth()->id();
-
-        $this->pricingColumnWidths = [];
-
-        if (! $userId) {
-            return;
-        }
-
-        AdminUiPreference::query()
-            ->where('user_id', $userId)
-            ->where('preference_key', $this->pricingColumnWidthPreferenceKey())
-            ->delete();
     }
 
     public function startInlineCostPercentParameterAdjustment(
@@ -216,11 +175,11 @@ class PricingCostCalculations extends Page implements HasTable
             Notification::make()
                 ->title('Paraméter mentve és újraszámolva')
                 ->body(
-                    self::parameterScopeLabel($parameter) .
-                    ' | Frissítve: ' . $result['updated'] .
-                    ', létrehozva: ' . $result['created'] .
-                    ', kihagyott: ' . $result['skipped'] .
-                    ', futás: ' . $result['run_id']
+                    self::parameterScopeLabel($parameter).
+                    ' | Frissítve: '.$result['updated'].
+                    ', létrehozva: '.$result['created'].
+                    ', kihagyott: '.$result['skipped'].
+                    ', futás: '.$result['run_id']
                 )
                 ->success()
                 ->send();
@@ -275,146 +234,14 @@ class PricingCostCalculations extends Page implements HasTable
         $this->pendingParameterScope = null;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    protected function loadTableColumnsFromSession(): array
+    public function pricingWorkspaceDescription(): string
     {
-        $hasReordered = $this->loadAdminPreference($this->tableHasReorderedColumnsPreferenceKey());
-
-        if (is_bool($hasReordered)) {
-            session()->put($this->getHasReorderedTableColumnsSessionKey(), $hasReordered);
-        }
-
-        $columns = $this->loadAdminPreference($this->tableColumnsPreferenceKey());
-
-        if (is_array($columns)) {
-            return $columns;
-        }
-
-        return session()->get(
-            $this->getTableColumnsSessionKey(),
-            $this->getDefaultTableColumnState(),
-        );
+        return 'Ez a munkafelület a bekerülési érték kalkuláció áttekintésére szolgál.';
     }
 
-    protected function persistTableColumns(): void
+    protected function pricingPreferencePrefix(): string
     {
-        if (! $this->getTable()->persistsColumnsInSession()) {
-            return;
-        }
-
-        session()->put(
-            $this->getTableColumnsSessionKey(),
-            $this->tableColumns
-        );
-
-        $this->saveAdminPreference($this->tableColumnsPreferenceKey(), $this->tableColumns);
-    }
-
-    protected function persistHasReorderedTableColumns(bool $wasReordered = false): void
-    {
-        $hasReordered = $wasReordered || $this->hasReorderedTableColumns();
-
-        session()->put(
-            $this->getHasReorderedTableColumnsSessionKey(),
-            $hasReordered
-        );
-
-        $this->saveAdminPreference($this->tableHasReorderedColumnsPreferenceKey(), $hasReordered);
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    private function loadPricingColumnWidths(): array
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return [];
-        }
-
-        $preference = AdminUiPreference::query()
-            ->where('user_id', $userId)
-            ->where('preference_key', $this->pricingColumnWidthPreferenceKey())
-            ->first();
-
-        return $this->sanitizePricingColumnWidths(is_array($preference?->value) ? $preference->value : []);
-    }
-
-    /**
-     * @param  array<string, mixed>  $widths
-     * @return array<string, int>
-     */
-    private function sanitizePricingColumnWidths(array $widths): array
-    {
-        $sanitized = [];
-
-        foreach ($widths as $column => $width) {
-            if (! is_string($column) || ! is_numeric($width)) {
-                continue;
-            }
-
-            $width = (int) round((float) $width);
-
-            if ($width < 72 || $width > 2000) {
-                continue;
-            }
-
-            $sanitized[$column] = $width;
-        }
-
-        return $sanitized;
-    }
-
-    private function pricingColumnWidthPreferenceKey(): string
-    {
-        return 'pricing_cost_calculation_column_widths';
-    }
-
-    private function tableColumnsPreferenceKey(): string
-    {
-        return 'pricing_cost_calculation_table_columns';
-    }
-
-    private function tableHasReorderedColumnsPreferenceKey(): string
-    {
-        return 'pricing_cost_calculation_has_reordered_columns';
-    }
-
-    private function loadAdminPreference(string $key): mixed
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return null;
-        }
-
-        return AdminUiPreference::query()
-            ->where('user_id', $userId)
-            ->where('preference_key', $key)
-            ->first()
-            ?->value;
-    }
-
-    private function saveAdminPreference(string $key, mixed $value): void
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return;
-        }
-
-        AdminUiPreference::query()->updateOrCreate(
-            [
-                'user_id' => $userId,
-                'preference_key' => $key,
-            ],
-            [
-                'value' => $value,
-            ],
-        );
+        return 'pricing_cost_calculation';
     }
 
     /**
@@ -430,12 +257,12 @@ class PricingCostCalculations extends Page implements HasTable
 
         if (filled($record->supplier?->country_code)) {
             $options[PricingParameter::SCOPE_SUPPLIER_COUNTRY] =
-                'Beszállító ország - ' . $record->supplier->country_code;
+                'Beszállító ország - '.$record->supplier->country_code;
         }
 
         if (filled($record->product?->item_main_group_id)) {
             $options[PricingParameter::SCOPE_ITEM_MAIN_GROUP] =
-                'Főcsoport - ' . (
+                'Főcsoport - '.(
                     $record->product->itemMainGroup?->name_hu
                     ?: $record->product->itemMainGroup?->code
                     ?: $record->product->item_main_group_id
@@ -444,7 +271,7 @@ class PricingCostCalculations extends Page implements HasTable
 
         if (filled($record->product_id)) {
             $options[PricingParameter::SCOPE_PRODUCT] =
-                'Modell - ' . ($record->product?->model_code ?: $record->product_id);
+                'Modell - '.($record->product?->model_code ?: $record->product_id);
         }
 
         return $options;
@@ -474,7 +301,7 @@ class PricingCostCalculations extends Page implements HasTable
     {
         foreach ($options as $scopeType => $label) {
             if (array_key_exists($scopeType, $counts)) {
-                $options[$scopeType] = $label . ' (' . $counts[$scopeType] . ' sor)';
+                $options[$scopeType] = $label.' ('.$counts[$scopeType].' sor)';
             }
         }
 
@@ -528,12 +355,9 @@ class PricingCostCalculations extends Page implements HasTable
     private static function parameterScopeLabel(PricingParameter $parameter): string
     {
         return match ($parameter->scope_type) {
-            PricingParameter::SCOPE_SUPPLIER_COUNTRY =>
-                'Beszállító ország: ' . $parameter->supplier_country_code,
-            PricingParameter::SCOPE_ITEM_MAIN_GROUP =>
-                'Főcsoport ID: ' . $parameter->item_main_group_id,
-            PricingParameter::SCOPE_PRODUCT =>
-                'Modell ID: ' . $parameter->product_id,
+            PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország: '.$parameter->supplier_country_code,
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport ID: '.$parameter->item_main_group_id,
+            PricingParameter::SCOPE_PRODUCT => 'Modell ID: '.$parameter->product_id,
             default => 'Globális paraméter',
         };
     }
