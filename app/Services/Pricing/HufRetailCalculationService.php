@@ -7,15 +7,16 @@ use App\Models\PriceList;
 use App\Models\PricingCalculationError;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
-use Brick\Math\BigDecimal;
-use Brick\Math\RoundingMode;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class HufRetailCalculationService
 {
-    public function __construct(private readonly HufRetailCalculator $calculator) {}
+    public function __construct(
+        private readonly HufRetailCalculator $calculator,
+        private readonly RetailCalculationDependencyService $dependencies,
+    ) {}
 
     public function recalculate(PricingProject $project, ?PriceList $priceList = null): array
     {
@@ -88,15 +89,18 @@ class HufRetailCalculationService
                     ]);
                     $previousSnapshot = $row->calculation_snapshot ?? [];
 
-                    if (! $created && $row->calculated_price !== null
-                        && BigDecimal::of($row->calculated_price)->compareTo(
-                            BigDecimal::of($calculation['calculated_price'])->toScale(4, RoundingMode::HALF_UP)
-                        ) !== 0
-                        && ($row->manual_price !== null || $row->status !== PricingCalculationRow::STATUS_CALCULATED)) {
+                    $protectedPrice = $row->manual_price !== null || $row->retained_price !== null
+                        || $row->status !== PricingCalculationRow::STATUS_CALCULATED;
+                    if (! $created && $protectedPrice
+                        && ($row->requires_review || $this->dependencies->calculationInputsChanged($row, $cost, $calculation)
+                            || $this->dependencies->approvalInputsChanged($row, $calculation))) {
                         if ($row->manual_price === null && $row->retained_price === null) {
                             $row->retained_price = $row->final_price;
                         }
                         $row->requires_review = true;
+                    } elseif (! $protectedPrice) {
+                        // Unreviewed calculated prices simply become current again after recalculation.
+                        $row->requires_review = false;
                     }
 
                     $row->fill(collect($cost->getAttributes())->only([

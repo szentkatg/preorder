@@ -77,6 +77,7 @@ class HufRetailCalculator
                 'source_cost_row_id' => $cost->id,
                 'source_cost_updated_at' => $cost->updated_at?->toISOString(),
                 'source_cost_snapshot' => $cost->calculation_snapshot,
+                'source_cost_inputs' => $cost->only(RetailCalculationDependencyService::SOURCE_COST_FIELDS),
                 'price_list' => ['id' => $priceList->id, 'code' => $priceList->code, 'name' => $priceList->name_hu],
                 'inputs' => ['base_price' => $base, 'multiplier' => $multiplier, 'unrounded_price' => $unrounded],
                 'retail_parameter' => [

@@ -75,6 +75,7 @@ class RetailPriceReviewService
         $row->calculation_snapshot = array_replace($snapshot, ['approval' => [
             'price' => $price, 'user_id' => auth()->id(), 'approved_at' => now()->toISOString(),
             'source_cost_row_id' => $snapshot['source_cost_row_id'] ?? null,
+            'source_cost_inputs' => $snapshot['source_cost_inputs'] ?? [],
             'inputs' => $snapshot['inputs'] ?? [], 'rounding' => $snapshot['rounding'] ?? [],
             'retail_parameter' => $snapshot['retail_parameter'] ?? [],
             'calculated_price' => (float) $row->calculated_price,
@@ -87,6 +88,8 @@ class RetailPriceReviewService
         Gate::authorize('update', $row);
 
         return DB::transaction(function () use ($row, $change): PricingCalculationRow {
+            // Match the calculation services' lock order for concurrent cost/retail updates.
+            PricingProject::query()->whereKey($row->pricing_project_id)->lockForUpdate()->firstOrFail();
             $stored = PricingCalculationRow::query()->lockForUpdate()->findOrFail($row->id);
             Gate::authorize('update', $stored);
 
@@ -95,6 +98,7 @@ class RetailPriceReviewService
                 throw new DomainException('Csak aktív árprojekt HUF kisker ára módosítható.');
             }
 
+            app(RetailCalculationDependencyService::class)->assertCalculationCurrent($stored);
             $change($stored);
             $stored->save();
 

@@ -71,9 +71,8 @@ class CostCalculationService
 
         $purchasePriceGroups = $purchasePrices
             ->groupBy(
-                fn (ProductPurchasePrice $purchasePrice): string =>
-                    $purchasePrice->product_id . '|'
-                    . ((int) ($purchasePrice->color_id ?? 0))
+                fn (ProductPurchasePrice $purchasePrice): string => $purchasePrice->product_id.'|'
+                    .((int) ($purchasePrice->color_id ?? 0))
             );
 
         $result = [
@@ -82,12 +81,12 @@ class CostCalculationService
             'updated' => 0,
             'skipped' => 0,
             'candidate_groups' => $purchasePriceGroups->count(),
-            'products_without_active_purchase_price' =>
-                $productsWithoutActivePurchasePrice->count(),
+            'products_without_active_purchase_price' => $productsWithoutActivePurchasePrice->count(),
             'errors' => [],
         ];
 
         DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $hufCurrency, $runId, &$result): void {
+            PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
             foreach ($productsWithoutActivePurchasePrice as $product) {
                 PricingCalculationError::query()->create([
                     'run_id' => $runId,
@@ -165,8 +164,7 @@ class CostCalculationService
 
                 usort(
                     $candidates,
-                    fn (array $left, array $right): int =>
-                        $left['calculation']['landed_cost_huf']
+                    fn (array $left, array $right): int => $left['calculation']['landed_cost_huf']
                         <=> $right['calculation']['landed_cost_huf']
                 );
 
@@ -181,12 +179,13 @@ class CostCalculationService
                     ->where('price_list_key', 0)
                     ->where('price_type', PricingCalculationRow::TYPE_COST)
                     ->where('currency_id', $hufCurrency->id)
+                    ->lockForUpdate()
                     ->first();
 
                 $wasRecentlyCreated = false;
 
                 if (! $row) {
-                    $row = new PricingCalculationRow();
+                    $row = new PricingCalculationRow;
                     $row->pricing_project_id = $project->id;
                     $row->product_id = $selectedPurchasePrice->product_id;
                     $row->color_id = $selectedPurchasePrice->color_id;

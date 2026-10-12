@@ -30,10 +30,10 @@ A szorzó a bruttó kisker árat képezi; külön áfa-szorzót ebben a lépésb
   előtti ár, a kalkulált, a manuális és a végleges ár, valamint a státusz.
 - A Manuális HUF mező közvetlenül szerkeszthető. Az üres érték visszaállítja
   a kalkulált árat. A manuális módosítás új jóváhagyást igényel.
-- A **Kisker szorzó** manuális vagy megtartott ár mellett az adott ár és a
+- A **Kisker szorzó** minden sornál a végleges, kerekítés utáni ár és a
   mentett bekerülési érték hányadosát mutatja, legfeljebb hat tizedesjeggyel.
-  Például `2490 / 460 = 5,413043`. Felülírás nélkül az eredeti kalkulációs
-  szorzó látszik. Törölt manuális ár / elfogadott új kalkuláció után ez visszaáll.
+  Például `1990 / 460 = 4,326087`, manuális árnál `2490 / 460 = 5,413043`.
+  Törölt manuális ár / elfogadott új kalkuláció után a kerekített kalkulált árból számol.
   A **Kalkulációs szorzó** külön, bekapcsolható oszlop; a részletek és a tooltip
   is megőrzik az eredeti értéket. Az árképzési paraméter és snapshot nem változik.
 - A manuális mező, a kijelzett szorzó és a végleges ár egységes piros lefelé /
@@ -47,7 +47,8 @@ A szorzó a bruttó kisker árat képezi; külön áfa-szorzót ebben a lépésb
   sorrend és oszlopszélesség nem vész el.
 - A végleges ár piros lefelé / zöld felfelé nyila jelzi az eltérést a kalkulálttól.
 - Újraszámításkor a manuális és már átnézett / jóváhagyott végleges árak megmaradnak.
-  Ha a kalkulált eredmény változik, a **Felülvizsgálandó** jelzés bekapcsol.
+  Ha releváns bemenet vagy a kalkulált eredmény változik, a **Felülvizsgálandó**
+  jelzés bekapcsol, akkor is, ha a kerekített ár változatlan.
 - Az **Ár megtartása és jóváhagyása** a korábbi végleges árat hagyja meg.
   A **Kalkulált ár elfogadása** a legutóbbi számított árat teszi véglegessé.
 - A Jóváhagyás műveletben átnézett, jóváhagyott, 2. és 3. körös jóváhagyott
@@ -103,6 +104,105 @@ Későbbi, külön jóváhagyott élesítéskor az éles ágba integrálás utá
 ```bash
 git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan migrate --force
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## Beszállítói oszlopok, alku-célár és átlagos szorzó
+
+- Az oszlopválasztóban elérhető **Beszállító kód** (`erp_partner_code`),
+  **Beszállító neve**, **Eredeti besz. ár** és **Besz. pénznem**.
+  Ezek az adott kalkulációhoz kiválasztott beszerzési ár beszállítóját/pénznemét mutatják.
+  Rendezhetők, szűrhetők és Excelbe exportálhatók.
+- A **Cél besz. ár** a beszerzési ár pénznemében jelenik meg.
+  Manuális vagy tudatosan megtartott árnál az arányos költségmodell szerinti képlet:
+
+  `cél besz. ár = eredeti besz. ár × végleges kisker ár / (bekerülési HUF × kalkulációs szorzó)`
+
+  Az eredetit meghaladó célt az eredetire korlátozzuk. Csökkentés esetén piros a cella.
+  Négy tizedesre lefelé kerekítünk: ez a beszerzési ár tárolható pontossága,
+  és így a célár nem csökkenti az elérhető szorzót a beállított érték alá.
+  Manuális/megtartott ár nélkül az eredeti beszerzési ár marad, még akkor is,
+  ha a kisker kerekítés lefelé térítette el az effektív szorzót.
+  Hiányzó adatnál `-` jelenik meg; nem írunk semmit a beszerzési ártörzsbe.
+- A **Kisker szorzó** fejlécében **Átlag** látszik: a szűrt sorok
+  `végleges kisker ár / bekerülési érték` szorzóinak **számtani átlaga**.
+  Nem `összes ár / összes bekerülési érték`, nem mennyiséggel súlyozott átlag,
+  és nem csak a megjelenített lap átlaga. A pozitív bekerülési érték nélküli sorok kimaradnak.
+  Keresés, egyedi oszlopszűrés, árprojekt/árlista szűrés és manuális ármódosítás után frissül.
+  Minden szűrt modell/szín/árlista kalkulációs sor egyenlő súllyal szerepel benne.
+- A kalkulációs szorzó továbbra is megmarad külön, bekapcsolható oszlopként.
+  A fő szorzó ezért a kerekítés hatását manuális ár nélkül is megmutatja.
+  A meglévő oszlopazonosító és mentett szélesség/sorrend megmarad.
+
+Ehhez és a felülvizsgálati javításhoz nincs új migráció, Composer install,
+frontend build, kézi assetfeltöltés vagy .env/jogosultság-módosítás.
+A korábbi hibás jóváhagyások ellenőrzéséhez telepítés után az érintett projektben
+egyszer HUF kisker-újraszámítás szükséges, az árak megőrzésével.
+
+A két változtatás együttes Git/NAS-telepítése a pricing worktree-ben:
+
+```powershell
+git add -- app/Models/PricingCalculationRow.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Support/AdminResourceTable.php app/Services/Pricing/RetailCalculationDependencyService.php app/Services/Pricing/CostCalculationService.php app/Services/Pricing/HufRetailCalculationService.php app/Services/Pricing/HufRetailCalculator.php app/Services/Pricing/RetailPriceReviewService.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/retail-calculation-details.blade.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Review changed retail inputs and add procurement pricing insights"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Külön jóváhagyott cPanel-élesítéskor, éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## Bekerülési változások és jóváhagyások felülvizsgálata
+
+- A bekerülési sor releváns adatainak mentett változása automatikusan jelöli a
+  hozzá tartozó meglévő HUF kisker sorokat. Az árprojekt, termék és szín alapján
+  minden érintett árlistára érvényes; más terméket/színt/projektet nem érint.
+- Figyelt adatok: végleges bekerülési érték, beszerzési ár, árfolyam, szállítási
+  és vám százalék, kiválasztott beszerzési ár/beszállító/pénznem és a forrás azonosítói.
+  Nem elég az updated_at vagy a snapshot időbélyegének változása; változatlan
+  újraszámítás, átnevezés és önmagában a jelöltek számának változása nem jelöl.
+- A jelölés nem változtatja meg a manuális/végleges árat, a státuszt vagy a
+  korábbi jóváhagyás snapshotját. Nem indít automatikusan teljes kisker-újraszámítást.
+  A bekerülési mentés és az automatikus jelölés a kalkulációs tranzakció része.
+- A következő HUF kisker-újraszámítás a bekerülési és kisker bemeneteket,
+  szorzót és a kerekítési szabályt is összehasonlítja, nem csak a kerekített árat.
+  A legutóbbi jóváhagyás bemenetei is megmaradnak összehasonlítási alapnak.
+  A manuális/jóváhagyott ár mindaddig megmarad, amíg a felhasználó dönt.
+- Elavult kalkulációt nem lehet jóváhagyni, elfogadni vagy manuális átírással
+  érvényessé tenni. A felület figyelmeztet, hogy előbb HUF kisker-újraszámítás szükséges.
+  A jelzés csak az aktuális kalkuláció átnézése/jóváhagyása vagy tudatos ármódosítása
+  után kapcsol ki. Még nem átnézett, nem felülírt kalkulált sornál a friss újraszámítás
+  önmagában megszünteti a jelzést.
+- Kisker szorzó/kerekítési szabály szerkesztése után továbbra is futtatni kell
+  a HUF újraszámítást; az új feltétel változatlan kerekített eredménynél is jelez.
+
+A korábbi hibával érintett soroknál a kihelyezés után **egyszer futtasd a HUF
+kisker árak újraszámítását** az érintett árprojektben. Az eredmények a korábbi
+jóváhagyási bemenetekkel is összevetődnek, az árakat nem írjuk felül automatikusan.
+Régi jóváhagyásnál csak a korábban elmentett bemenetek állíthatók helyre; új
+jóváhagyásnál a másolt bekerülési bemeneteket is külön megőrizzük a snapshotban.
+
+Ehhez a javításhoz **nem kell új migráció, Composer install, frontend build,
+kézi feltöltés, .env módosítás vagy Shield-generálás**.
+
+Git/NAS a `feature/pricing-module` worktree-ben:
+
+```powershell
+git add -- app/Models/PricingCalculationRow.php app/Services/Pricing/RetailCalculationDependencyService.php app/Services/Pricing/CostCalculationService.php app/Services/Pricing/HufRetailCalculationService.php app/Services/Pricing/HufRetailCalculator.php app/Services/Pricing/RetailPriceReviewService.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php resources/views/filament/pricing/retail-calculation-details.blade.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Flag retail prices for review when calculation inputs change"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan optimize:clear
 /opt/alt/php83/usr/bin/php artisan optimize
 ```

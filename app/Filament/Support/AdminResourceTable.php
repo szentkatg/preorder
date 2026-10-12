@@ -94,10 +94,14 @@ class AdminResourceTable
 
         if (($modelClass === PricingCalculationRow::class)
             && (($column->getName() === 'calculation_multiplier')
+                || ($column->getName() === 'target_purchase_price')
                 || (($column->getName() === 'multiplier')
                     && ($column->getExtraAttributes()['data-pricing-derived-multiplier'] ?? false)))) {
-            $expression = $column->getName() === 'calculation_multiplier'
-                ? 'multiplier' : PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL;
+            $expression = match ($column->getName()) {
+                'calculation_multiplier' => 'multiplier',
+                'target_purchase_price' => PricingCalculationRow::targetPurchasePriceSql(),
+                default => PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL,
+            };
             $column
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw(
                     $expression.' '.($direction === 'desc' ? 'desc' : 'asc'),

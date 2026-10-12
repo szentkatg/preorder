@@ -11,7 +11,9 @@ use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Computed;
 
 class PricingHufRetailCalculations extends Page implements HasTable
 {
@@ -51,7 +53,16 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'HUF bruttó kisker árak: végleges bekerülési érték × kalkulációs szorzó, majd kerekítés és korrekció. Manuális árnál a Kisker szorzó az ár / bekerülési érték alapján frissül. A piros lefelé / zöld felfelé nyíl a végleges ár eltérését jelzi a kalkulálttól.';
+        return 'HUF bruttó kisker árak: a Kisker szorzó minden sornál a végleges, kerekítés utáni ár / bekerülési érték. Az átlag a szűrt sorok szorzóinak számtani átlaga. A piros cél-beszerzési ár jelzi, ha a kalkulációs szorzó eléréséhez alkudni kell.';
+    }
+
+    #[Computed]
+    public function averageRetailMultiplier(): ?float
+    {
+        $query = clone $this->getFilteredTableQuery();
+        $average = $query->toBase()->avg(DB::raw(PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL));
+
+        return $average === null ? null : (float) $average;
     }
 
     protected function pricingPreferencePrefix(): string
@@ -70,7 +81,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
             HufRetailCalculationsTable::configure($table)->query(
                 PricingCalculationRow::query()->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                     ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))
-                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule'])
+                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency'])
             ),
             PricingCalculationRow::class,
             withViewAction: false,

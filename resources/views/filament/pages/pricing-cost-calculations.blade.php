@@ -111,6 +111,20 @@
             line-height: 1.25rem;
         }
 
+        [data-pricing-resizable-columns] th[data-pricing-average-multiplier]::before {
+            content: attr(data-pricing-average-multiplier);
+            display: block;
+            margin-bottom: 0.125rem;
+            color: rgb(75 85 99);
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1rem;
+        }
+
+        .dark [data-pricing-resizable-columns] th[data-pricing-average-multiplier]::before {
+            color: rgb(209 213 219);
+        }
+
         [data-pricing-resizable-columns] .fi-ta-table > tbody > tr > .fi-ta-cell {
             padding-block: 0.125rem;
             font-size: 0.875rem;

@@ -5,8 +5,11 @@ namespace App\Filament\Resources\PricingCalculationRows\Tables;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
 use App\Services\Pricing\RetailPriceReviewService;
+use Closure;
+use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -28,16 +31,31 @@ class HufRetailCalculationsTable
             TextColumn::make('product.model_code')->label('Modell kód'),
             TextColumn::make('product.name_hu')->label('Modell név'),
             TextColumn::make('color.name_hu')->label('Szín'),
+            TextColumn::make('supplier.erp_partner_code')->label('Beszállító kód')
+                ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('supplier.name')->label('Beszállító neve')
+                ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('purchase_price')->label('Eredeti besz. ár')
+                ->formatStateUsing(fn ($state) => self::formatPrice($state))
+                ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('purchaseCurrency.code')->label('Besz. pénznem')
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('base_price')->label('Bekerülési HUF')->formatStateUsing(fn ($state) => self::formatPrice($state)),
             TextColumn::make('multiplier')->label('Kisker szorzó')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->effective_multiplier)
                 ->extraAttributes(['data-pricing-derived-multiplier' => true])
+                ->extraHeaderAttributes(fn ($livewire) => [
+                    'data-pricing-average-multiplier' => 'Átlag: '.self::formatMultiplier($livewire->averageRetailMultiplier),
+                    'aria-description' => 'A szűrt sorok szorzóinak számtani átlaga: '.self::formatMultiplier($livewire->averageRetailMultiplier),
+                ])
                 ->formatStateUsing(fn ($state) => self::formatMultiplier($state))
                 ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
                 ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->color(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->tooltip(fn (PricingCalculationRow $record) => 'Kalkulációs szorzó: '.self::formatMultiplier($record->multiplier)
-                    .'. Manuális vagy megtartott árnál: végleges ár / bekerülési érték. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
+                    .'. Kerekítés utáni szorzó: '.self::formatMultiplier(
+                        (float) $record->base_price > 0 ? (float) $record->calculated_price / (float) $record->base_price : null,
+                    ).'. A kijelzett szorzó minden esetben a végleges ár / bekerülési érték. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
             TextColumn::make('calculation_multiplier')->label('Kalkulációs szorzó')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier)
                 ->formatStateUsing(fn ($state) => self::formatMultiplier($state))
@@ -56,15 +74,29 @@ class HufRetailCalculationsTable
                 ->tooltip('Írd át a manuális árat. Az üres mező visszaállítja a kalkulált árat. A módosítás után új jóváhagyás szükséges.')
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
                 ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, $livewire) {
-                    $updated = app(RetailPriceReviewService::class)->setManualPrice($record, $state);
-                    $livewire->resetTable();
+                    try {
+                        $updated = app(RetailPriceReviewService::class)->setManualPrice($record, $state);
 
-                    return $updated->manual_price === null ? null : rtrim(rtrim($updated->manual_price, '0'), '.');
+                        return $updated->manual_price === null ? null : rtrim(rtrim($updated->manual_price, '0'), '.');
+                    } catch (DomainException $exception) {
+                        self::notifyCalculationError($exception);
+
+                        return ['error' => $exception->getMessage()];
+                    } finally {
+                        $livewire->resetTable();
+                    }
                 }),
             TextColumn::make('final_price')->label('Végleges kisker HUF')->formatStateUsing(fn ($state) => self::formatPrice($state))
                 ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
                 ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->color(fn (PricingCalculationRow $record) => self::differenceColor($record)),
+            TextColumn::make('target_purchase_price')->label('Cél besz. ár')
+                ->placeholder('-')
+                ->formatStateUsing(fn ($state, PricingCalculationRow $record) => $state === null
+                    ? '-' : self::formatPrice($state).' '.($record->purchaseCurrency?->code ?? ''))
+                ->color(fn (PricingCalculationRow $record) => $record->needsPurchasePriceNegotiation() ? 'danger' : null)
+                ->tooltip(fn (PricingCalculationRow $record) => 'Eredeti besz. ár: '.self::formatPrice($record->purchase_price)
+                    .' '.($record->purchaseCurrency?->code ?? '').'. Célár = eredeti besz. ár × végleges kisker ár / (bekerülési érték × kalkulációs szorzó). Csak manuális/megtartott árnál számolunk csökkentést, felfelé nem módosítunk.'),
             IconColumn::make('requires_review')->label('Felülvizsgálandó')->boolean(),
             TextColumn::make('status')->label('Státusz')->badge()->formatStateUsing(fn ($state) => match ($state) {
                 PricingCalculationRow::STATUS_CALCULATED => 'Kalkulált ár',
@@ -97,14 +129,18 @@ class HufRetailCalculationsTable
                 ])
                 ->visible(fn (PricingCalculationRow $record) => Gate::allows('update', $record))
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->action(fn (PricingCalculationRow $record, array $data) => app(RetailPriceReviewService::class)->approveCurrentPrice($record, $data['approval_status']))
+                ->action(fn (PricingCalculationRow $record, array $data) => self::reviewAction(
+                    fn () => app(RetailPriceReviewService::class)->approveCurrentPrice($record, $data['approval_status']),
+                ))
                 ->after(fn ($livewire) => $livewire->resetTable()),
             Action::make('acceptCalculatedRetail')->label('Kalkulált ár elfogadása')->icon('heroicon-o-arrow-path')->requiresConfirmation()
                 ->modalDescription('A végleges ár a legutóbbi kalkulált ár lesz. A manuális vagy korábban megtartott ár helyett ezt hagyod jóvá.')
                 ->visible(fn (PricingCalculationRow $record) => Gate::allows('update', $record)
                     && ($record->requires_review || $record->manual_price !== null || $record->retained_price !== null))
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->action(fn (PricingCalculationRow $record) => app(RetailPriceReviewService::class)->acceptCalculatedPrice($record))
+                ->action(fn (PricingCalculationRow $record) => self::reviewAction(
+                    fn () => app(RetailPriceReviewService::class)->acceptCalculatedPrice($record),
+                ))
                 ->after(fn ($livewire) => $livewire->resetTable()),
         ])->defaultSort('updated_at', 'desc')->reorderableColumns()->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
@@ -113,6 +149,21 @@ class HufRetailCalculationsTable
     private static function formatPrice(mixed $state): string
     {
         return rtrim(rtrim(number_format((float) $state, 4, ',', ' '), '0'), ',');
+    }
+
+    private static function reviewAction(Closure $action): void
+    {
+        try {
+            $action();
+        } catch (DomainException $exception) {
+            self::notifyCalculationError($exception);
+        }
+    }
+
+    private static function notifyCalculationError(DomainException $exception): void
+    {
+        Notification::make()->title('A kisker kalkuláció nem aktuális')
+            ->body($exception->getMessage())->warning()->send();
     }
 
     private static function formatMultiplier(mixed $state): string

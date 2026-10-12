@@ -22,7 +22,7 @@
     </style>
     <p class="mb-3">{{ $record->product?->model_code }} · {{ $snapshot['price_list']['code'] ?? $record->priceList?->code }} · Kalkulálva: {{ $snapshot['calculated_at'] ?? '-' }}</p>
     @if ($record->requires_review)
-        <p class="mb-3 font-semibold">A bemeneti adatok megváltoztak. A korábbi végleges ár megmaradt; döntsd el, hogy megtartod vagy elfogadod az új kalkulált árat.</p>
+        <p class="mb-3 font-semibold">A bemeneti adatok megváltoztak. A korábbi végleges ár megmaradt. A HUF kisker újraszámítás frissíti a kalkulációt; ezután dönthetsz az ár megtartásáról vagy az új kalkulált ár elfogadásáról. A felülvizsgálat akkor is szükséges lehet, ha a kerekített ár változatlan.</p>
     @endif
     <div class="retail-details-wrap">
         <table>
@@ -35,7 +35,8 @@
                 <tr><td>Kerekítés utáni korrekció</td><td>Hozzáadás / levonás</td><td class="numeric">{{ number_format((float) ($rounding['adjustment'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
                 <tr class="retail-total"><td>Kalkulált bruttó kisker ár</td><td>Kerekített érték + korrekció</td><td class="numeric">{{ number_format((float) $record->calculated_price, 4, ',', ' ') }} HUF</td></tr>
                 <tr><td>Manuális ár</td><td>Felhasználói eltérés</td><td class="numeric">{{ $record->manual_price === null ? '-' : number_format((float) $record->manual_price, 4, ',', ' ') . ' HUF' }}</td></tr>
-                <tr><td>Érvényes kisker szorzó</td><td>Manuális / megtartott árnál: végleges ár ÷ bekerülési érték; egyébként a kalkulációs szorzó</td><td class="numeric">{{ $record->effective_multiplier === null ? '-' : rtrim(rtrim(number_format($record->effective_multiplier, 6, ',', ''), '0'), ',') }}</td></tr>
+                <tr><td>Érvényes kisker szorzó</td><td>Végleges, kerekítés utáni ár ÷ bekerülési érték</td><td class="numeric">{{ $record->effective_multiplier === null ? '-' : rtrim(rtrim(number_format($record->effective_multiplier, 6, ',', ''), '0'), ',') }}</td></tr>
+                <tr><td>Cél-beszerzési ár</td><td>Az eredeti beszerzési ár arányos csökkentése a kalkulációs szorzó eléréséhez, felfelé nem módosítva</td><td class="numeric" @if ($record->needsPurchasePriceNegotiation()) style="color: rgb(220 38 38)" @endif>{{ $record->target_purchase_price === null ? '-' : rtrim(rtrim(number_format((float) $record->target_purchase_price, 4, ',', ' '), '0'), ',') . ' ' . ($record->purchaseCurrency?->code ?? '') }}</td></tr>
                 <tr><td>Korábban jóváhagyott, megtartott ár</td><td>Újraszámításkor megőrizve</td><td class="numeric">{{ $record->retained_price === null ? '-' : number_format((float) $record->retained_price, 4, ',', ' ') . ' HUF' }}</td></tr>
                 <tr class="retail-total"><td>Végleges bruttó kisker ár</td><td>Manuális → megtartott → kalkulált</td><td class="numeric">{{ number_format((float) $record->final_price, 4, ',', ' ') }} HUF</td></tr>
             </tbody>

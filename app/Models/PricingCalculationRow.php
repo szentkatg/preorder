@@ -2,13 +2,30 @@
 
 namespace App\Models;
 
+use App\Services\Pricing\RetailCalculationDependencyService;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PricingCalculationRow extends Model
 {
     // Keep the displayed multiplier sortable/searchable without changing the stored calculation input.
-    public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN manual_price IS NULL AND retained_price IS NULL THEN multiplier WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price) / NULLIF(base_price, 0)) ELSE NULL END';
+    public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price, calculated_price) / NULLIF(base_price, 0)) ELSE NULL END';
+
+    public static function targetPurchasePriceSql(): string
+    {
+        $price = 'COALESCE(manual_price, retained_price, calculated_price)';
+        $scaled = '1.0 * purchase_price * '.$price.' / NULLIF(base_price * multiplier, 0) * 10000';
+        // The local SQLite build has no optional math functions. Values are nonnegative, so truncation is floor.
+        $rounded = (new static)->getConnection()->getDriverName() === 'sqlite'
+            ? 'CAST(('.$scaled.') AS INTEGER)' : 'FLOOR('.$scaled.')';
+
+        return 'CASE WHEN purchase_price IS NULL OR purchase_price < 0 THEN NULL'
+            .' WHEN manual_price IS NULL AND retained_price IS NULL THEN purchase_price'
+            .' WHEN base_price IS NULL OR base_price <= 0 OR multiplier IS NULL OR multiplier <= 0 OR '.$price.' <= 0 THEN NULL'
+            .' WHEN '.$price.' >= base_price * multiplier THEN purchase_price ELSE '.$rounded.' / 10000.0 END';
+    }
 
     public const TYPE_COST = 'cost';
 
@@ -96,6 +113,14 @@ class PricingCalculationRow extends Model
 
             $row->final_price = $row->manual_price ?? $row->retained_price ?? $row->calculated_price;
         });
+
+        static::updated(function (PricingCalculationRow $row): void {
+            if ((($row->price_type === self::TYPE_COST && (int) $row->price_list_key === 0)
+                    || ($row->getOriginal('price_type') === self::TYPE_COST && (int) $row->getOriginal('price_list_key') === 0))
+                && $row->wasChanged(RetailCalculationDependencyService::COST_INPUT_FIELDS)) {
+                app(RetailCalculationDependencyService::class)->invalidateForCostChange($row);
+            }
+        });
     }
 
     public function pricingProject(): BelongsTo
@@ -168,15 +193,43 @@ class PricingCalculationRow extends Model
 
     public function getEffectiveMultiplierAttribute(): ?float
     {
-        $override = $this->manual_price ?? $this->retained_price;
+        $price = $this->manual_price ?? $this->retained_price ?? $this->calculated_price;
 
-        if ($override === null) {
-            return $this->multiplier === null ? null : (float) $this->multiplier;
+        return $price !== null && $this->base_price !== null && (float) $this->base_price > 0
+            ? (float) $price / (float) $this->base_price
+            : null;
+    }
+
+    public function getTargetPurchasePriceAttribute(): ?string
+    {
+        if ($this->purchase_price === null || (float) $this->purchase_price < 0) {
+            return null;
+        }
+        if ($this->manual_price === null && $this->retained_price === null) {
+            return $this->purchase_price;
         }
 
-        return $this->base_price !== null && (float) $this->base_price > 0
-            ? (float) $override / (float) $this->base_price
-            : null;
+        $price = $this->manual_price ?? $this->retained_price;
+        if ($this->base_price === null || (float) $this->base_price <= 0
+            || $this->multiplier === null || (float) $this->multiplier <= 0 || (float) $price <= 0) {
+            return null;
+        }
+
+        $original = BigDecimal::of($this->purchase_price);
+        $target = $original->multipliedBy($price)->dividedBy(
+            BigDecimal::of($this->base_price)->multipliedBy($this->multiplier),
+            4, RoundingMode::DOWN,
+        );
+
+        return $target->isLessThan($original) ? (string) $target : $this->purchase_price;
+    }
+
+    public function needsPurchasePriceNegotiation(): bool
+    {
+        $target = $this->target_purchase_price;
+
+        return $target !== null && $this->purchase_price !== null
+            && BigDecimal::of($target)->isLessThan(BigDecimal::of($this->purchase_price));
     }
 
     public function finalPriceDifferenceDirection(): ?string

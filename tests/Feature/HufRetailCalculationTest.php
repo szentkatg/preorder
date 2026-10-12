@@ -16,9 +16,13 @@ use App\Models\PricingParameter;
 use App\Models\PricingProject;
 use App\Models\PricingRoundingRule;
 use App\Models\Product;
+use App\Models\ProductPurchasePrice;
 use App\Models\Season;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\HufRetailCalculationService;
+use App\Services\Pricing\HufRetailCalculator;
 use App\Services\Pricing\PricingRoundingService;
 use App\Services\Pricing\RetailPriceReviewService;
 use DomainException;
@@ -262,7 +266,7 @@ class HufRetailCalculationTest extends TestCase
         $this->calculate();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $page = Livewire::test(PricingHufRetailCalculations::class);
-        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $this->assertEqualsWithDelta(1990 / 460, $this->retail()->effective_multiplier, 0.0000001);
         $originalSnapshot = $this->retail()->calculation_snapshot;
 
         foreach ([2490 => ['up', 'success'], 1490 => ['down', 'danger'], 1990 => [null, null]] as $price => [$direction, $color]) {
@@ -270,6 +274,7 @@ class HufRetailCalculationTest extends TestCase
                 ->assertHasNoErrors();
             $row = $this->retail();
             $this->assertEqualsWithDelta($price / 460, $row->effective_multiplier, 0.0000001);
+            $this->assertEqualsWithDelta($price / 460, $page->instance()->averageRetailMultiplier, 0.0000001);
             $this->assertSame($direction, $row->finalPriceDifferenceDirection());
             $this->assertSame('4.700000', $row->multiplier);
             $this->assertSame($originalSnapshot, $row->calculation_snapshot);
@@ -282,7 +287,7 @@ class HufRetailCalculationTest extends TestCase
         }
 
         $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, null)->assertHasNoErrors();
-        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $this->assertEqualsWithDelta(1990 / 460, $this->retail()->effective_multiplier, 0.0000001);
         $this->assertNull($this->retail()->finalPriceDifferenceDirection());
         $this->assertSame('1990.0000', $this->retail()->final_price);
     }
@@ -322,7 +327,7 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame(1.99, $row->effective_multiplier);
         $this->assertSame('down', $row->finalPriceDifferenceDirection());
         $review->acceptCalculatedPrice($row);
-        $this->assertSame(4.7, $this->retail()->effective_multiplier);
+        $this->assertSame(4.99, $this->retail()->effective_multiplier);
         $this->assertNull($this->retail()->finalPriceDifferenceDirection());
     }
 
@@ -406,5 +411,376 @@ class HufRetailCalculationTest extends TestCase
             $this->assertSame('1990.0000', $row->final_price);
             $this->assertNotNull($row->approved_by);
         }
+    }
+
+    public function test_cost_change_immediately_marks_approved_manual_price_and_rounding_does_not_hide_it(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $approved = $review->approveCurrentPrice($review->setManualPrice($this->retail(), 2490));
+        $approval = $approved->calculation_snapshot['approval'];
+        $this->cost->update(['shipping_cost_percent' => 9, 'calculated_price' => 470]);
+
+        $row = $this->retail();
+        $this->assertTrue($row->requires_review);
+        $this->assertSame('modified_approved', $row->status);
+        $this->assertSame('2490.0000', $row->final_price);
+        $this->assertSame($approval, $row->calculation_snapshot['approval']);
+        $this->assertSame('460.0000', $row->base_price);
+
+        $this->calculate();
+        $row = $this->retail();
+        $this->assertSame('470.0000', $row->base_price);
+        $this->assertSame('1990.0000', $row->calculated_price);
+        $this->assertTrue($row->requires_review);
+        $this->assertSame('2490.0000', $row->manual_price);
+        $this->assertSame($approval, $row->calculation_snapshot['approval']);
+        $review->approveCurrentPrice($row);
+        $this->calculate();
+        $this->assertFalse($this->retail()->requires_review);
+        $this->assertSame('2490.0000', $this->retail()->final_price);
+    }
+
+    public function test_unchanged_cost_values_and_snapshot_timestamps_do_not_require_review(): void
+    {
+        $this->calculate();
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->retail());
+        $this->cost->update(['calculated_price' => 460, 'candidate_count' => 2,
+            'calculation_snapshot' => ['test_source' => true, 'calculated_at' => now()->addMinute()->toISOString()]]);
+        $this->rounding->update(['name' => 'Átnevezett, változatlan szabály']);
+        $this->assertFalse($this->retail()->requires_review);
+        $this->calculate();
+        $this->assertFalse($this->retail()->requires_review);
+    }
+
+    public function test_only_same_project_product_color_retail_rows_are_invalidated_across_lists(): void
+    {
+        $colorCost = $this->cost->replicate();
+        $colorCost->color_id = Color::create(['product_id' => $this->cost->product_id, 'code' => 'BR', 'name_hu' => 'Barna', 'active' => true])->id;
+        $colorCost->save();
+        $product = $this->cost->product->replicate();
+        $product->model_code = 'UNRELATED';
+        $product->save();
+        $otherCost = $this->cost->replicate();
+        $otherCost->product_id = $product->id;
+        $otherCost->save();
+        $otherProject = $this->project->replicate();
+        $otherProject->save();
+        foreach ([$this->multiplier, $this->rounding] as $input) {
+            $copy = $input->replicate();
+            $copy->pricing_project_id = $otherProject->id;
+            $copy->save();
+        }
+        $projectCost = $this->cost->replicate();
+        $projectCost->pricing_project_id = $otherProject->id;
+        $projectCost->save();
+        PriceList::create(['code' => 'HUF-SECOND', 'name_hu' => 'Második árlista', 'type' => 'retail',
+            'currency_id' => $this->list->currency_id, 'active' => true]);
+        app(HufRetailCalculationService::class)->recalculate($this->project);
+        app(HufRetailCalculationService::class)->recalculate($otherProject, $this->list);
+
+        $this->cost->update(['calculated_price' => 470]);
+        $this->assertSame(2, PricingCalculationRow::where('price_type', 'retail')->where('requires_review', true)->count());
+        $this->assertFalse(PricingCalculationRow::where('price_type', 'retail')
+            ->where('color_id', $colorCost->color_id)->firstOrFail()->requires_review);
+        $this->assertFalse(PricingCalculationRow::where('price_type', 'retail')
+            ->where('product_id', $product->id)->firstOrFail()->requires_review);
+        $this->assertFalse(PricingCalculationRow::where('price_type', 'retail')
+            ->where('pricing_project_id', $otherProject->id)->firstOrFail()->requires_review);
+        $this->calculate();
+        $this->assertFalse($this->retail()->requires_review); // No manual price/approval: recalculation resolves it.
+    }
+
+    public function test_reviewed_and_all_approved_statuses_preserve_prices_when_inputs_change(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        foreach ([PricingCalculationRow::STATUS_REVIEWED, PricingCalculationRow::STATUS_APPROVED,
+            PricingCalculationRow::STATUS_APPROVED_ROUND_2, PricingCalculationRow::STATUS_APPROVED_ROUND_3] as $index => $status) {
+            $approved = $review->approveCurrentPrice($this->retail(), $status);
+            $this->cost->update(['calculated_price' => 470 + $index * 10]);
+            $this->assertTrue($this->retail()->requires_review);
+            $this->calculate();
+            $this->assertTrue($this->retail()->requires_review);
+            $this->assertSame($approved->status, $this->retail()->status);
+            $this->assertSame('1990.0000', $this->retail()->final_price);
+            $this->assertSame('1990.0000', $this->retail()->retained_price);
+        }
+    }
+
+    public function test_multiplier_and_rounding_changes_require_review_even_if_price_stays_the_same(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->approveCurrentPrice($this->retail());
+        $this->multiplier->update(['value' => 4.8]);
+        $this->calculate();
+        $this->assertSame('1990.0000', $this->retail()->calculated_price);
+        $this->assertTrue($this->retail()->requires_review);
+        $review->approveCurrentPrice($this->retail());
+        $this->rounding->update(['mode' => 'down']);
+        $this->calculate();
+        $this->assertSame('1990.0000', $this->retail()->calculated_price);
+        $this->assertTrue($this->retail()->requires_review);
+    }
+
+    public function test_stale_calculation_cannot_be_approved_accepted_or_cleared_by_a_manual_edit(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->approveCurrentPrice($review->setManualPrice($this->retail(), 2490));
+        $this->cost->update(['calculated_price' => 470]);
+        foreach (['approve', 'accept', 'edit'] as $operation) {
+            try {
+                match ($operation) {
+                    'approve' => $review->approveCurrentPrice($this->retail()),
+                    'accept' => $review->acceptCalculatedPrice($this->retail()),
+                    'edit' => $review->setManualPrice($this->retail(), 2590),
+                };
+                $this->fail('An obsolete calculation must not be approved or edited.');
+            } catch (DomainException $exception) {
+                $this->assertStringContainsString('újraszámítását', $exception->getMessage());
+            }
+            $this->assertTrue($this->retail()->requires_review);
+            $this->assertSame('2490.0000', $this->retail()->final_price);
+            $this->assertSame('modified_approved', $this->retail()->status);
+        }
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingHufRetailCalculations::class)
+            ->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '2590')
+            ->assertNotified('A kisker kalkuláció nem aktuális');
+        Livewire::test(PricingHufRetailCalculations::class)
+            ->callTableAction('approveRetail', $this->retail(), ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->assertNotified('A kisker kalkuláció nem aktuális');
+        Livewire::test(PricingHufRetailCalculations::class)
+            ->callTableAction('acceptCalculatedRetail', $this->retail())
+            ->assertNotified('A kisker kalkuláció nem aktuális');
+        $this->assertSame('2490.0000', $this->retail()->manual_price);
+        $this->assertTrue($this->retail()->requires_review);
+    }
+
+    public function test_changed_shipping_input_is_reviewed_even_with_a_fixed_manual_cost(): void
+    {
+        $this->cost->update(['manual_price' => 460, 'shipping_cost_percent' => 8]);
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->approveCurrentPrice($review->setManualPrice($this->retail(), 2490));
+        $this->cost->update(['shipping_cost_percent' => 9, 'calculated_price' => 470]);
+        $this->assertSame('460.0000', $this->cost->fresh()->final_price);
+        $this->assertTrue($this->retail()->requires_review);
+        $this->calculate();
+        $this->assertTrue($this->retail()->requires_review);
+        $this->assertSame('1990.0000', $this->retail()->calculated_price);
+        $this->assertSame('2490.0000', $this->retail()->final_price);
+        $this->assertSame('8.0000', $this->retail()->calculation_snapshot['approval']['source_cost_inputs']['shipping_cost_percent']);
+        $review->approveCurrentPrice($this->retail());
+        $this->calculate();
+        $this->assertFalse($this->retail()->requires_review);
+        $this->assertSame('9.0000', $this->retail()->calculation_snapshot['approval']['source_cost_inputs']['shipping_cost_percent']);
+    }
+
+    public function test_prior_silent_recalculation_is_detected_using_the_approval_baseline(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $row = $review->approveCurrentPrice($review->setManualPrice($this->retail(), 2490));
+        $approval = $row->calculation_snapshot['approval'];
+        unset($approval['source_cost_inputs']); // Snapshot saved by the older release.
+        $this->cost->updateQuietly(['calculated_price' => 470, 'final_price' => 470]);
+        $calculation = app(HufRetailCalculator::class)->calculate($this->project, $this->cost->fresh(), $this->list);
+        $row->fill(collect($calculation)->except('snapshot')->all());
+        $row->calculation_snapshot = $calculation['snapshot'] + ['approval' => $approval];
+        $row->saveQuietly();
+        $this->assertFalse($this->retail()->requires_review);
+
+        $this->calculate();
+        $this->assertTrue($this->retail()->requires_review);
+        $this->assertSame('2490.0000', $this->retail()->final_price);
+        $this->assertSame($approval, $this->retail()->calculation_snapshot['approval']);
+    }
+
+    public function test_cost_change_and_dependency_flags_roll_back_together(): void
+    {
+        $this->calculate();
+        try {
+            DB::transaction(function (): void {
+                $this->cost->update(['calculated_price' => 470]);
+                $this->assertTrue($this->retail()->requires_review);
+                throw new \RuntimeException('Abort test transaction');
+            });
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Abort test transaction', $exception->getMessage());
+        }
+        $this->assertSame('460.0000', $this->cost->fresh()->final_price);
+        $this->assertFalse($this->retail()->requires_review);
+    }
+
+    public function test_real_shipping_parameter_edit_and_cost_recalculation_mark_existing_manual_approval(): void
+    {
+        $supplier = Supplier::create(['erp_partner_code' => 'SUP-TEST', 'name' => 'Teszt beszállító', 'active' => true]);
+        ProductPurchasePrice::create(['product_id' => $this->cost->product_id, 'supplier_id' => $supplier->supplier_id,
+            'currency_id' => $this->cost->currency_id, 'purchase_price' => 460, 'active' => true]);
+        app(CostCalculationService::class)->recalculate($this->project);
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->approveCurrentPrice($review->setManualPrice($this->retail(), 2490));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingCostCalculations::class)
+            ->call('startInlineCostPercentParameterAdjustment', $this->cost->id, PricingParameter::TYPE_SHIPPING_COST_PERCENT, 9)
+            ->set('pendingParameterScope', PricingParameter::SCOPE_PRODUCT)
+            ->call('confirmPendingParameterAdjustment')
+            ->assertHasNoErrors();
+
+        $this->assertSame('9.0000', $this->cost->fresh()->shipping_cost_percent);
+        $this->assertSame('501.4000', $this->cost->fresh()->final_price);
+        $this->assertTrue($this->retail()->requires_review);
+        $this->assertSame('2490.0000', $this->retail()->final_price);
+        $this->assertSame('modified_approved', $this->retail()->status);
+        $this->calculate();
+        $this->assertSame('1990.0000', $this->retail()->calculated_price);
+        $this->assertTrue($this->retail()->requires_review);
+    }
+
+    public function test_actual_multiplier_includes_rounding_without_a_manual_override(): void
+    {
+        $this->calculate();
+        $row = $this->retail();
+        $this->assertNull($row->manual_price);
+        $this->assertEqualsWithDelta(1990 / 460, $row->effective_multiplier, 0.0000001);
+        $this->assertSame('4.700000', $row->multiplier);
+        $this->assertEqualsWithDelta($row->effective_multiplier, (float) PricingCalculationRow::whereKey($row->id)
+            ->selectRaw(PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL.' AS sql_multiplier')->firstOrFail()->sql_multiplier, 0.0000001);
+    }
+
+    public function test_negotiation_target_is_capped_and_rounded_down_in_purchase_currency(): void
+    {
+        $row = new PricingCalculationRow(['base_price' => 100, 'multiplier' => 2,
+            'purchase_price' => 10, 'calculated_price' => 199]);
+        $this->assertSame('10.0000', $row->target_purchase_price);
+        $this->assertFalse($row->needsPurchasePriceNegotiation());
+        $row->manual_price = 150;
+        $this->assertSame('7.5000', $row->target_purchase_price);
+        $this->assertTrue($row->needsPurchasePriceNegotiation());
+        $row->manual_price = 250;
+        $this->assertSame('10.0000', $row->target_purchase_price);
+        $this->assertFalse($row->needsPurchasePriceNegotiation());
+        $row->manual_price = 199;
+        $this->assertSame('9.9500', $row->target_purchase_price); // Target is the configured multiplier, not the rounded old price.
+        $row->manual_price = null;
+        $row->retained_price = 150;
+        $this->assertSame('7.5000', $row->target_purchase_price);
+        $row->retained_price = null;
+        $this->assertSame('10.0000', $row->target_purchase_price);
+
+        $row->base_price = 460;
+        $row->multiplier = 4.7;
+        $row->purchase_price = 8.8;
+        $row->manual_price = 1500;
+        $this->assertSame('6.1054', $row->target_purchase_price);
+        $this->assertGreaterThanOrEqual(4.7, 1500 / (460 * (float) $row->target_purchase_price / 8.8));
+        $row->base_price = 0;
+        $this->assertNull($row->target_purchase_price);
+        $row->base_price = 460;
+        $row->multiplier = null;
+        $this->assertNull($row->target_purchase_price);
+        $row->multiplier = 4.7;
+        $row->purchase_price = null;
+        $this->assertNull($row->target_purchase_price);
+    }
+
+    public function test_supplier_columns_and_purchase_target_support_filter_sort_and_export(): void
+    {
+        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollar', 'name_hu' => 'Dollár', 'active' => true]);
+        $supplier = Supplier::create(['erp_partner_code' => 'SUP-PRICE', 'name' => 'Test Supplier Name', 'active' => true]);
+        $this->cost->update(['purchase_price' => 8.8, 'purchase_currency_id' => $usd->id, 'supplier_id' => $supplier->supplier_id]);
+        $this->calculate();
+        app(RetailPriceReviewService::class)->setManualPrice($this->retail(), 1500);
+        $lower = $this->retail();
+        $higher = $lower->replicate();
+        $higher->color_id = Color::create(['product_id' => $this->cost->product_id, 'code' => 'BR', 'name_hu' => 'Barna', 'active' => true])->id;
+        $higher->manual_price = 2490;
+        $higher->save();
+        $this->assertSame('6.1054', $lower->target_purchase_price);
+        $this->assertEqualsWithDelta(6.1054, (float) PricingCalculationRow::whereKey($lower->id)
+            ->selectRaw(PricingCalculationRow::targetPurchasePriceSql().' AS sql_target')->firstOrFail()->sql_target, 0.0000001);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $columns = $page->instance()->getDefaultTableColumnState();
+        foreach ($columns as &$column) {
+            if (in_array($column['name'], ['supplier.erp_partner_code', 'supplier.name', 'purchaseCurrency.code'], true)) {
+                $column['isToggled'] = true;
+            }
+        }
+        unset($column);
+        $page->call('applyTableColumnManager', $columns)
+            ->assertSee('SUP-PRICE')->assertSee('Test Supplier Name')->assertSee('6,1054 USD');
+        $page->sortTable('target_purchase_price', 'asc')->assertCanSeeTableRecords([$lower, $higher], inOrder: true);
+        $page->sortTable('target_purchase_price', 'desc')->assertCanSeeTableRecords([$higher, $lower], inOrder: true);
+        $page->searchTableColumns(['target_purchase_price' => '6,1054'])
+            ->assertCanSeeTableRecords([$lower])->assertCanNotSeeTableRecords([$higher]);
+        $page->searchTableColumns(['supplier.erp_partner_code' => 'SUP-PRICE', 'supplier.name' => 'Test Supplier'])
+            ->assertCanSeeTableRecords([$lower, $higher]);
+        $target = $page->instance()->getTable()->getColumn('target_purchase_price')->record($lower);
+        $this->assertSame('danger', $target->getColor($lower->target_purchase_price));
+        $target->record($higher);
+        $this->assertNull($target->getColor($higher->target_purchase_price));
+        $table = $page->instance()->getTable();
+        $export = new AdminTableExport(PricingCalculationRow::query(), [
+            $table->getColumn('supplier.erp_partner_code'), $table->getColumn('supplier.name'), $table->getColumn('target_purchase_price'),
+        ]);
+        $this->assertSame(['SUP-PRICE', 'Test Supplier Name', '6.1054'], $export->map($lower));
+    }
+
+    public function test_average_multiplier_is_arithmetic_and_follows_filters_and_search(): void
+    {
+        $this->calculate();
+        $first = $this->retail();
+        $first->update(['base_price' => 100, 'calculated_price' => 200]);
+        $product = $this->cost->product->replicate();
+        $product->model_code = 'SECOND-MODEL';
+        $product->save();
+        $second = $first->replicate();
+        $second->product_id = $product->id;
+        $second->base_price = 300;
+        $second->calculated_price = 1200;
+        $second->save();
+        $otherList = PriceList::create(['code' => 'OTHER-AVG', 'name_hu' => 'Másik átlag árlista', 'type' => 'retail',
+            'currency_id' => $this->list->currency_id, 'active' => true]);
+        $third = $first->replicate();
+        $third->price_list_id = $otherList->id;
+        $third->calculated_price = 1000;
+        $third->save();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $this->assertEqualsWithDelta(16 / 3, $page->instance()->averageRetailMultiplier, 0.0000001);
+        $page->filterTable('price_list_id', $this->list->id);
+        $this->assertSame(3.0, $page->instance()->averageRetailMultiplier);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 3"', false);
+        $this->assertNotSame(3.5, $page->instance()->averageRetailMultiplier); // Sum(price) / sum(cost) would be weighted.
+        $page->searchTableColumns(['product.model_code' => 'SECOND-MODEL']);
+        $this->assertSame(4.0, $page->instance()->averageRetailMultiplier);
+        $page->searchTableColumns(['product.model_code' => 'NO-SUCH-PRODUCT']);
+        $this->assertNull($page->instance()->averageRetailMultiplier);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: -"', false);
+    }
+
+    public function test_average_includes_rows_outside_the_current_page_and_skips_invalid_costs(): void
+    {
+        $this->calculate();
+        $first = $this->retail();
+        $first->update(['base_price' => 100, 'calculated_price' => 200]);
+        for ($index = 1; $index <= 50; $index++) {
+            $copy = $first->replicate();
+            $copy->color_id = Color::create(['product_id' => $this->cost->product_id, 'code' => 'C'.$index, 'name_hu' => 'Szín '.$index, 'active' => true])->id;
+            $copy->calculated_price = $index === 50 ? 400 : 200;
+            $copy->save();
+        }
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class)->set('tableRecordsPerPage', 50);
+        $this->assertSame(50, $page->instance()->getTableRecords()->count());
+        $this->assertEqualsWithDelta(104 / 51, $page->instance()->averageRetailMultiplier, 0.0000001);
+        $first->update(['base_price' => 0]);
+        $page->call('$refresh');
+        $this->assertEqualsWithDelta(102 / 50, $page->instance()->averageRetailMultiplier, 0.0000001);
     }
 }
