@@ -103,6 +103,52 @@
 
         [data-pricing-resizable-columns] .fi-ta-table th {
             position: relative;
+            padding-block: 0.25rem;
+            line-height: 1.25rem;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-table > tbody > tr > .fi-ta-cell {
+            padding-block: 0.125rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text-input {
+            padding-block: 0;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-input,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-btn,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-badge {
+            padding-block: 0;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-ta-text-item,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-input,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-link,
+        [data-pricing-resizable-columns] .fi-ta-cell .fi-btn {
+            line-height: 1.25rem;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-cell-shipping-cost-percent .fi-ta-text-input,
+        [data-pricing-resizable-columns] .fi-ta-cell-customs-percent .fi-ta-text-input {
+            min-width: 0;
+            padding-inline: 0.5rem;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-header-cell-shipping-cost-percent,
+        [data-pricing-resizable-columns] .fi-ta-header-cell-customs-percent,
+        [data-pricing-resizable-columns] .fi-ta-individual-search-cell-shipping-cost-percent,
+        [data-pricing-resizable-columns] .fi-ta-individual-search-cell-customs-percent {
+            min-width: 0;
+            padding-inline: 0.5rem;
+        }
+
+        [data-pricing-resizable-columns] [data-pricing-column-width].fi-ta-individual-search-cell,
+        [data-pricing-resizable-columns] [data-pricing-column-width] .fi-ta-search-field,
+        [data-pricing-resizable-columns] [data-pricing-column-width] .fi-ta-text-input {
+            min-width: 0;
         }
 
         [data-pricing-resizable-columns] .fi-ta-cell-shipping-cost-percent .fi-input-wrp,
@@ -111,7 +157,16 @@
             min-width: 5.25rem;
         }
 
+        [data-pricing-resizable-columns] .fi-ta-cell-shipping-cost-percent .fi-input-wrp-suffix,
+        [data-pricing-resizable-columns] .fi-ta-cell-customs-percent .fi-input-wrp-suffix {
+            flex: 0 0 auto;
+            padding-inline: 0.25rem 0.5rem;
+        }
+
         [data-pricing-resizable-columns] .pricing-percent-input {
+            min-width: 0;
+            padding-inline: 0.5rem 0.25rem;
+            font-variant-numeric: tabular-nums;
             text-align: right;
         }
 
@@ -352,8 +407,13 @@
                 return label || `column-${index}`;
             }
 
-            function applyWidth(table, columnIndex, width) {
+            function applyWidth(table, columnIndex, width, notify = true) {
                 table.querySelectorAll('tr').forEach((row) => {
+                    // Group headings and empty-state rows span several columns.
+                    if (Array.from(row.children).some((cell) => cell.colSpan > 1)) {
+                        return;
+                    }
+
                     const cell = row.children[columnIndex];
 
                     if (! cell) {
@@ -362,20 +422,50 @@
 
                     cell.style.width = `${width}px`;
                     cell.style.minWidth = `${width}px`;
+                    cell.style.maxWidth = `${width}px`;
                     cell.dataset.pricingColumnWidth = `${width}`;
                 });
 
-                window.dispatchEvent(new Event('resize'));
+                const headers = Array.from(table.querySelectorAll('thead th'));
+                const totalWidth = headers.reduce(
+                    (total, header) => total + Number(header.dataset.pricingColumnWidth || 0),
+                    0,
+                );
+
+                // An explicit total and fixed layout prevent intrinsic input widths
+                // or spare viewport space from expanding a resized column again.
+                table.style.tableLayout = 'fixed';
+                table.style.minWidth = '0';
+                table.style.width = `${totalWidth}px`;
+                if (notify) {
+                    window.dispatchEvent(new Event('resize'));
+                }
             }
 
-            function clearWidths(table) {
+            function clearWidths(table, forgetWidths = true) {
                 table.querySelectorAll('th, td').forEach((cell) => {
                     cell.style.width = '';
                     cell.style.minWidth = '';
-                    delete cell.dataset.pricingColumnWidth;
+                    cell.style.maxWidth = '';
+
+                    if (forgetWidths) {
+                        delete cell.dataset.pricingColumnWidth;
+                    }
                 });
 
-                window.dispatchEvent(new Event('resize'));
+                table.style.tableLayout = '';
+                table.style.width = '';
+                table.style.minWidth = '';
+            }
+
+            function minimumColumnWidth(header) {
+                const key = columnKey(header, 0);
+
+                if (['shipping-cost-percent', 'customs-percent'].includes(key)) {
+                    return Math.ceil(parseFloat(getComputedStyle(document.documentElement).fontSize) * 6.25);
+                }
+
+                return minimumWidth;
             }
 
             function removeExistingResizers(table) {
@@ -389,6 +479,25 @@
                 const headers = Array.from(table.querySelectorAll('thead th'));
 
                 removeExistingResizers(table);
+                clearWidths(table, false);
+
+                // Measure new columns with the natural layout, before fixing every
+                // column. Keep existing widths across Livewire and column reorders.
+                const initialWidths = headers.map((header, index) => {
+                    const key = columnKey(header, index);
+                    const minWidth = minimumColumnWidth(header);
+                    const isPercent = ['shipping-cost-percent', 'customs-percent'].includes(key);
+
+                    return Math.max(
+                        header.classList.contains('fi-ta-header-cell') ? minWidth : 0,
+                        Number(widths[key] || header.dataset.pricingColumnWidth)
+                            || (isPercent ? minWidth : Math.ceil(header.getBoundingClientRect().width)),
+                    );
+                });
+
+                headers.forEach((header, index) => {
+                    header.dataset.pricingColumnWidth = `${initialWidths[index]}`;
+                });
 
                 headers.forEach((header, index) => {
                     const key = columnKey(header, index);
@@ -397,9 +506,7 @@
                         return;
                     }
 
-                    if (widths[key]) {
-                        applyWidth(table, index, widths[key]);
-                    }
+                    applyWidth(table, index, initialWidths[index], false);
 
                     if (! header.classList.contains('fi-ta-header-cell')) {
                         return;
@@ -424,7 +531,7 @@
 
                         const onMove = (moveEvent) => {
                             const nextWidth = Math.max(
-                                minimumWidth,
+                                minimumColumnWidth(header),
                                 Math.round(startWidth + moveEvent.clientX - startX),
                             );
 
@@ -452,6 +559,8 @@
                         resizer.addEventListener('pointercancel', onUp);
                     });
                 });
+
+                window.dispatchEvent(new Event('resize'));
             }
 
             function scheduleInitialisePricingColumnResizing(delay = 50) {
@@ -488,7 +597,10 @@
 
                             document
                                 .querySelectorAll('[data-pricing-resizable-columns] .fi-ta-table')
-                                .forEach(clearWidths);
+                                .forEach((table) => {
+                                    clearWidths(table);
+                                    initialiseTable(table);
+                                });
                         });
                     });
 
