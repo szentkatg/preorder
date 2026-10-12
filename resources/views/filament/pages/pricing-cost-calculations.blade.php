@@ -105,6 +105,22 @@
             position: relative;
         }
 
+        [data-pricing-resizable-columns] .fi-ta-cell-shipping-cost-percent .fi-input-wrp,
+        [data-pricing-resizable-columns] .fi-ta-cell-customs-percent .fi-input-wrp {
+            width: 5.25rem;
+            min-width: 5.25rem;
+        }
+
+        [data-pricing-resizable-columns] .pricing-percent-input {
+            text-align: right;
+        }
+
+        [data-pricing-resizable-columns] .pricing-percent-input::-webkit-outer-spin-button,
+        [data-pricing-resizable-columns] .pricing-percent-input::-webkit-inner-spin-button {
+            margin: 0;
+            appearance: none;
+        }
+
         [data-pricing-column-resizer] {
             position: absolute;
             top: 0;

@@ -53,10 +53,11 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('shipping_cost_percent')
                     ->label('Száll. %')
-                    ->type('number')
+                    ->type('text')
                     ->inputMode('decimal')
-                    ->step('0.01')
                     ->suffix('%', true)
+                    ->width('5.5rem')
+                    ->extraInputAttributes(['class' => 'pricing-percent-input'])
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
@@ -77,10 +78,11 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('customs_percent')
                     ->label('Vám %')
-                    ->type('number')
+                    ->type('text')
                     ->inputMode('decimal')
-                    ->step('0.01')
                     ->suffix('%', true)
+                    ->width('5.5rem')
+                    ->extraInputAttributes(['class' => 'pricing-percent-input'])
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
