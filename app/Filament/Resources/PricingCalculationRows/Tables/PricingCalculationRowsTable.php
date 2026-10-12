@@ -52,6 +52,10 @@ class PricingCalculationRowsTable
                     ->numeric(decimalPlaces: 4)
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('shipping_cost_percent')
+                    ->getStateUsing(
+                        fn (PricingCalculationRow $record): ?string =>
+                            self::formatPercentInput($record->shipping_cost_percent)
+                    )
                     ->label('Száll. %')
                     ->type('text')
                     ->inputMode('decimal')
@@ -73,10 +77,14 @@ class PricingCalculationRowsTable
                             );
                         }
 
-                        return $state;
+                        return self::formatPercentInput($state);
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextInputColumn::make('customs_percent')
+                    ->getStateUsing(
+                        fn (PricingCalculationRow $record): ?string =>
+                            self::formatPercentInput($record->customs_percent)
+                    )
                     ->label('Vám %')
                     ->type('text')
                     ->inputMode('decimal')
@@ -98,7 +106,7 @@ class PricingCalculationRowsTable
                             );
                         }
 
-                        return $state;
+                        return self::formatPercentInput($state);
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('candidate_count')
@@ -196,6 +204,19 @@ class PricingCalculationRowsTable
             ->toolbarActions([
                 BulkActionGroup::make([DeleteBulkAction::make()]),
             ]);
+    }
+
+    private static function formatPercentInput(mixed $state): ?string
+    {
+        if ($state === null) {
+            return null;
+        }
+
+        $value = (string) $state;
+
+        return str_contains($value, '.')
+            ? rtrim(rtrim($value, '0'), '.')
+            : $value;
     }
 
     private static function parameterAction(
