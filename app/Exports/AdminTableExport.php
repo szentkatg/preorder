@@ -5,6 +5,7 @@ namespace App\Exports;
 use BackedEnum;
 use DateTimeInterface;
 use Filament\Tables\Columns\Column;
+use Filament\Tables\Columns\TextColumn;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -14,12 +15,13 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use Stringable;
 
-class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAutoSize, WithCustomValueBinder, WithHeadings, WithMapping
+class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAutoSize, WithCustomValueBinder, WithHeadings, WithMapping, WithStrictNullComparison
 {
     /**
      * @param  array<Column>  $columns
@@ -50,7 +52,16 @@ class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAu
                 $column->record($record);
                 $column->clearCachedState();
 
-                return $this->exportValue($column->getState());
+                $value = $column->getState();
+
+                // Decimal casts return strings. Export them as actual numbers so
+                // Excel can use the viewer's system separators and calculations.
+                // Do not infer numeric types from the value alone: codes are text.
+                if (is_string($value) && is_numeric($value) && $this->isNumericColumn($column, $record)) {
+                    return (float) $value;
+                }
+
+                return $this->exportValue($value);
             },
             $this->columns,
         );
@@ -65,6 +76,22 @@ class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAu
         }
 
         return parent::bindValue($cell, $value);
+    }
+
+    private function isNumericColumn(Column $column, Model $record): bool
+    {
+        if (($column instanceof TextColumn) && ($column->isNumeric() || $column->isMoney())) {
+            return true;
+        }
+
+        $path = explode('.', $column->getName());
+        $attribute = array_pop($path);
+        $owner = $path === [] ? $record : data_get($record, implode('.', $path));
+
+        return ($owner instanceof Model) && $owner->hasCast(
+            $attribute,
+            ['decimal', 'float', 'double', 'real', 'integer', 'int'],
+        );
     }
 
     private function exportValue(mixed $value): mixed

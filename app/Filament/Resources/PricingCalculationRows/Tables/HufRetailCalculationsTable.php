@@ -57,7 +57,7 @@ class HufRetailCalculationsTable
                         (float) $record->base_price > 0 ? (float) $record->calculated_price / (float) $record->base_price : null,
                     ).'. A kijelzett szorzó minden esetben a végleges ár / bekerülési érték. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
             TextColumn::make('calculation_multiplier')->label('Kalkulációs szorzó')
-                ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier)
+                ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier === null ? null : (float) $record->multiplier)
                 ->formatStateUsing(fn ($state) => self::formatMultiplier($state))
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('unrounded_price')->label('Kerekítés előtti HUF')->formatStateUsing(fn ($state) => self::formatPrice($state)),
@@ -91,6 +91,7 @@ class HufRetailCalculationsTable
                 ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->color(fn (PricingCalculationRow $record) => self::differenceColor($record)),
             TextColumn::make('target_purchase_price')->label('Cél besz. ár')
+                ->getStateUsing(fn (PricingCalculationRow $record) => $record->target_purchase_price === null ? null : (float) $record->target_purchase_price)
                 ->placeholder('-')
                 ->formatStateUsing(fn ($state, PricingCalculationRow $record) => $state === null
                     ? '-' : self::formatPrice($state).' '.($record->purchaseCurrency?->code ?? ''))

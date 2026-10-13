@@ -312,7 +312,7 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame(['Kisker szorzó'], $export->headings());
         $this->assertEqualsWithDelta(2490 / 460, $export->map($this->retail())[0], 0.0000001);
         $original = $page->instance()->getTable()->getColumn('calculation_multiplier');
-        $this->assertSame('4.700000', (new AdminTableExport(PricingCalculationRow::query(), [$original]))->map($this->retail())[0]);
+        $this->assertSame(4.7, (new AdminTableExport(PricingCalculationRow::query(), [$original]))->map($this->retail())[0]);
     }
 
     public function test_retained_price_uses_current_cost_for_its_multiplier_and_accepting_calculation_resets_it(): void
@@ -728,7 +728,7 @@ class HufRetailCalculationTest extends TestCase
         $export = new AdminTableExport(PricingCalculationRow::query(), [
             $table->getColumn('supplier.erp_partner_code'), $table->getColumn('supplier.name'), $table->getColumn('target_purchase_price'),
         ]);
-        $this->assertSame(['SUP-PRICE', 'Test Supplier Name', '6.1054'], $export->map($lower));
+        $this->assertSame(['SUP-PRICE', 'Test Supplier Name', 6.1054], $export->map($lower));
     }
 
     public function test_average_multiplier_is_arithmetic_and_follows_filters_and_search(): void

@@ -7,6 +7,47 @@ HUF pénznemű kisker árlistára futtatható. Az árlistatörzs szezonfüggetle
 a kalkuláció szezonját az árprojekt határozza meg. Ugyanaz az árlista
 több szezonban is használható, a publikált árak szezonja a tételekhez tartozik.
 
+## Excel-export és tizedeselválasztó
+
+A közös admin-táblázat export a numerikus oszlopokat és a modell numerikus
+castjait valódi Excel-számcellaként menti, a kapcsolódó rekordok mezőit is.
+A kisker kalkuláció számított cél-beszerzési ára és kalkulációs szorzója is
+számként kerül a fájlba. A szöveges azonosítók, kezdő nullák, üres értékek
+és nulla számértékek megmaradnak; a százalékok egysége változatlan (12 = 12%).
+Nem cserélünk pontot vesszőre szövegekben vagy az XLSX belső számformátumában.
+
+A megjelenítés az Excel beállítását követi. Windows régiós beállításához az
+Excel Fájl → Beállítások → Speciális → Rendszerelválasztók használata opciója
+legyen bekapcsolva. Magyar tizedeselválasztóval például 8,8 jelenik meg,
+pontot használó környezetben 8.8, ugyanabból a számcellából. A szerver nem
+olvassa ki a felhasználó Windows-beállítását, és nem is szükséges ezt átadni.
+A korábban letöltött, szöveges cellákat tartalmazó fájlokat újra kell exportálni.
+
+Ellenőrzés: a mentett XLSX visszaolvasása, numerikus cellatípusok, összegezhetőség,
+negatív érték, nulla/üres érték és kódszöveg megőrzése. Összesen 49 kapcsolódó
+teszt, 391 assertion sikeres. Windows Excelben a tényleges megjelenítés helyi
+ellenőrzést igényel; a tesztek az XLSX-ben tárolt típusokat és értékeket vizsgálják.
+
+Ehhez nincs új migráció, Composer install, npm build, kézi feltöltés vagy
+szerverkonfiguráció-módosítás. NAS-frissítés csak külön kérésre történik.
+
+Git/NAS a `feature/pricing-module` worktree-ben:
+
+```powershell
+git add -- app/Exports/AdminTableExport.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php tests/Feature/Admin/AdminTableExportTest.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Export table decimals as native Excel numbers"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Előkészítés
 
 1. Legyenek elmentett bekerülési értékek az árprojektben.
