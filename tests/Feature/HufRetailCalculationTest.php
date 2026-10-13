@@ -24,12 +24,14 @@ use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\HufRetailCalculationService;
 use App\Services\Pricing\HufRetailCalculator;
 use App\Services\Pricing\PricingRoundingService;
+use App\Services\Pricing\RetailCalculationDependencyService;
 use App\Services\Pricing\RetailPriceReviewService;
 use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use PDO;
@@ -283,6 +285,23 @@ class HufRetailCalculationTest extends TestCase
         $this->assertStringContainsString('Kerekítés előtti bruttó kisker ár', $html);
         $this->assertStringContainsString('2 162,0000', $html);
         $this->assertStringContainsString('1 990,0000', $html);
+    }
+
+    public function test_review_column_is_red_when_review_is_required_and_green_otherwise(): void
+    {
+        $this->calculate();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful();
+        $column = $page->instance()->getTable()->getColumn('requires_review')->record($this->retail());
+        $this->assertFalse($column->getState());
+        $this->assertSame('success', $column->getColor($column->getState()));
+
+        $row = $this->retail();
+        $row->update(['requires_review' => true]);
+        $column->record($row)->clearCachedState();
+        $this->assertTrue($column->getState());
+        $this->assertSame('danger', $column->getColor($column->getState()));
+        $this->assertSame('1990.0000', $row->fresh()->final_price);
     }
 
     public function test_manual_price_refreshes_multiplier_and_colored_direction_without_changing_the_formula(): void
@@ -806,5 +825,223 @@ class HufRetailCalculationTest extends TestCase
         $first->update(['base_price' => 0]);
         $page->call('$refresh');
         $this->assertEqualsWithDelta(102 / 50, $page->instance()->averageRetailMultiplier, 0.0000001);
+    }
+
+    public function test_bulk_approval_preserves_manual_prices_and_only_changes_selected_rows(): void
+    {
+        $this->addColorCost('BR');
+        $this->addColorCost('BK');
+        $this->calculate();
+        $rows = PricingCalculationRow::where('price_type', 'retail')->orderBy('id')->get();
+        app(RetailPriceReviewService::class)->setManualPrice($rows[0], 1490);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $this->assertTrue($page->instance()->getTable()->isSelectionEnabled());
+        $page->callTableBulkAction('approveRetailBulk', [$rows[0], $rows[1]], [
+            'approval_status' => PricingCalculationRow::STATUS_APPROVED,
+        ])->assertHasNoErrors()->assertNotified('Tömeges jóváhagyás befejezve')
+            ->assertDispatched('deselectAllTableRecords');
+        $this->assertSame(PricingCalculationRow::STATUS_MODIFIED_APPROVED, $rows[0]->fresh()->status);
+        $this->assertSame('1490.0000', $rows[0]->fresh()->manual_price);
+        $this->assertSame('1490.0000', $rows[0]->fresh()->final_price);
+        $this->assertSame(PricingCalculationRow::STATUS_APPROVED, $rows[1]->fresh()->status);
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $rows[2]->fresh()->status);
+        foreach ([$rows[0], $rows[1]] as $row) {
+            $this->assertSame(auth()->id(), $row->fresh()->approved_by);
+            $this->assertSame(auth()->id(), $row->fresh()->calculation_snapshot['approval']['user_id']);
+        }
+        $this->assertSame(0, DB::table('price_list_items')->count());
+    }
+
+    public function test_bulk_approval_supports_every_existing_review_level_and_deduplicates_rows(): void
+    {
+        $this->calculate();
+        $service = app(RetailPriceReviewService::class);
+        foreach ([PricingCalculationRow::STATUS_REVIEWED, PricingCalculationRow::STATUS_APPROVED,
+            PricingCalculationRow::STATUS_APPROVED_ROUND_2, PricingCalculationRow::STATUS_APPROVED_ROUND_3] as $status) {
+            $result = $service->approveCurrentPrices(collect([$this->retail(), $this->retail()]), $status);
+            $this->assertSame(['approved' => 1, 'skipped' => 0, 'reasons' => []], $result);
+            $this->assertSame($status, $this->retail()->status);
+            $this->assertSame($status, $this->retail()->calculation_snapshot['approval']['status']);
+            $this->assertSame($status === PricingCalculationRow::STATUS_REVIEWED ? null : auth()->id(), $this->retail()->approved_by);
+        }
+    }
+
+    public function test_bulk_approval_skips_stale_calculations_and_reports_the_reason(): void
+    {
+        $colorCost = $this->addColorCost('BR');
+        $this->calculate();
+        $stale = $this->retail();
+        app(RetailPriceReviewService::class)->setManualPrice($stale, 2490);
+        $this->cost->update(['calculated_price' => 470]);
+        $current = PricingCalculationRow::where('price_type', 'retail')->where('color_id', $colorCost->color_id)->firstOrFail();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingHufRetailCalculations::class)
+            ->callTableBulkAction('approveRetailBulk', [$stale, $current], ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->assertHasNoErrors();
+        $notification = collect(session('filament.claimed_notifications'))->last();
+        $this->assertSame('Tömeges jóváhagyás befejezve', $notification['title']);
+        $this->assertSame('warning', $notification['status']);
+        $this->assertStringContainsString('Sikeres: 1 sor. Kihagyott: 1 sor.', $notification['body']);
+        $this->assertStringContainsString('újraszámítását', $notification['body']);
+        $this->assertSame('2490.0000', $stale->fresh()->final_price);
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $stale->fresh()->status);
+        $this->assertTrue($stale->fresh()->requires_review);
+        $this->assertSame(PricingCalculationRow::STATUS_APPROVED, $current->fresh()->status);
+    }
+
+    public function test_bulk_approval_is_hidden_and_server_side_denied_for_read_only_users(): void
+    {
+        $this->calculate();
+        $reader = User::factory()->create();
+        $reader->givePermissionTo(array_map(fn ($name) => Permission::findOrCreate($name, 'web'), [
+            'View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow',
+        ]));
+        $this->actingAs($reader);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class)->assertTableBulkActionHidden('approveRetailBulk');
+        $this->assertFalse($page->instance()->getTable()->isSelectionEnabled());
+        $page->mountTableBulkAction('approveRetailBulk', [$this->retail()])->assertTableBulkActionNotMounted('approveRetailBulk');
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $this->retail()->status);
+        $this->expectException(AuthorizationException::class);
+        app(RetailPriceReviewService::class)->approveCurrentPrices(collect([$this->retail()]));
+    }
+
+    public function test_bulk_approval_rechecks_each_rows_permission_and_project_state(): void
+    {
+        $colorCost = $this->addColorCost('BR');
+        $this->calculate();
+        $denied = $this->retail();
+        $allowed = PricingCalculationRow::where('price_type', 'retail')->where('color_id', $colorCost->color_id)->firstOrFail();
+        $editor = User::factory()->create();
+        $editor->givePermissionTo(Permission::findOrCreate('Update:PricingCalculationRow', 'web'));
+        $this->actingAs($editor);
+        Gate::before(fn (User $user, string $ability, array $arguments) => $ability === 'update'
+            && ($arguments[0] ?? null) instanceof PricingCalculationRow && $arguments[0]->id === $denied->id ? false : null);
+        $service = app(RetailPriceReviewService::class);
+        $result = $service->approveCurrentPrices(collect([$denied, $allowed, $this->cost]));
+        $this->assertSame(1, $result['approved']);
+        $this->assertSame(2, $result['skipped']);
+        $this->assertSame(1, $result['reasons']['Nincs módosítási jogosultság.']);
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $denied->fresh()->status);
+        $this->project->update(['status' => PricingProject::STATUS_CLOSED]);
+        $result = $service->approveCurrentPrices(collect([$allowed]), PricingCalculationRow::STATUS_APPROVED_ROUND_2);
+        $this->assertSame(0, $result['approved']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame(PricingCalculationRow::STATUS_APPROVED, $allowed->fresh()->status);
+    }
+
+    public function test_closed_or_inactive_project_rows_cannot_be_selected(): void
+    {
+        $this->calculate();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $this->assertTrue($page->instance()->getTable()->isRecordSelectable($this->retail()));
+        $this->project->update(['status' => PricingProject::STATUS_CLOSED]);
+        $this->assertFalse($page->instance()->getTable()->isRecordSelectable($this->retail()));
+        $this->project->update(['status' => PricingProject::STATUS_ACTIVE, 'active' => false]);
+        $this->assertFalse($page->instance()->getTable()->isRecordSelectable($this->retail()));
+    }
+
+    public function test_bulk_select_all_uses_all_filtered_pages_and_respects_deselected_rows(): void
+    {
+        for ($index = 1; $index <= 51; $index++) {
+            $this->addColorCost('C'.$index);
+        }
+        $this->calculate();
+        $excluded = $this->retail();
+        $otherList = PriceList::create(['code' => 'OTHER-BULK', 'name_hu' => 'Másik árlista', 'type' => 'retail',
+            'currency_id' => $this->list->currency_id, 'active' => true]);
+        app(HufRetailCalculationService::class)->recalculate($this->project, $otherList);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class)->set('tableRecordsPerPage', 50)
+            ->filterTable('price_list_id', $this->list->id);
+        $this->assertSame(50, $page->instance()->getTableRecords()->count());
+        $this->assertSame(52, $page->instance()->getAllSelectableTableRecordsCount());
+        $page->set('isTrackingDeselectedTableRecords', true)
+            ->set('deselectedTableRecords', [(string) $excluded->id])
+            ->callTableBulkAction('approveRetailBulk', [], ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->assertNotified('Tömeges jóváhagyás befejezve');
+        $this->assertSame(51, PricingCalculationRow::where('price_type', 'retail')->where('status', PricingCalculationRow::STATUS_APPROVED)->count());
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $excluded->fresh()->status);
+        $this->assertSame(0, PricingCalculationRow::where('price_list_id', $otherList->id)->whereNot('status', PricingCalculationRow::STATUS_CALCULATED)->count());
+    }
+
+    public function test_bulk_query_cannot_approve_forged_cost_or_non_huf_row_ids(): void
+    {
+        $this->calculate();
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euro', 'name_hu' => 'Euró', 'active' => true]);
+        $foreign = $this->retail()->replicate();
+        $foreign->currency_id = $eur->id;
+        $foreign->save();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingHufRetailCalculations::class)->callTableBulkAction('approveRetailBulk', [
+            $this->cost, $foreign, $this->retail(),
+        ], ['approval_status' => PricingCalculationRow::STATUS_APPROVED])->assertHasNoErrors();
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $this->cost->fresh()->status);
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $foreign->fresh()->status);
+        $this->assertSame(PricingCalculationRow::STATUS_APPROVED, $this->retail()->status);
+    }
+
+    public function test_unexpected_bulk_failure_rolls_back_previously_approved_rows(): void
+    {
+        $this->addColorCost('BR');
+        $this->calculate();
+        $rows = PricingCalculationRow::where('price_type', 'retail')->orderBy('id')->get();
+        $this->mock(RetailCalculationDependencyService::class, function ($mock) use ($rows): void {
+            $mock->shouldReceive('assertCalculationCurrent')->once()->withArgs(fn ($row) => $row->id === $rows[0]->id);
+            $mock->shouldReceive('assertCalculationCurrent')->once()->withArgs(fn ($row) => $row->id === $rows[1]->id)
+                ->andThrow(new \RuntimeException('Unexpected database/workflow failure'));
+        });
+        try {
+            app(RetailPriceReviewService::class)->approveCurrentPrices($rows);
+            $this->fail('The unexpected error must not be silently skipped.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unexpected database/workflow failure', $exception->getMessage());
+        }
+        foreach ($rows as $row) {
+            $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $row->fresh()->status);
+            $this->assertNull($row->fresh()->approved_by);
+            $this->assertArrayNotHasKey('approval', $row->fresh()->calculation_snapshot);
+        }
+    }
+
+    public function test_bulk_approval_rechecks_workspace_access_after_the_modal_was_opened(): void
+    {
+        $this->calculate();
+        $editor = User::factory()->create();
+        $editor->givePermissionTo(array_map(fn ($name) => Permission::findOrCreate($name, 'web'), [
+            'View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow', 'Update:PricingCalculationRow',
+        ]));
+        $this->actingAs($editor);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->mountTableBulkAction('approveRetailBulk', [$this->retail()])->assertTableBulkActionMounted('approveRetailBulk');
+        $editor->revokePermissionTo('View:PricingHufRetailCalculations');
+        $page->callMountedTableBulkAction();
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $this->retail()->status);
+        $this->assertNull($this->retail()->approved_by);
+    }
+
+    public function test_bulk_approval_rejects_an_invalid_status_without_writing_any_rows(): void
+    {
+        $this->calculate();
+        try {
+            app(RetailPriceReviewService::class)->approveCurrentPrices(collect([$this->retail()]), 'invalid');
+            $this->fail('Invalid review levels must be rejected.');
+        } catch (DomainException $exception) {
+            $this->assertSame('Érvénytelen jóváhagyási státusz.', $exception->getMessage());
+        }
+        $this->assertSame(PricingCalculationRow::STATUS_CALCULATED, $this->retail()->status);
+        $this->assertNull($this->retail()->approved_by);
+    }
+
+    private function addColorCost(string $code): PricingCalculationRow
+    {
+        $cost = $this->cost->replicate();
+        $cost->color_id = Color::create(['product_id' => $this->cost->product_id, 'code' => $code, 'name_hu' => $code, 'active' => true])->id;
+        $cost->save();
+
+        return $cost;
     }
 }

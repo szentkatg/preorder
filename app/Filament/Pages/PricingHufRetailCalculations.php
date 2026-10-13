@@ -54,6 +54,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
     {
         abort_unless(static::canAccess(), 403);
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
+        $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
     }
 
     public function pricingWorkspaceDescription(): string
@@ -77,7 +78,17 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
-        return [CalculateHufRetailAction::make()];
+        return [CalculateHufRetailAction::make(), $this->pricingDecimalPlacesAction()];
+    }
+
+    protected function pricingDecimalColumns(): array
+    {
+        return [
+            'purchase_price' => 'Eredeti beszerzési ár', 'base_price' => 'Bekerülési HUF',
+            'multiplier' => 'Kisker szorzó és átlaga', 'calculation_multiplier' => 'Kalkulációs szorzó',
+            'unrounded_price' => 'Kerekítés előtti HUF', 'calculated_price' => 'Kalkulált kisker HUF',
+            'final_price' => 'Végleges kisker HUF', 'target_purchase_price' => 'Cél beszerzési ár',
+        ];
     }
 
     public function table(Table $table): Table

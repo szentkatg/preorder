@@ -30,6 +30,10 @@ class AdminResourceTable
         string $modelClass,
         bool $withViewAction = true,
     ): Table {
+        $table->columnManagerApplyAction(
+            fn (Action $action): Action => $action->alpineClickHandler('await applyTableColumnManager(); if (! error) close()'),
+        );
+
         foreach ($table->getColumns() as $column) {
             self::configureColumn($column, $modelClass);
         }
@@ -61,6 +65,8 @@ class AdminResourceTable
                             new AdminTableExport(
                                 $query,
                                 $columns,
+                                columnFormats: method_exists($livewire, 'pricingDecimalExportFormats')
+                                    ? $livewire->pricingDecimalExportFormats($columns) : [],
                             ),
                             $tableName.'-'.now()->format('Ymd-His').'.xlsx',
                         );

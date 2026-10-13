@@ -145,6 +145,147 @@ hozzáférése megmarad. A partnerportál jogosultságait nem módosítjuk.
 
 ## Tesztelés és telepítés
 
+### Felülvizsgálandó oszlop színei
+
+A HUF kisker táblázatban a Felülvizsgálandó oszlop igaz értéke piros (`danger`),
+a hamis értéke zöld (`success`). Az ikonok, az árak és a felülvizsgálat logikája
+változatlan. Ehhez nincs új migráció, Composer install, frontend build vagy
+kézi fájlfeltöltés.
+
+A színjavítás külön kért kihelyezéséhez, a pricing worktree-ből:
+
+```powershell
+git add -- app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Show required retail review in red and no review in green"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Oszloponkénti tizedesbeállítás
+
+A Bekerülési értékek és HUF kisker árak munkafelület felső **Tizedesjegyek**
+gombja egy beállító ablakot nyit. Oszloponként választható az Alapértelmezett,
+vagy 0–6 tizedesjegy. A Mentés bezárja az ablakot és frissíti a kijelzést.
+Alapértelmezett választással az eredeti megjelenítés áll vissza: a kisker áraknál
+a felesleges záró nullák elmaradnak, a bekerülési táblázat korábbi pontossága megmarad.
+A konkrét szám kiválasztása pontosan annyi tizedest jelenít meg, záró nullákkal is.
+
+- Bekerülési oldalon: beszerzési ár, árfolyam, kalkulált, manuális és végleges ár.
+- Kisker oldalon: eredeti beszerzési ár, bekerülési érték, kisker szorzó és az
+  oszlop fölötti átlag, kalkulációs szorzó, kerekítés előtti, kalkulált és végleges
+  kisker ár, cél-beszerzési ár.
+- A szerkeszthető kisker manuális ármező, szállítás% és vám% beviteli mezők teljes
+  pontosságúak maradnak: egy megjelenítési kerekítés nem írhat vissza más értéket.
+  A részletező modal és tooltip eredeti részletes számai nem változnak.
+
+A beállítás a meglévő `admin_ui_preferences` táblában, felhasználónként és
+munkafelületenként külön tárolódik (`*_decimal_places`). Újbóli belépéskor is
+megmarad, más felhasználó vagy a másik munkafelület beállítását nem befolyásolja.
+Nem módosítja az oszlopszélességet, láthatóságot, sorrendet vagy a szűrőket.
+A csak megtekintő szerepkör is állíthatja saját megjelenítését; az oldalhoz
+szükséges jogosultságot mentéskor is ellenőrizzük.
+
+Az Excel-export ugyanilyen megjelenítési pontosságot kap a kiválasztott
+oszlopokon. A számok továbbra is teljes pontosságú numerikus cellák: csak az
+invariáns Excel-számformátum (`#,##0`, `#,##0.00` stb.) változik, nem a cella
+értéke. A Windows/Excel tizedeselválasztója és a szöveges kódok megmaradnak.
+Az Alapértelmezett opciónál a korábbi exportformátum marad.
+Számítás, jóváhagyás, eltérésjelzés, keresés és rendezés a tényleges, nem a
+kijelzéshez kerekített értékek alapján működik.
+
+Ellenőrzés: 75 kapcsolódó teszt, 647 assertion sikeres. A mentett XLSX-et is
+visszaolvastuk, numerikus cellatípusokkal, pontos értékekkel és kiválasztott
+számformátumokkal. A sok Livewire-modal teszt futtatásához a CLI-parancsban
+ideiglenes `-d memory_limit=256M` kapcsolót használunk; nincs php.ini/.env vagy
+szerver-memóriabeállítás módosítás.
+
+Nincs új migráció, Composer install, frontend build, kézi feltöltés vagy
+szerepkör-módosítás. A jelenlegi, még helyi felülvizsgálati színjavítással és tömeges jóváhagyással együtt
+kihelyezhető a pricing worktree-ből:
+
+```powershell
+git add -- app/Exports/AdminTableExport.php app/Filament/Pages/PricingCostCalculations.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingTablePreferences.php app/Services/Pricing/RetailPriceReviewService.php resources/views/filament/pages/pricing-cost-calculations.blade.php tests/Feature/PricingDecimalPreferencesTest.php tests/Feature/Admin/AdminAuthorizationTest.php tests/Feature/Admin/AdminTableExportTest.php tests/Feature/HufRetailCalculationTest.php tests/Frontend/column-manager-close.test.mjs docs/huf-retail-pricing.md
+git commit -m "Add bulk retail approval, decimal preferences and column manager closing"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Oszlopkezelő bezárása az alkalmazás után
+
+A jelenlegi oszlopválasztó/rendező legördülő panel (`ColumnManagerLayout::Dropdown`),
+nem normál Filament-akció modal. A korábbi 100 ms-os, bármely látható modal-bezáró
+gombra kattintó kód ezért nem tudta bezárni, és nem célzottan kezelte a felületet.
+Ezt eltávolítottuk. A közös `AdminResourceTable` konfiguráció Apply gombja most
+megvárja a Filament oszlopkezelő mentési műveletét, és csak hibamentes eredmény
+után zárja be a saját legördülő paneljét. Hiba esetén nyitva marad, a beállítás
+újrapróbálható. A meglévő oszlopszélesség/morph/resize figyelés megmarad.
+Ez az összes, közös konfigurációval készült admin táblázatra érvényes.
+
+Ellenőrzés: 4 admin-menü/oszlopkezelő teszt, 14 assertion sikeres. A JavaScript
+regressziós teszt a telepített Filament oszlopkezelő és dropdown implementációját
+használja, mockolt szervermentéssel. Igazolja a mentés megvárását, a hibánál
+nyitva maradást és a sikeres újrapróbálás utáni bezárást.
+Node.js elérhető fejlesztői környezetben: `node tests/Frontend/column-manager-close.test.mjs`.
+A teszt a beépített JavaScript-futtatókörnyezetben is futtatható; a NAS-ra nincs
+szükség Node.js-re, nincs új frontend asset vagy build. Az alkalmazás vendor
+fájljait nem módosítottuk.
+
+### HUF kisker árak tömeges átnézése/jóváhagyása
+
+A sor elején található jelölőnégyzettel több ár választható ki. A fejlécben
+az aktuális oldal összes sora kijelölhető; a Filament összes kijelölése funkciója
+az aktuális szűrés összes oldalára is kiterjeszti a kijelölést. Egyes sorok
+visszavonhatók, vagy az egész kijelölés törölhető. Szűrőváltáskor a kijelölés törlődik.
+A lezárt/inaktív árprojekt sorai nem jelölhetők ki.
+
+A **Kijelölt árak jóváhagyása** gomb megerősítő ablakot nyit, amelyben a szint:
+Átnézett ár / Jóváhagyott ár / 2. körös / 3. körös jóváhagyott.
+Minden kijelölt sor **aktuális végleges ára** marad meg; a manuális vagy megtartott
+árat nem cseréljük a kalkuláltra. Az alap Jóváhagyott szint manuális/megtartott árnál
+Módosított jóváhagyott státuszt eredményez. A jóváhagyó és a bemeneti snapshot
+soronként mentődik, az élő árlisták nem változnak.
+
+Ugyanaz az `Update:PricingCalculationRow` jogosultság kell, mint az egyedi
+művelethez, a munkafelület saját megtekintési joga és a sorok ViewAny joga mellett.
+Csak megtekintőnek a tömeges gomb és a kijelölés nem látszik. Az akció az oldalhoz
+való hozzáférést, a szolgáltatás minden sor módosítási jogát mentéskor ismét ellenőrzi.
+Hamisított bekerülési/EUR sorazonosító nem kerülhet a HUF kisker akcióba.
+
+Elavult kalkuláció, hiányzó sor/projekt, lezárt/inaktív projekt vagy időközben
+megvont sorjogosultság esetén a sort kihagyjuk. Az összesítés megmutatja a sikeres
+és kihagyott sorok számát, valamint a kihagyás okait. Elavult kalkulációt előbb
+újra kell számítani. Sikeres futás után a kijelölés törlődik.
+Váratlan rendszer/adatbázishibánál a teljes művelet tranzakciója visszagördül;
+nem marad félbehagyott tömeges jóváhagyás.
+
+Ellenőrzés: 11 tömeges jóváhagyási teszt, 97 assertion sikeres, beleértve a több
+lapos szűrt kijelölést, kihagyást, jogosultság-visszavonást és tranzakciós visszaállást.
+Az összes jelenlegi változtatás teljes tesztfutása: 130 teszt, 891 assertion;
+128 sikeres, a két korábbról ismert admin-resource darabszám-elvárás hibázik
+(30 helyett 32, illetve 31). Új teszthiba nincs. A Pint és a JavaScript
+oszlopkezelő-regressziós teszt is sikeres.
+Nincs új migráció, Composer install, npm build, kézi feltöltés vagy Shield-generálás.
+Kihelyezéskor csak cache-törlés és újraépítés szükséges; a fenti Git/NAS és
+cPanel parancsok az összes jelenlegi helyi változtatást együtt tartalmazzák.
+
+### Kalkulációs modul telepítése
+
 A helyi vendor könyvtár közös junctionja mellett is a helyes worktree-t teszteli:
 
 ```powershell

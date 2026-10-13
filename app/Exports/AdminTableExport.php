@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -21,7 +22,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use Stringable;
 
-class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAutoSize, WithCustomValueBinder, WithHeadings, WithMapping, WithStrictNullComparison
+class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAutoSize, WithColumnFormatting, WithCustomValueBinder, WithHeadings, WithMapping, WithStrictNullComparison
 {
     /**
      * @param  array<Column>  $columns
@@ -29,11 +30,17 @@ class AdminTableExport extends DefaultValueBinder implements FromQuery, ShouldAu
     public function __construct(
         protected Builder $query,
         protected array $columns,
+        protected array $columnFormats = [],
     ) {}
 
     public function query(): Builder
     {
         return $this->query;
+    }
+
+    public function columnFormats(): array
+    {
+        return $this->columnFormats;
     }
 
     public function headings(): array

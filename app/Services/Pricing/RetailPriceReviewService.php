@@ -6,6 +6,9 @@ use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
 use Closure;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -32,10 +35,7 @@ class RetailPriceReviewService
 
     public function approveCurrentPrice(PricingCalculationRow $row, string $status = PricingCalculationRow::STATUS_APPROVED): PricingCalculationRow
     {
-        if (! in_array($status, [PricingCalculationRow::STATUS_REVIEWED, PricingCalculationRow::STATUS_APPROVED,
-            PricingCalculationRow::STATUS_APPROVED_ROUND_2, PricingCalculationRow::STATUS_APPROVED_ROUND_3], true)) {
-            throw new DomainException('Érvénytelen jóváhagyási státusz.');
-        }
+        $this->validateApprovalStatus($status);
 
         return $this->change($row, function (PricingCalculationRow $stored) use ($status): void {
             if ($stored->final_price === null || (float) $stored->final_price <= 0) {
@@ -52,6 +52,49 @@ class RetailPriceReviewService
             }
             $this->saveApprovalInputs($stored, (float) $stored->final_price);
         });
+    }
+
+    /**
+     * @param  Collection<int, PricingCalculationRow>  $rows
+     * @return array{approved: int, skipped: int, reasons: array<string, int>}
+     */
+    public function approveCurrentPrices(Collection $rows, string $status = PricingCalculationRow::STATUS_APPROVED): array
+    {
+        Gate::authorize('update', new PricingCalculationRow);
+        $this->validateApprovalStatus($status);
+
+        // Stable project/row order matches the individual operation's lock order.
+        // Expected row-level rejections are skipped; unexpected failures roll back the entire batch.
+        return DB::transaction(function () use ($rows, $status): array {
+            $result = ['approved' => 0, 'skipped' => 0, 'reasons' => []];
+
+            foreach ($rows->unique('id')->sortBy([
+                ['pricing_project_id', 'asc'], ['id', 'asc'],
+            ]) as $row) {
+                try {
+                    $this->approveCurrentPrice($row, $status);
+                    $result['approved']++;
+                } catch (DomainException|AuthorizationException|ModelNotFoundException $exception) {
+                    $reason = match (true) {
+                        $exception instanceof AuthorizationException => 'Nincs módosítási jogosultság.',
+                        $exception instanceof ModelNotFoundException => 'A sor vagy az árprojekt már nem létezik.',
+                        default => $exception->getMessage(),
+                    };
+                    $result['skipped']++;
+                    $result['reasons'][$reason] = ($result['reasons'][$reason] ?? 0) + 1;
+                }
+            }
+
+            return $result;
+        });
+    }
+
+    private function validateApprovalStatus(string $status): void
+    {
+        if (! in_array($status, [PricingCalculationRow::STATUS_REVIEWED, PricingCalculationRow::STATUS_APPROVED,
+            PricingCalculationRow::STATUS_APPROVED_ROUND_2, PricingCalculationRow::STATUS_APPROVED_ROUND_3], true)) {
+            throw new DomainException('Érvénytelen jóváhagyási státusz.');
+        }
     }
 
     public function acceptCalculatedPrice(PricingCalculationRow $row): PricingCalculationRow

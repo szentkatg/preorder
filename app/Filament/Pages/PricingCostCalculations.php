@@ -61,6 +61,20 @@ class PricingCostCalculations extends Page implements HasTable
     {
         abort_unless(static::canAccess(), 403);
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
+        $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->pricingDecimalPlacesAction()];
+    }
+
+    protected function pricingDecimalColumns(): array
+    {
+        return [
+            'purchase_price' => 'Beszerzési ár', 'exchange_rate' => 'Árfolyam',
+            'calculated_price' => 'Kalkulált ár', 'manual_price' => 'Manuális ár', 'final_price' => 'Végleges ár',
+        ];
     }
 
     public function startInlineCostPercentParameterAdjustment(
@@ -237,6 +251,12 @@ class PricingCostCalculations extends Page implements HasTable
                 fn (Builder $query): Builder => $query
                     ->where('price_type', PricingCalculationRow::TYPE_COST)
             );
+
+        foreach (['purchase_price' => 4, 'exchange_rate' => 4, 'calculated_price' => 2, 'manual_price' => 2, 'final_price' => 2] as $name => $defaultDecimals) {
+            $table->getColumn($name)->numeric(
+                decimalPlaces: fn ($livewire): int => $livewire->pricingDecimalPlacesFor($name) ?? $defaultDecimals,
+            );
+        }
 
         return AdminResourceTable::configure(
             $table,

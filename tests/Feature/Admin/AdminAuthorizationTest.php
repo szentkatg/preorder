@@ -94,6 +94,23 @@ class AdminAuthorizationTest extends TestCase
         $this->assertSame(Width::Full, $panel->getMaxContentWidth());
     }
 
+    public function test_column_manager_apply_waits_for_save_before_closing_the_dropdown(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(ListBrands::class);
+        $this->assertSame(
+            'await applyTableColumnManager(); if (! error) close()',
+            $page->instance()->getTable()->getColumnManagerApplyAction()->getAlpineClickHandler(),
+        );
+        $state = $page->instance()->tableColumns;
+        $state[0]['isToggled'] = ! $state[0]['isToggled'];
+        $page->call('applyTableColumnManager', $state);
+        $this->assertSame($state[0]['isToggled'], $page->instance()->tableColumns[0]['isToggled']);
+    }
+
     public function test_admin_sidebar_controls_and_expanding_content_are_rendered(): void
     {
         $user = User::factory()->create();

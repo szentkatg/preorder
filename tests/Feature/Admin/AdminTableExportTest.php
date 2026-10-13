@@ -20,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AdminTableExportTest extends TestCase
@@ -72,7 +73,8 @@ class AdminTableExportTest extends TestCase
         $this->assertSame(['123.45', 0.0], $export->map($record));
     }
 
-    public function test_saved_xlsx_contains_numeric_values_and_safe_text_identifiers(): void
+    #[DataProvider('xlsxColumnFormats')]
+    public function test_saved_xlsx_contains_numeric_values_and_safe_text_identifiers(array $formats): void
     {
         Schema::create('admin_export_test_rows', function (Blueprint $table) {
             $table->id();
@@ -86,7 +88,7 @@ class AdminTableExportTest extends TestCase
             TextColumn::make('amount')->label('Összeg'),
             TextColumn::make('uncast_amount')->numeric()->label('Korrekció'),
             TextColumn::make('code')->label('Kód'),
-        ]);
+        ], $formats);
         $path = tempnam(sys_get_temp_dir(), 'admin-export-test-');
         $previousBinder = Cell::getValueBinder();
 
@@ -101,7 +103,8 @@ class AdminTableExportTest extends TestCase
             $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('B2')->getDataType());
             $this->assertSame(1234.56, $sheet->getCell('A2')->getValue());
             $this->assertSame(-8.25, $sheet->getCell('B2')->getValue());
-            $this->assertSame('General', $sheet->getStyle('A2')->getNumberFormat()->getFormatCode());
+            $this->assertSame($formats['A'] ?? 'General', $sheet->getStyle('A2')->getNumberFormat()->getFormatCode());
+            $this->assertSame($formats['B'] ?? 'General', $sheet->getStyle('B2')->getNumberFormat()->getFormatCode());
             $this->assertSame(DataType::TYPE_STRING, $sheet->getCell('C2')->getDataType());
             $this->assertSame('00123.45', $sheet->getCell('C2')->getValue());
             $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('A3')->getDataType());
@@ -118,13 +121,18 @@ class AdminTableExportTest extends TestCase
         }
     }
 
-    private function export(Builder $query, array $columns): AdminTableExport
+    public static function xlsxColumnFormats(): array
+    {
+        return ['default' => [[]], 'selected' => [['A' => '#,##0', 'B' => '#,##0.000000']]];
+    }
+
+    private function export(Builder $query, array $columns, array $formats = []): AdminTableExport
     {
         $livewire = Mockery::mock(HasTable::class);
         $livewire->shouldReceive('getTableRecordKey')->andReturnUsing(fn (Model $record): string => (string) $record->getKey());
         $table = Table::make($livewire)->query($query)->columns($columns);
 
-        return new AdminTableExport($query, array_values($table->getColumns()));
+        return new AdminTableExport($query, array_values($table->getColumns()), $formats);
     }
 }
 

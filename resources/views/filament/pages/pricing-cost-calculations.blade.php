@@ -622,15 +622,6 @@
                 initialiseTimer = window.setTimeout(initialisePricingColumnResizing, delay);
             }
 
-            function closeColumnManagerModalIfOpen() {
-                window.setTimeout(() => {
-                    const closeButton = Array.from(document.querySelectorAll('.fi-modal-close-btn'))
-                        .find((button) => button.getClientRects().length > 0);
-
-                    closeButton?.click();
-                }, 100);
-            }
-
             function initialisePricingColumnResizing() {
                 suppressMutationObserverUntil = Date.now() + 150;
 
@@ -699,7 +690,6 @@
             document.addEventListener('DOMContentLoaded', initialisePricingColumnResizing);
             document.addEventListener('livewire:navigated', () => scheduleInitialisePricingColumnResizing(50));
             document.addEventListener('apply-table-column-manager', () => {
-                closeColumnManagerModalIfOpen();
                 scheduleInitialisePricingColumnResizing(120);
             });
             document.addEventListener('reset-table-column-manager', () => scheduleInitialisePricingColumnResizing(120));
