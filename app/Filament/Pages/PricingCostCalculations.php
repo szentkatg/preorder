@@ -7,6 +7,7 @@ use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
+use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\PricingParameterAdjustmentService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
@@ -16,11 +17,14 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 
 class PricingCostCalculations extends Page implements HasTable
 {
-    use HasPageShield;
+    use HasPageShield {
+        canAccess as protected canAccessUsingPagePermission;
+    }
     use HasPricingTablePreferences, InteractsWithTable {
         HasPricingTablePreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
         HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
@@ -47,8 +51,15 @@ class PricingCostCalculations extends Page implements HasTable
 
     public ?string $pendingParameterScope = null;
 
+    public static function canAccess(): bool
+    {
+        return static::canAccessUsingPagePermission()
+            && Gate::allows('viewAny', PricingCalculationRow::class);
+    }
+
     public function mount(): void
     {
+        abort_unless(static::canAccess(), 403);
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
     }
 
@@ -57,6 +68,7 @@ class PricingCostCalculations extends Page implements HasTable
         string $parameterType,
         mixed $value,
     ): void {
+        abort_unless(static::canAccess(), 403);
         if (! is_numeric($value) || (float) $value < 0) {
             Notification::make()
                 ->title('Érvénytelen érték')
@@ -99,6 +111,8 @@ class PricingCostCalculations extends Page implements HasTable
             return;
         }
 
+        CostCalculationAuthorization::authorizeParameterAdjustment($record);
+
         $scopeOptions = self::parameterScopeOptions($record);
         $scopeCounts = self::parameterScopeCounts($record, array_keys($scopeOptions));
 
@@ -125,6 +139,7 @@ class PricingCostCalculations extends Page implements HasTable
 
     public function confirmPendingParameterAdjustment(): void
     {
+        abort_unless(static::canAccess(), 403);
         if (! $this->pendingParameterAdjustment) {
             return;
         }
@@ -159,6 +174,8 @@ class PricingCostCalculations extends Page implements HasTable
 
             return;
         }
+
+        CostCalculationAuthorization::authorizeParameterAdjustment($record);
 
         try {
             $parameter = app(PricingParameterAdjustmentService::class)

@@ -27,6 +27,7 @@ use BezhanSalleh\FilamentShield\Facades\FilamentShield as Shield;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -82,6 +83,30 @@ class AdminAuthorizationTest extends TestCase
             ->assertOk()
             ->assertSee('/css/admin-table-scroll.css', false)
             ->assertSee('/js/admin-table-scroll.js', false);
+    }
+
+    public function test_admin_sidebar_can_be_fully_collapsed_on_desktop(): void
+    {
+        $panel = Filament::getPanel('admin');
+
+        $this->assertTrue($panel->isSidebarFullyCollapsibleOnDesktop());
+        $this->assertFalse($panel->isSidebarCollapsibleOnDesktop());
+        $this->assertSame(Width::Full, $panel->getMaxContentWidth());
+    }
+
+    public function test_admin_sidebar_controls_and_expanding_content_are_rendered(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+        $this->actingAs($user)
+            ->get('/admin/products')
+            ->assertOk()
+            ->assertSee('fi-body-has-sidebar-fully-collapsible-on-desktop', false)
+            ->assertSee('fi-topbar-close-collapse-sidebar-btn', false)
+            ->assertSee('fi-topbar-open-sidebar-btn', false)
+            ->assertSee('fi-main-ctn-sidebar-open', false)
+            ->assertSee('fi-width-full', false);
     }
 
     public function test_only_users_with_an_admin_role_can_access_the_admin_panel(): void

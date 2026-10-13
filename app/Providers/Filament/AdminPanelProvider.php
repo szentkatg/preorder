@@ -32,6 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->profile(isSimple: false)
+            ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
             ->bootUsing(fn () => app()->setLocale('hu'))
             ->colors([

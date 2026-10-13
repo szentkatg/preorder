@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PricingProjects\Pages;
 
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
+use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\CostCalculationService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -18,6 +19,8 @@ class EditPricingProject extends EditRecord
     {
         return [
             Action::make('recalculateCost')
+                ->visible(fn (): bool => CostCalculationAuthorization::canRecalculate($this->record))
+                ->authorize(fn (): bool => CostCalculationAuthorization::canRecalculate($this->record))
                 ->label('Bekerülési értékek újraszámítása')
                 ->icon('heroicon-o-calculator')
                 ->color('success')

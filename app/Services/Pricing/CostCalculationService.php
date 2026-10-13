@@ -32,6 +32,7 @@ class CostCalculationService
      */
     public function recalculate(PricingProject $project): array
     {
+        CostCalculationAuthorization::authorizeRecalculation($project);
         $project->loadMissing('season');
         $runId = (string) Str::uuid();
 

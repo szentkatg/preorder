@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
+use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\PricingParameterAdjustmentService;
 use Filament\Actions\Action;
@@ -18,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 
 class PricingCalculationRowsTable
@@ -64,9 +66,10 @@ class PricingCalculationRowsTable
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
-                        fn (PricingCalculationRow $record): bool => $record->price_type !== PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => ! CostCalculationAuthorization::canAdjustParameter($record)
                     )
                     ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
+                        CostCalculationAuthorization::authorizeParameterAdjustment($record);
                         if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
                             $livewire->startInlineCostPercentParameterAdjustment(
                                 (int) $record->getKey(),
@@ -91,9 +94,10 @@ class PricingCalculationRowsTable
                     ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
                     ->rules(['required', 'numeric', 'min:0'])
                     ->disabled(
-                        fn (PricingCalculationRow $record): bool => $record->price_type !== PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => ! CostCalculationAuthorization::canAdjustParameter($record)
                     )
                     ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
+                        CostCalculationAuthorization::authorizeParameterAdjustment($record);
                         if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
                             $livewire->startInlineCostPercentParameterAdjustment(
                                 (int) $record->getKey(),
@@ -161,6 +165,8 @@ class PricingCalculationRowsTable
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([
                 Action::make('calculationDetails')
+                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
+                    ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
                     ->label('Részletek')
                     ->icon('heroicon-o-document-magnifying-glass')
                     ->modalHeading('Kalkuláció részletei')
@@ -183,7 +189,7 @@ class PricingCalculationRowsTable
                 )
                     ->icon('heroicon-o-truck')
                     ->visible(
-                        fn (PricingCalculationRow $record): bool => $record->price_type === PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record)
                     ),
                 self::parameterAction(
                     'updateCustomsPercent',
@@ -193,12 +199,18 @@ class PricingCalculationRowsTable
                 )
                     ->icon('heroicon-o-receipt-percent')
                     ->visible(
-                        fn (PricingCalculationRow $record): bool => $record->price_type === PricingCalculationRow::TYPE_COST
+                        fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record)
                     ),
-                EditAction::make(),
+                EditAction::make()
+                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record))
+                    ->authorize('update'),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([DeleteBulkAction::make()]),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(fn (): bool => Gate::allows('deleteAny', PricingCalculationRow::class))
+                        ->authorize(fn (): bool => Gate::allows('deleteAny', PricingCalculationRow::class)),
+                ]),
             ]);
     }
 
@@ -222,6 +234,7 @@ class PricingCalculationRowsTable
         string $rowAttribute,
     ): Action {
         return Action::make($name)
+            ->authorize(fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record))
             ->label($label)
             ->icon('heroicon-o-pencil-square')
             ->modalHeading($label)

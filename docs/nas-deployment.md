@@ -51,6 +51,75 @@ a frontend buildet Windows alatt kell elkészíteni, és a teljes `public/build`
 könyvtár feltöltését külön kell megszervezni. A Blade/PHP módosítások nem
 igényelnek frontend buildet.
 
+## Összecsukható admin-menü
+
+Az admin panel a Filament beépített `sidebarFullyCollapsibleOnDesktop()`
+beállítását használja. Asztali méreten a felső sáv balra mutató nyila teljesen
+elrejti a menüt; a háromvonalas menügomb visszanyitja. A tartalom a felszabaduló
+helyre terjeszkedik, mert a panel teljes szélességű (`Width::Full`).
+A mobilmenü működése megmarad. A nyitott/zárt asztali állapotot a Filament
+ugyanabban a böngészőben helyi tárolóban megjegyzi; nem szerveroldali felhasználói
+beállítás. A táblázatok meglévő ResizeObserver figyelése a méretváltozást kezeli.
+
+Ellenőrzés: 3 kapcsolódó teszt, 12 assertion sikeres (panelbeállítás, renderelt
+nyitó/záró gombok és rugalmas tartalom, táblázatos görgetés assetjei).
+Nincs új migráció, Composer install, npm build, kézi fájlfeltöltés vagy
+jogosultság-változtatás. A partnerportált ez nem érinti.
+
+Git/NAS a módosított worktree-ben, külön kért kihelyezéshez:
+
+```powershell
+git add -- app/Providers/Filament/AdminPanelProvider.php tests/Feature/Admin/AdminAuthorizationTest.php docs/nas-deployment.md
+git commit -m "Allow fully collapsing the admin sidebar on desktop"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## Menü és árképzési jogosultságjavítás közös telepítése
+
+A két árképzési oldal egységesen külön oldaljogot és az árkalkulációs sorok
+View any jogát ellenőrzi. A szállítás% / vám% műveletek, megerősítő hívások,
+általános sor-szerkesztés és tömeges törlés, illetve az árprojekt bekerülési
+újraszámítása szerveroldali jogosultságellenőrzést is kapott.
+A pontos szerepkör-beállítások a `docs/huf-retail-pricing.md` Jogosultságok részében
+találhatók. A régi szerepköröknek nem adunk automatikusan új oldaljogokat.
+Nincs új migráció, Composer install, npm build, kézi feltöltés vagy .env módosítás.
+Külön Shield-generálás sem szükséges, a permission rekordot a szerepkör mentése
+hozza létre, ha még hiányzik.
+
+Ellenőrzés: 63 kapcsolódó teszt, 528 assertion sikeres. A külön admin-menü
+és görgetési tesztek is sikeresek. Az új jogosultsági tesztek 14 esetet fednek le,
+beleértve a közvetlen URL-eket, külön oldaljogokat, csak megtekintő szerepkört,
+hamisított szerkesztési/törlési és megerősítő kéréseket, szolgáltatáshívásokat,
+az egyenként hiányzó jogokat és a szerkesztés közbeni jogosultság-visszavonást.
+A teljes csomag két korábbról ismert, rögzített admin-erőforrás-darabszámot
+elváró tesztje változatlanul elavult; ezeket nem módosítottuk.
+
+A közös változtatás Git/NAS parancsai:
+
+```powershell
+git add -- app/Providers/Filament/AdminPanelProvider.php app/Filament/Pages/PricingCostCalculations.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/PricingCalculationRowsTable.php app/Filament/Resources/PricingProjects/Pages/EditPricingProject.php app/Filament/Resources/PricingProjects/Pages/ViewPricingProject.php app/Services/Pricing/CostCalculationAuthorization.php app/Services/Pricing/CostCalculationService.php app/Services/Pricing/PricingParameterAdjustmentService.php tests/Feature/Admin/AdminAuthorizationTest.php tests/Feature/PricingAuthorizationTest.php tests/Feature/HufRetailCalculationTest.php docs/huf-retail-pricing.md docs/nas-deployment.md
+git commit -m "Secure pricing workspace actions and allow collapsing the admin sidebar"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Codex-engedélyezés
 
 A script első Codex-futtatásakor a **tartós engedélyezés** lehetőséget válaszd a

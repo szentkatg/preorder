@@ -224,6 +224,7 @@ class HufRetailCalculationTest extends TestCase
         $this->calculate();
         $reader = User::factory()->create();
         $reader->givePermissionTo(Permission::firstOrCreate(['name' => 'ViewAny:PricingCalculationRow', 'guard_name' => 'web']));
+        $reader->givePermissionTo(Permission::findOrCreate('View:PricingHufRetailCalculations', 'web'));
         $this->actingAs($reader);
         $this->assertTrue(PricingHufRetailCalculations::canAccess());
         $this->expectException(AuthorizationException::class);
@@ -239,6 +240,29 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame(120, AdminUiPreference::where('preference_key', 'pricing_cost_calculation_column_widths')->firstOrFail()->value['model-code']);
         $this->assertSame(240, AdminUiPreference::where('preference_key', 'pricing_huf_retail_calculation_column_widths')->firstOrFail()->value['model-code']);
         $this->assertNotSame($costPage->pricingColumnStorageKey(), $retailPage->pricingColumnStorageKey());
+    }
+
+    public function test_retail_editor_role_can_edit_and_approve_without_cost_parameter_permissions(): void
+    {
+        $this->calculate();
+        $editor = User::factory()->create();
+        $role = Role::findOrCreate('retail_editor', 'web');
+        $role->givePermissionTo(array_map(fn ($name) => Permission::findOrCreate($name, 'web'), [
+            'View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow', 'View:PricingCalculationRow',
+            'Update:PricingCalculationRow',
+        ]));
+        $editor->assignRole($role);
+        $this->actingAs($editor);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()
+            ->assertActionHidden('calculateHufRetail')
+            ->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '2490')
+            ->callTableAction('approveRetail', $this->retail(), ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->assertHasNoErrors();
+        $this->assertSame('2490.0000', $this->retail()->final_price);
+        $this->assertSame(PricingCalculationRow::STATUS_MODIFIED_APPROVED, $this->retail()->status);
+        $this->assertSame($editor->id, $this->retail()->approved_by);
+        $this->assertFalse($editor->can('Update:PricingParameter'));
     }
 
     private function calculate(): array

@@ -7,6 +7,7 @@ use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -17,6 +18,9 @@ use Livewire\Attributes\Computed;
 
 class PricingHufRetailCalculations extends Page implements HasTable
 {
+    use HasPageShield {
+        canAccess as protected canAccessUsingPagePermission;
+    }
     use HasPricingTablePreferences, InteractsWithTable {
         HasPricingTablePreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
         HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
@@ -37,7 +41,8 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return Gate::allows('viewAny', PricingCalculationRow::class);
+        return static::canAccessUsingPagePermission()
+            && Gate::allows('viewAny', PricingCalculationRow::class);
     }
 
     public static function shouldRegisterNavigation(): bool

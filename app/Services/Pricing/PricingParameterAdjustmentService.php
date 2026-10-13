@@ -14,6 +14,8 @@ class PricingParameterAdjustmentService
         string $scopeType,
         float $value,
     ): PricingParameter {
+        CostCalculationAuthorization::authorizeParameterAdjustment($row);
+
         if (! in_array($parameterType, [
             PricingParameter::TYPE_SHIPPING_COST_PERCENT,
             PricingParameter::TYPE_CUSTOMS_PERCENT,

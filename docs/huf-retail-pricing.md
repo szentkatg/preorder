@@ -111,10 +111,37 @@ A bekerülési és kisker munkafelület beállításai külön tárolódnak.
 
 ## Jogosultságok
 
-A munkafelülethez az árkalkulációs sorok `ViewAny` joga szükséges;
-a Részletekhez `View`. A manuális ármódosítás és jóváhagyás `Update` jogot
-igényel. Teljes újraszámításhoz az árprojekt `Update`, az árkalkulációs sorok
-`Create` és `Update` joga is kell. Új Shield-generálás ehhez nem szükséges.
+Az admin **Jogosultságkezelés → Szerepkörök → szerepkör szerkesztése** oldalán
+mindkét munkafelület külön engedélyezhető az **Oldalak / Pages** fülön:
+
+- Bekerülési értékek: `View:PricingCostCalculations`.
+- HUF kisker árak: `View:PricingHufRetailCalculations`.
+
+A kiválasztott oldaljog mellett az **Erőforrások / Resources → Árkalkulációs
+sorok / PricingCalculationRow → View any** (`ViewAny:PricingCalculationRow`)
+is szükséges. Közvetlen URL-en is ugyanígy ellenőrizzük a hozzáférést.
+Korábban a kisker oldalhoz elég volt a View any: ezt most az oldaljoggal is
+ki kell egészíteni a megfelelő szerepkörön. Nem adunk automatikusan új jogot.
+
+| Művelet | Szükséges erőforrásjogok az oldal megtekintési jogain felül |
+| --- | --- |
+| Lista, szűrés, rendezés, Excel-export | Árkalkulációs sorok: View any |
+| Részletek | Árkalkulációs sorok: View |
+| Kisker manuális ár és jóváhagyás | Árkalkulációs sorok: Update |
+| Bekerülési vagy kisker teljes újraszámítás | Árprojektek: Update; Árkalkulációs sorok: Create + Update |
+| Szállítás% / vám% átírása és újraszámítás | Árprojektek: Update; Árkalkulációs sorok: Create + Update; Árparaméterek / PricingParameter: Create + Update |
+
+A paraméterválasztás új, szűkebb szabályt is létrehozhat, ezért itt Create és
+Update együtt szükséges. A szerkesztőmezők és akciók a jogosultságokhoz
+igazodnak. A szolgáltatások is ellenőrzik a jogokat minden adatírás előtt;
+a megerősítés újra ellenőriz, nem csak a szerkesztés megkezdése.
+A csak megtekintő szerepkör nem módosíthat paramétert, árat vagy jóváhagyást,
+és nem indíthat újraszámítást, általános sor-szerkesztést vagy tömeges törlést.
+
+Nincs új migráció vagy automatikus szerepkör-módosítás. Shield-generálás sem
+kell: a két oldal az Oldalak fülön megjelenik; a Shield a kijelölt permission
+rekordokat a szerepkör mentésekor létrehozza, ha még hiányoznak. A super_admin
+hozzáférése megmarad. A partnerportál jogosultságait nem módosítjuk.
 
 ## Tesztelés és telepítés
 
