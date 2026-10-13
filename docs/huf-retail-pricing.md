@@ -284,6 +284,40 @@ Nincs új migráció, Composer install, npm build, kézi feltöltés vagy Shield
 Kihelyezéskor csak cache-törlés és újraépítés szükséges; a fenti Git/NAS és
 cPanel parancsok az összes jelenlegi helyi változtatást együtt tartalmazzák.
 
+### Értékoszlopok jobbra igazítása
+
+A Bekerülési értékek, a HUF kisker árak és az általános árkalkulációs lista
+számoszlopai jobbra igazítottak: árak, árfolyam, százalékok, szorzók és
+vizsgált árak darabszáma. A fejléc és a szerkeszthető beviteli mező is követi
+az igazítást. A modell-/beszállítókód, pénznem és más szöveges mezők változatlanok.
+Az igazítást a Filament natív oszlopkonfigurációja kezeli; megmarad a mentett
+oszlopszélesség, sorrend, tizedesbeállítás és eltérésjelzés. Számítás, adat és
+Excel-export nem változik. A regressziós teszt a ténylegesen renderelt fejléceket
+és beviteli mezőket is ellenőrzi.
+
+Ellenőrzés: 87 kapcsolódó teszt, 813 assertion sikeres; Pint és `git diff --check`
+hibamentes. A változás egyelőre csak helyi, külön NAS-kihelyezési kérésre vár.
+
+Ehhez nincs új migráció, Composer install, npm build, kézi feltöltés,
+új jogosultság vagy .env módosítás. Kihelyezés után cache-frissítés szükséges.
+
+Git/NAS a `feature/pricing-module` worktree-ben, külön kihelyezési kérésre:
+
+```powershell
+git add -- app/Filament/Support/AdminResourceTable.php tests/Feature/PricingDecimalPreferencesTest.php docs/huf-retail-pricing.md
+git commit -m "Right align pricing values, headers and editable inputs"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ### Kalkulációs modul telepítése
 
 A helyi vendor könyvtár közös junctionja mellett is a helyes worktree-t teszteli:

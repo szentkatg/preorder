@@ -90,6 +90,15 @@ class AdminResourceTable
             ->sortable()
             ->searchable(isIndividual: true);
 
+        if ($modelClass === PricingCalculationRow::class && in_array($column->getName(), [
+            'purchase_price', 'exchange_rate', 'shipping_cost_percent', 'customs_percent', 'candidate_count',
+            'base_price', 'multiplier', 'calculation_multiplier', 'unrounded_price',
+            'calculated_price', 'manual_price', 'retained_price', 'final_price', 'target_purchase_price',
+        ], true)) {
+            // Filament applies the alignment to the header, cell content and editable input.
+            $column->alignEnd();
+        }
+
         if ($modelClass === Order::class) {
             self::configureOrderTotalColumn($column);
         }

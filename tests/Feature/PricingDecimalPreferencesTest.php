@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\Season;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Alignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
@@ -222,6 +223,56 @@ class PricingDecimalPreferencesTest extends TestCase
             return count($export->columnFormats()) === 3 && $export->query()->count() === 1;
         });
         $this->travelBack();
+    }
+
+    public function test_pricing_values_headers_and_editable_inputs_are_right_aligned(): void
+    {
+        foreach ([
+            PricingCostCalculations::class => ['purchase_price', 'exchange_rate', 'shipping_cost_percent',
+                'customs_percent', 'candidate_count', 'calculated_price', 'manual_price', 'final_price'],
+            PricingHufRetailCalculations::class => ['purchase_price', 'base_price', 'multiplier', 'calculation_multiplier',
+                'unrounded_price', 'calculated_price', 'manual_price', 'final_price', 'target_purchase_price'],
+        ] as $pageClass => $names) {
+            $page = Livewire::test($pageClass);
+            $columns = $page->instance()->tableColumns;
+            foreach ($columns as &$column) {
+                $column['isToggled'] = true;
+            }
+            unset($column);
+            $page->call('applyTableColumnManager', $columns)->assertSuccessful();
+            $table = $page->instance()->getTable();
+            foreach ($names as $name) {
+                $this->assertSame(Alignment::End, $table->getColumn($name)->getAlignment(), $pageClass.': '.$name);
+            }
+            foreach (['product.model_code', 'product.name_hu', 'purchaseCurrency.code', 'status'] as $name) {
+                $this->assertNotSame(Alignment::End, $table->getColumn($name)->getAlignment(), $name);
+            }
+
+            $dom = new \DOMDocument;
+            $previousErrors = libxml_use_internal_errors(true);
+            try {
+                $dom->loadHTML('<?xml encoding="UTF-8">'.$page->html());
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previousErrors);
+            }
+            $xpath = new \DOMXPath($dom);
+            foreach ($names as $name) {
+                $key = str_replace('_', '-', $name);
+                $header = $xpath->query('//th[contains(@class, "fi-ta-header-cell-'.$key.'")]')->item(0);
+                $this->assertNotNull($header, 'Missing header: '.$name);
+                $this->assertStringContainsString('fi-align-end', $header->getAttribute('class'), $name);
+            }
+            $inputNames = $pageClass === PricingCostCalculations::class ? ['shipping_cost_percent', 'customs_percent'] : ['manual_price'];
+            foreach ($inputNames as $name) {
+                $key = str_replace('_', '-', $name);
+                $input = $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input[contains(@class, "fi-input")]')->item(0);
+                $this->assertNotNull($input, 'Missing input: '.$name);
+                $this->assertStringContainsString('fi-align-end', $input->getAttribute('class'));
+            }
+        }
+        $this->assertSame('496.1299', $this->retail->fresh()->final_price);
+        $this->assertSame('123.4567', $this->cost->fresh()->final_price);
     }
 
     private function formatted($page, string $field, PricingCalculationRow $row): string
