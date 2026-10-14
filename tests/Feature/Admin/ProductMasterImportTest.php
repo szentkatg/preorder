@@ -105,6 +105,54 @@ class ProductMasterImportTest extends TestCase
         ];
     }
 
+    #[DataProvider('excelDeliveryDateFormats')]
+    public function test_real_excel_dates_ignore_display_format_during_validation_and_import(string $format, mixed $value): void
+    {
+        $this->createProductReferences();
+        $sheet = (new Spreadsheet)->getActiveSheet();
+        $sheet->fromArray([
+            ['model_code', 'name_hu', 'season_code', 'brand_code', 'order_sheet_type_code', 'item_main_group_code', 'promised_delivery_date'],
+            ['EXCEL-DATE', 'Excel dátum teszt', 'S01', 'BR', 'STD', 'TST', $value],
+        ]);
+        $sheet->getStyle('G2')->getNumberFormat()->setFormatCode($format);
+        $page = $this->importPage();
+        $rows = $page->rowsFromSheet($sheet);
+        $this->assertEquals(46295, $rows[0]['promised_delivery_date']);
+        $this->assertSame([], $page->validateProductRows($rows));
+        $page->importProductRows($rows);
+        $this->assertSame('2026-09-30', Product::where('model_code', 'EXCEL-DATE')->firstOrFail()->promised_delivery_date);
+    }
+
+    public static function excelDeliveryDateFormats(): array
+    {
+        return [
+            'US display used in the W26 workbook' => ['m/d/yyyy', 46295],
+            'Hungarian dotted display' => ['yyyy.mm.dd', 46295],
+            'ISO display' => ['yyyy-mm-dd', 46295],
+            'date and time display' => ['m/d/yyyy h:mm AM/PM', 46295],
+            'date formula' => ['m/d/yyyy', '=DATE(2026,9,30)'],
+        ];
+    }
+
+    public function test_date_cell_coordinates_survive_blank_rows_and_other_columns_keep_zero_padding(): void
+    {
+        $sheet = (new Spreadsheet)->getActiveSheet();
+        $sheet->fromArray([
+            ['model_code', 'promised_delivery_date'],
+            [1, 46295],
+            [null, null],
+            [2, 46280],
+        ]);
+        $sheet->getStyle('A2:A4')->getNumberFormat()->setFormatCode('00000');
+        $sheet->getStyle('B2:B4')->getNumberFormat()->setFormatCode('m/d/yyyy');
+        $rows = $this->importPage()->rowsFromSheet($sheet);
+        $this->assertCount(2, $rows);
+        $this->assertSame('00001', $rows[0]['model_code']);
+        $this->assertSame('00002', $rows[1]['model_code']);
+        $this->assertEquals(46295, $rows[0]['promised_delivery_date']);
+        $this->assertEquals(46280, $rows[1]['promised_delivery_date']);
+    }
+
     private function importPage(): ProductMasterImport
     {
         return new class extends ProductMasterImport

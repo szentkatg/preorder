@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Models\Brand;
 use App\Models\Color;
 use App\Models\ColorImage;
-use App\Models\ItemAssortment;
 use App\Models\ItemMainGroup;
 use App\Models\OrderSheetType;
 use App\Models\Product;
@@ -263,7 +262,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         }
 
         $headerRow = $sheet->rangeToArray(
-            'A1:' . $sheet->getHighestColumn() . '1',
+            'A1:'.$sheet->getHighestColumn().'1',
             null,
             true,
             true,
@@ -477,6 +476,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $modelCode || $this->isInvalidModel($modelCode)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -532,68 +532,70 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         $skipped = 0;
         $imagesCreated = 0;
         $imagesUpdated = 0;
-    
+
         $products = Product::query()
             ->whereNotNull('model_code')
             ->get()
             ->keyBy('model_code');
-    
+
         foreach ($rows as $row) {
             $modelCode = $this->nullIfEmpty($row['model_code'] ?? null);
             $colorCode = $this->nullIfEmpty($row['color_code'] ?? null);
-    
+
             if (! $modelCode || ! $colorCode || $this->isInvalidModel($modelCode)) {
                 $skipped++;
+
                 continue;
             }
-    
+
             $product = $products->get($modelCode);
-    
+
             if (! $product) {
                 $skipped++;
+
                 continue;
             }
-    
+
             $color = Color::firstOrNew([
                 'product_id' => $product->id,
                 'code' => $colorCode,
             ]);
-    
+
             $exists = $color->exists;
-    
+
             $color->forceFill([
                 'name_hu' => $this->nullIfEmpty($row['name_hu'] ?? null) ?? $colorCode,
                 'name_en' => $this->nullIfEmpty($row['name_en'] ?? null),
                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                 'active' => $this->boolValue($row['active'] ?? true),
             ]);
-    
+
             $color->save();
-    
+
             $exists ? $updated++ : $created++;
-    
+
             $imageUrl = $this->nullIfEmpty($row['image_url'] ?? null);
-    
+
             if ($imageUrl) {
                 $colorImage = ColorImage::firstOrNew([
                     'product_id' => $product->id,
                     'color_id' => $color->id,
                     'image_url' => $imageUrl,
                 ]);
-    
+
                 $imageExists = $colorImage->exists;
-    
+
                 $colorImage->forceFill([
                     'sort_order' => (int) ($row['sort_order'] ?? 10),
                     'active' => $this->boolValue($row['active'] ?? true),
                 ]);
-    
+
                 $colorImage->save();
-    
+
                 $imageExists ? $imagesUpdated++ : $imagesCreated++;
             }
         }
-    
+
         $this->statistics['Színek létrehozva'] = $created;
         $this->statistics['Színek frissítve'] = $updated;
         $this->statistics['Színek kihagyva'] = $skipped;
@@ -613,7 +615,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         $colors = Color::query()
             ->with('product')
             ->get()
-            ->keyBy(fn (Color $color) => $color->product?->model_code . '|' . $color->code);
+            ->keyBy(fn (Color $color) => $color->product?->model_code.'|'.$color->code);
 
         foreach ($rows as $row) {
             $modelCode = $this->nullIfEmpty($row['model_code'] ?? null);
@@ -622,6 +624,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $modelCode || ! $colorCode || ! $skuCode || $this->isInvalidModel($modelCode)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -630,6 +633,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $product || ! $color) {
                 $skipped++;
+
                 continue;
             }
 
@@ -667,7 +671,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         $colors = Color::query()
             ->with('product')
             ->get()
-            ->keyBy(fn (Color $color) => $color->product?->model_code . '|' . $color->code);
+            ->keyBy(fn (Color $color) => $color->product?->model_code.'|'.$color->code);
 
         $skus = Sku::query()->whereNotNull('sku_code')->get()->keyBy('sku_code');
 
@@ -677,6 +681,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $modelCode || ! $colorCode || $this->isInvalidModel($modelCode)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -687,6 +692,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             if (! $product || ! $color || ! $assortmentSku || ! $componentSku) {
                 $skipped++;
+
                 continue;
             }
 
@@ -737,11 +743,19 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
         $result = [];
 
-        foreach ($rows as $row) {
+        foreach ($rows as $rowIndex => $row) {
             $item = [];
 
             foreach ($headers as $column => $header) {
                 $item[$header] = $row[$column] ?? null;
+                if ($header === 'promised_delivery_date') {
+                    // Keep Excel date serials independent of locale/display formatting.
+                    // Other columns retain their formatting (for example zero-padded codes).
+                    $rawValue = $sheet->getCell($column.($rowIndex + 2))->getCalculatedValue();
+                    if (is_numeric($rawValue)) {
+                        $item[$header] = $rawValue;
+                    }
+                }
             }
 
             $hasValue = collect($item)

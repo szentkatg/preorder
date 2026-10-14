@@ -185,3 +185,39 @@ Utána mindig ugyanazt a teljes scriptútvonalat használjuk. Másik worktree-be
 helyezett scripthez új szabály szükséges; a mentett szabály nem írja felül a
 szervezeti tiltásokat. A Git add/commit/push a már külön engedélyezett Git
 parancsokat használja.
+
+## Valódi Excel-dátumok a terméktörzs-importban
+
+A `promised_delivery_date` számmal tárolt Excel-dátumait az importáló a nyers,
+illetve képletből kiszámított cellaértékből olvassa. A cella megjelenítési
+formátuma nem változtatja meg a dátumot: az `m/d/yyyy` formátummal kijelzett
+`9/30/2026` ugyanúgy `2026-09-30`-ként menthető, mint az ISO vagy pontozott
+megjelenítés. Szöveges cellánál a meglévő támogatott dátumformátumok maradnak.
+Más oszlopok formázott értékeit nem változtatjuk meg, így a kezdő nullás
+azonosítók megmaradnak. Az eredeti munkafüzetet nem kell módosítani.
+
+Ellenőrzés: 10 importteszt, 37 ellenőrzés sikeres. A megadott W26 munkafüzet
+292 terméksorának dátumhibája megszűnt; ez a dátumokra vonatkozik, a többi
+törzsadat- és hivatkozásellenőrzést nem kapcsoljuk ki. Kihelyezés után
+ugyanazzal a fájllal újra kell futtatni a **Validálás** műveletet.
+
+Nincs új migráció, Composer install, frontend build, kézi fájlfeltöltés,
+.env-módosítás vagy jogosultság-beállítás.
+
+Git és NAS a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/ProductMasterImport.php tests/Feature/Admin/ProductMasterImportTest.php docs/nas-deployment.md
+git commit -m "Read product delivery dates from raw Excel cell values"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Az éles WePanel-rendszert nem frissítjük automatikusan. Külön jóváhagyott
+élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
