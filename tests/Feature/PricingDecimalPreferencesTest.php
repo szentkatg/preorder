@@ -275,6 +275,37 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->assertSame('123.4567', $this->cost->fresh()->final_price);
     }
 
+    public function test_width_save_and_reset_do_not_resend_the_table_but_keep_user_preferences(): void
+    {
+        $before = $this->retail->fresh()->getAttributes();
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class] as $pageClass) {
+            $page = Livewire::test($pageClass)->call('savePricingColumnWidths', ['final-price' => 110]);
+            $this->assertArrayNotHasKey('html', $page->effects);
+            $this->assertSame(['final-price' => 110], $page->instance()->pricingColumnWidths);
+            $this->assertLessThan(20000, strlen(json_encode(['snapshot' => $page->snapshot, 'effects' => $page->effects])));
+            $fresh = Livewire::test($pageClass);
+            $this->assertSame(['final-price' => 110], $fresh->instance()->pricingColumnWidths);
+            $fresh->call('resetPricingColumnWidths');
+            $this->assertArrayNotHasKey('html', $fresh->effects);
+            $this->assertSame([], $fresh->instance()->pricingColumnWidths);
+            $this->assertSame([], Livewire::test($pageClass)->instance()->pricingColumnWidths);
+        }
+        $this->assertSame($before, $this->retail->fresh()->getAttributes());
+    }
+
+    public function test_width_save_does_not_suppress_another_bundled_table_change(): void
+    {
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $columns = $page->instance()->tableColumns;
+        $page->update([
+            ['method' => 'savePricingColumnWidths', 'params' => [['final-price' => 110]]],
+            ['method' => 'applyTableColumnManager', 'params' => [$columns]],
+        ]);
+        $this->assertArrayHasKey('html', $page->effects);
+        $this->assertSame(['final-price' => 110], $page->instance()->pricingColumnWidths);
+        $page->assertSee('DEC-001');
+    }
+
     private function formatted($page, string $field, PricingCalculationRow $row): string
     {
         $column = $page->instance()->getTable()->getColumn($field)->record($row);

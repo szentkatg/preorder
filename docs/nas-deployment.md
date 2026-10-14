@@ -120,6 +120,60 @@ git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan optimize
 ```
 
+## Teljesítmény és HTTP-tömörítés
+
+Az `infrastructure/docker/nginx/default.conf` gzip-beállításokat tartalmaz,
+hogy a HTML-t tartalmazó Livewire JSON-válaszok is tömörítve menjenek át a hálózaton.
+Az app-only telepítő ezt a fájlt csak a Git-repositoryban frissíti. A compose fájl
+egy host-oldali fájlt mountol az Nginx-be; a tényleges útvonalat ellenőrizni kell,
+nem szabad feltételezni, hogy megegyezik a konténerben lehúzott Git-fájllal.
+Konfigurációváltozáskor a telepítő `NGINX ACTION REQUIRED` jelzést ad.
+
+Egyszeri NAS-üzemeltetői lépések, a host terminálján, megfelelő sudo joggal:
+
+1. Azonosítsd a `default.conf` runtime forrását:
+
+   ```bash
+   sudo /usr/local/bin/docker inspect preorder-v2-dev-nginx --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}'
+   ```
+
+2. A kapott pontos fájlról készíts mentést. Ebbe a meglévő konfigurációba vidd át
+   a projekt `default.conf` új gzip direktíváit. Egyedi root/upstream/TLS-beállítást
+   ne írj felül. Az első aktiváláshoz szükséges új blokk:
+
+   ```nginx
+   gzip on;
+   gzip_vary on;
+   gzip_comp_level 5;
+   gzip_min_length 1024;
+   gzip_proxied expired no-cache no-store private auth;
+   gzip_types application/json application/javascript text/css text/plain image/svg+xml;
+   ```
+
+3. Előbb szintaxisellenőrzés, és csak sikeres ellenőrzés után graceful reload:
+
+   ```bash
+   sudo /usr/local/bin/docker exec preorder-v2-dev-nginx nginx -t
+   sudo /usr/local/bin/docker exec preorder-v2-dev-nginx nginx -s reload
+   ```
+
+   Hibás szintaxisnál ne futtasd a reloadot; állítsd vissza a mentett fájlt,
+   és ismételd meg az ellenőrzést. Konténer-/adatbázis-újraindítás nem szükséges.
+
+4. Ellenőrizd a böngésző Network nézetében egy árlista-módosítás vagy rendezés
+   `/livewire/update` válaszát: `Content-Encoding: gzip`, `Vary: Accept-Encoding`.
+   A **transferred** méretet nézd, ne a kitömörített **resource size** értéket;
+   az utóbbi továbbra is nagy lesz. A szűrés, ár/státusz, szorzó/átlag és kijelölés
+   helyességét is ellenőrizd. Az eredeti gzip direktívák visszaállítása és újabb
+   `nginx -t` / reload visszavonja ezt az üzemeltetési változtatást.
+
+A jelenlegi jelszó nélküli `preorder-admin artisan` segédparancs nem kezel
+Nginx-mountot, config-másolást vagy reloadot. Ne adj általános Docker/root jogot
+csak emiatt; az üzemeltető egyszer elvégezheti a fenti lépéseket. Ha később ezt is
+automatizáljuk, pontosan erre a konténerre és ellenőrzött configcélra korlátozott
+host segédparancs szükséges. cPanel-élesítéshez külön webszerver-beállítás kell;
+oda ezt az Nginx-konfigurációt nem telepítjük.
+
 ## Codex-engedélyezés
 
 A script első Codex-futtatásakor a **tartós engedélyezés** lehetőséget válaszd a

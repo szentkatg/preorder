@@ -116,6 +116,7 @@ try {
         throw new \RuntimeException('Frontend build inputs changed. Build on Windows and arrange public/build upload before deployment. The NAS working tree was not updated.');
     }
     $composerChanged = (bool) preg_match('~^composer\.(?:json|lock)$~m', $changes);
+    $nginxConfigChanged = (bool) preg_match('~^infrastructure/docker/nginx/default\.conf$~m', $changes);
     if ($composerChanged) {
         $read('command -v composer');
     }
@@ -130,6 +131,9 @@ try {
     $run('php artisan optimize');
     if ($read('git rev-parse HEAD') !== $expected) {
         throw new \RuntimeException('Deployed commit does not match the target.');
+    }
+    if ($nginxConfigChanged) {
+        echo "NGINX ACTION REQUIRED: the application repository is updated, but the host-mounted Nginx config is not managed by this command. Verify the mount, update the runtime config, run nginx -t and reload preorder-v2-dev-nginx. See docs/nas-deployment.md.\n";
     }
     echo 'DEPLOY OK: ' . substr($expected, 0, 7) . " on {$branch}\n";
 } finally {

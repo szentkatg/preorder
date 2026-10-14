@@ -7,6 +7,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\Width;
+use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Filament\Tables\Columns\Column;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Locked;
@@ -132,6 +133,10 @@ trait HasPricingTablePreferences
                 'value' => $this->pricingColumnWidths,
             ],
         );
+
+        // The browser already resized the columns. No table HTML is needed.
+        // Unlike skipRender(), this still permits a full render for other bundled changes.
+        app(PartialsComponentHook::class)->skipPartialRender($this);
     }
 
     public function resetPricingColumnWidths(): void
@@ -148,6 +153,8 @@ trait HasPricingTablePreferences
             ->where('user_id', $userId)
             ->where('preference_key', $this->pricingColumnWidthPreferenceKey())
             ->delete();
+
+        app(PartialsComponentHook::class)->skipPartialRender($this);
     }
 
     abstract protected function pricingPreferencePrefix(): string;

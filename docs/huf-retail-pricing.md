@@ -318,6 +318,88 @@ git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan optimize
 ```
 
+### Árlista-műveletek adatforgalma és teljesítménye
+
+Az első optimalizálás nem változtat a lapméreten, az árakon, a szűréseken,
+az oszlopokon vagy a jóváhagyási szabályokon. A manuális ár és a rendezés a
+teljes listát frissíti, hogy a sorrend, az átlag, a státusz és a színezés helyes maradjon.
+
+A 100 soros, helyi SQLite/Livewire tesztben a válasz méretének döntő része
+a teljes táblázat HTML-je, nem a Livewire-állapot. Szintetikus adatokkal mértünk,
+nem a NAS üzleti adatain módosítottunk:
+
+| Művelet | Válasz tömörítés nélkül | Gzip 5 becslés |
+| --- | ---: | ---: |
+| Manuális kiskerár módosítása | 3 347 718 bájt | kb. 87 700 bájt |
+| Ár szerinti rendezés | 3 347 877 bájt | kb. 86 700 bájt |
+| Jóváhagyó ablak megnyitása | 22 898 bájt | kb. 4 100 bájt |
+| Oszlopszélesség mentése, korábban | 3 343 916 bájt | kb. 85 800 bájt |
+| Oszlopszélesség mentése, javítás után | 6 295 bájt | kb. 1 230 bájt |
+
+A tömörített méretek az alkalmazás válaszának helyi `gzencode(..., 5)` méréséből
+származnak; nem élő Nginx-válaszok. A NAS nyilvános login GET ellenőrzésekor,
+`Accept-Encoding: gzip` kérés mellett nem érkezett `Content-Encoding` fejléc.
+Az élő, hitelesített árlista POST-ot külön a böngésző Network nézetében kell
+ellenőrizni kihelyezés után. A pontos méret az oszlopoktól, soroktól és adatoktól függ.
+
+Az oszlopszélesség mentése és visszaállítása most csak a felhasználói
+beállítást menti. A böngésző már elvégezte a méretezést, ezért nem küldjük újra
+a táblázatot. A Filament natív részleges-render hookját használjuk, nem globális
+`skipRender()`-t: az ugyanabba a kérésbe csomagolt ármódosítás vagy oszlopválasztás
+továbbra is teljes, helyes frissítést kap. A rejtett/újrarendezett oszlopok és
+a következő belépéskor visszatöltött szélességek változatlanul működnek.
+Az önálló szélességmentés helyi mért ideje kb. 0,87 s-ról 0,04 s-ra csökkent;
+ez nem NAS-teljesítménygarancia.
+
+Ellenőrzés: a teljes csomag 136 tesztje / 1003 assertionje közül 134 teszt sikeres;
+csak a két korábbról ismert admin-resource darabszám-elvárás hibázik (32/31 helyett 30).
+Új hiba nincs. A 100 soros payload-teszt, a mentett szélességek és a csomagolt
+kérések tesztjei sikeresek; gzip-dekódolás után a válasz bájtra azonos.
+Pint, `git diff --check`, a telepítő PowerShell és beágyazott PHP szintaxisa hibamentes.
+Az Nginx runtime `nginx -t` és az élő gzip POST ellenőrzése még üzemeltetői lépés.
+
+Az Nginx-konfiguráció előkészíti a gzip tömörítést a HTML/JSON és szöveges
+assetek számára. Ez a rendezés és ármódosítás hálózati forgalmát is jelentősen
+csökkenti, de nem szünteti meg a szerveroldali HTML-renderelés költségét.
+A képek és XLSX-exportok bináris típusa nincs a gzip típuslistában.
+A `Vary: Accept-Encoding` fejléc és a proxy mögötti privát/no-cache válaszok kezelése
+az [Nginx hivatalos gzip-beállításait](https://nginx.org/en/docs/http/ngx_http_gzip_module.html)
+követi. HTTPS-élesítésnél a szolgáltatóval a dokumentációban említett BREACH-kockázatot
+is ellenőrizni kell; a cPanel konfigurációját nem módosítjuk automatikusan.
+
+Fontos: a projekt Git-frissítése **nem feltétlenül frissíti** a NAS Nginx-be
+csatolt konfigurációs fájlt. A runtime mount azonosítása, a beállítások átvitele,
+`nginx -t`, reload és a tömörítés élő ellenőrzése külön szükséges; részletek a
+`docs/nas-deployment.md` Teljesítmény és HTTP-tömörítés részében. A jelenlegi
+`preorder-admin artisan` jogosultság önmagában erre nem elég. A közvetlen,
+csak olvasásos Docker-inspect próbára a NAS jelszót kért, ezért a mountot és
+a konfiguráció szintaxisát élőben még nem ellenőriztük.
+
+Nincs új migráció, Composer install, npm build, ár-újraszámítás, Shield-generálás
+vagy .env módosítás. Az alkalmazáshoz cache-frissítés kell. Kézi beavatkozás:
+a NAS host-mounted Nginx-konfiguráció frissítése és újratöltése; az app-only
+univerzális telepítő külön `NGINX ACTION REQUIRED` jelzést ad, ha ez a fájl változott.
+
+Git/NAS a `feature/pricing-module` worktree-ben, külön kért kihelyezéshez:
+
+```powershell
+git add -- app/Filament/Support/Concerns/HasPricingTablePreferences.php infrastructure/docker/nginx/default.conf infrastructure/scripts/deploy-nas.ps1 tests/Feature/PricingDecimalPreferencesTest.php tests/Feature/HufRetailCalculationTest.php tests/Feature/PricingPayloadPerformanceTest.php docs/huf-retail-pricing.md docs/nas-deployment.md
+git commit -m "Avoid layout rerenders and prepare compressed Livewire responses"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+cPanel csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+A cPanel webszerver tömörítését külön a tárhelyszolgáltatóval kell egyeztetni.
+A NAS Nginx-konfigurációját nem másoljuk át az éles tárhelyre.
+
 ### Kalkulációs modul telepítése
 
 A helyi vendor könyvtár közös junctionja mellett is a helyes worktree-t teszteli:

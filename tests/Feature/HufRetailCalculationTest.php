@@ -1036,6 +1036,21 @@ class HufRetailCalculationTest extends TestCase
         $this->assertNull($this->retail()->approved_by);
     }
 
+    public function test_bundled_width_save_and_manual_price_edit_still_refresh_the_prices_and_average(): void
+    {
+        $this->calculate();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $page->update([
+            ['method' => 'savePricingColumnWidths', 'params' => [['final-price' => 110]]],
+            ['method' => 'updateTableColumnState', 'params' => ['manual_price', (string) $this->retail()->id, '1490']],
+        ])->assertHasNoErrors();
+        $this->assertArrayHasKey('html', $page->effects);
+        $this->assertSame('1490.0000', $this->retail()->final_price);
+        $this->assertEqualsWithDelta(1490 / 460, $page->instance()->averageRetailMultiplier, 0.0000001);
+        $this->assertSame(['final-price' => 110], $page->instance()->pricingColumnWidths);
+    }
+
     private function addColorCost(string $code): PricingCalculationRow
     {
         $cost = $this->cost->replicate();
