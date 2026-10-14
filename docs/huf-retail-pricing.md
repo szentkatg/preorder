@@ -7,6 +7,73 @@ HUF pénznemű kisker árlistára futtatható. Az árlistatörzs szezonfüggetle
 a kalkuláció szezonját az árprojekt határozza meg. Ugyanaz az árlista
 több szezonban is használható, a publikált árak szezonja a tételekhez tartozik.
 
+## Közös árprojekt-választó és archív nézet
+
+A **Bekerülési értékek** és **HUF kisker árak** munkafelületen először
+árprojektet választunk. A szezon az árprojektből következik: nincs külön
+szezonválasztó, és a szezon aktív jelölője vagy határideje nem korlátozza a munkát.
+A feldolgozhatóságot kizárólag az árprojekt státusza határozza meg:
+`draft` (Tervezet) és `active` (Aktív) feldolgozható, `closed` (Lezárt) nem.
+Az árprojekt korábbi `active` jelölője sem feltétele a kalkulációnak.
+
+- Egyszerre csak egy árprojekt sorai töltődnek be. Több választható projektnél
+  választás nélkül üres a lista; pontosan egy projektnél automatikusan kiválasztjuk.
+- A választás és az archív mód felhasználónként az `admin_ui_preferences`
+  táblában megmarad (`pricing_workspace_project_context`), a két munkafelület közösen használja.
+- Az **Archív megtekintés** kizárólag lezárt projektek kiválasztását engedi.
+  Az archív munkafelületen a sorok olvashatók, szűrhetők, rendezhetők és
+  Excelbe exportálhatók; újraszámítás, paramétermódosítás, manuális kiskerár,
+  jóváhagyás és tömeges törlés nem indítható.
+- A táblázat, export, tömeges műveletek és átlagos szorzó szerveroldali
+  lekérdezése is az adott projektre korlátozott. Projektváltáskor a függőben
+  lévő szerkesztés, nyitott akció, kijelölés és keresés/szűrés törlődik.
+  Az oszlopsorrend, láthatóság, szélesség és tizedesbeállítás megmarad.
+- A projektválasztó nem ad új jogosultságot: a megtekintő szerepkör továbbra
+  sem írhat. A kalkulációs szolgáltatások a tranzakcióban ellenőrzik a lezárást,
+  így egy korábban megnyitott oldal sem menthet már lezárt projektet.
+
+Ez a devizás kiskerárak előkészítésének első lépése. Az EUR/CZK/RON/PLN
+kalkuláció és közös pénznemes munkafelület még nem része ennek a változtatásnak.
+Nem zárunk le automatikusan régi projekteket: amelyeket ki szeretnénk venni
+a feldolgozásból, azokat az **Árprojektek** törzsben **Lezárt** státuszra kell állítani.
+Az archív korlátozás a két munkafelületre és kalkulációs szolgáltatásaikra
+vonatkozik; nem adatbázisszintű zárolás, és nem szünteti meg a törzskezelő jogosultságokat.
+
+Ehhez **nem szükséges új migráció, Composer install, npm build, kézi
+fájlfeltöltés, .env-módosítás vagy Shield-generálás**. A meglévő felhasználói
+beállítástáblát használjuk. A NAS-frissítés külön kihelyezési kérésre történik;
+az éles WePanel-rendszert nem érinti.
+
+Ellenőrzés a pricing worktree-ben:
+
+Az új projektkontextus 14 tesztje és 118 ellenőrzése sikeres. A teljes
+csomagban 148/150 teszt sikeres (1121 ellenőrzés); a két korábbról ismert
+admin-resource darabszám-elvárás továbbra is hibás (30 helyett 32, illetve 31).
+A PHP-formázás és a `git diff --check` rendben. Az új választót Livewire
+renderelési teszt ellenőrzi, valódi böngészős vizuális ellenőrzés még nem történt.
+
+```powershell
+php -d memory_limit=256M -d extension=pdo_sqlite -d extension=sqlite3 infrastructure/scripts/test-worktree.php tests/Feature/PricingProjectContextTest.php tests/Feature/HufRetailCalculationTest.php tests/Feature/PricingAuthorizationTest.php
+```
+
+Git és NAS, külön kihelyezési kérés után, kizárólag a módosított fájlokkal:
+
+```powershell
+git add -- app/Filament/Pages/PricingCostCalculations.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Resources/PricingCalculationRows/Tables/PricingCalculationRowsTable.php app/Filament/Support/Actions/CalculateHufRetailAction.php app/Filament/Support/Concerns/HasPricingProjectContext.php app/Models/PricingProject.php app/Services/Pricing/CostCalculationAuthorization.php app/Services/Pricing/CostCalculationService.php app/Services/Pricing/HufRetailCalculationService.php app/Services/Pricing/PricingParameterAdjustmentService.php app/Services/Pricing/RetailPriceReviewService.php resources/views/filament/pages/pricing-cost-calculations.blade.php tests/Feature/HufRetailCalculationTest.php tests/Feature/PricingProjectContextTest.php docs/huf-retail-pricing.md
+git commit -m "Scope pricing workspaces to a remembered project and add read-only archives"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanelen csak külön engedélyezett élesítés és az éles ágba integrálás után,
+az éles projekt könyvtárában:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Excel-export és tizedeselválasztó
 
 A közös admin-táblázat export a numerikus oszlopokat és a modell numerikus

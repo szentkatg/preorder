@@ -137,8 +137,8 @@ class RetailPriceReviewService
             Gate::authorize('update', $stored);
 
             if ($stored->price_type !== PricingCalculationRow::TYPE_RETAIL || $stored->currency?->code !== 'HUF'
-                || ! $stored->pricingProject?->active || $stored->pricingProject->status === PricingProject::STATUS_CLOSED) {
-                throw new DomainException('Csak aktív árprojekt HUF kisker ára módosítható.');
+                || ! ($stored->pricingProject?->isOpenForPricing() ?? false)) {
+                throw new DomainException('Csak nem lezárt árprojekt HUF kisker ára módosítható.');
             }
 
             app(RetailCalculationDependencyService::class)->assertCalculationCurrent($stored);

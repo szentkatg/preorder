@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
@@ -25,6 +26,7 @@ class PricingCostCalculations extends Page implements HasTable
     use HasPageShield {
         canAccess as protected canAccessUsingPagePermission;
     }
+    use HasPricingProjectContext;
     use HasPricingTablePreferences, InteractsWithTable {
         HasPricingTablePreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
         HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
@@ -60,6 +62,7 @@ class PricingCostCalculations extends Page implements HasTable
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+        $this->initialisePricingProjectContext();
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
         $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
     }
@@ -83,6 +86,7 @@ class PricingCostCalculations extends Page implements HasTable
         mixed $value,
     ): void {
         abort_unless(static::canAccess(), 403);
+        abort_unless($this->pricingWorkspaceIsEditable(), 403);
         if (! is_numeric($value) || (float) $value < 0) {
             Notification::make()
                 ->title('Érvénytelen érték')
@@ -110,6 +114,7 @@ class PricingCostCalculations extends Page implements HasTable
         }
 
         $record = PricingCalculationRow::query()
+            ->where('pricing_project_id', $this->pricingProjectId)
             ->with(['pricingProject', 'product.itemMainGroup', 'supplier'])
             ->find($recordId);
 
@@ -154,6 +159,7 @@ class PricingCostCalculations extends Page implements HasTable
     public function confirmPendingParameterAdjustment(): void
     {
         abort_unless(static::canAccess(), 403);
+        abort_unless($this->pricingWorkspaceIsEditable(), 403);
         if (! $this->pendingParameterAdjustment) {
             return;
         }
@@ -174,6 +180,7 @@ class PricingCostCalculations extends Page implements HasTable
         }
 
         $record = PricingCalculationRow::query()
+            ->where('pricing_project_id', $this->pricingProjectId)
             ->with(['pricingProject', 'product.itemMainGroup', 'supplier'])
             ->find($this->pendingParameterAdjustment['record_id']);
 
@@ -248,9 +255,13 @@ class PricingCostCalculations extends Page implements HasTable
                     ])
             )
             ->modifyQueryUsing(
-                fn (Builder $query): Builder => $query
+                fn (Builder $query): Builder => $this->scopePricingProjectContext($query)
                     ->where('price_type', PricingCalculationRow::TYPE_COST)
             );
+
+        $filters = $table->getFilters();
+        unset($filters['pricing_project_id']);
+        $table->filters(array_values($filters));
 
         foreach (['purchase_price' => 4, 'exchange_rate' => 4, 'calculated_price' => 2, 'manual_price' => 2, 'final_price' => 2] as $name => $defaultDecimals) {
             $table->getColumn($name)->numeric(

@@ -87,7 +87,8 @@ class CostCalculationService
         ];
 
         DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $hufCurrency, $runId, &$result): void {
-            PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
+            $lockedProject = PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
+            CostCalculationAuthorization::authorizeRecalculation($lockedProject);
             foreach ($productsWithoutActivePurchasePrice as $product) {
                 PricingCalculationError::query()->create([
                     'run_id' => $runId,

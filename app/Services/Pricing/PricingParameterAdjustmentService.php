@@ -4,11 +4,27 @@ namespace App\Services\Pricing;
 
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
+use App\Models\PricingProject;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class PricingParameterAdjustmentService
 {
     public function updateCostPercentParameter(
+        PricingCalculationRow $row,
+        string $parameterType,
+        string $scopeType,
+        float $value,
+    ): PricingParameter {
+        return DB::transaction(function () use ($row, $parameterType, $scopeType, $value): PricingParameter {
+            $project = PricingProject::query()->whereKey($row->pricing_project_id)->lockForUpdate()->firstOrFail();
+            $row->setRelation('pricingProject', $project);
+
+            return $this->writeCostPercentParameter($row, $parameterType, $scopeType, $value);
+        });
+    }
+
+    private function writeCostPercentParameter(
         PricingCalculationRow $row,
         string $parameterType,
         string $scopeType,

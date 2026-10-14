@@ -19,15 +19,18 @@ class CalculateHufRetailAction
     {
         return Action::make('calculateHufRetail')
             ->label('HUF kisker árak újraszámítása')->icon('heroicon-o-calculator')->color('success')
-            ->visible(fn (): bool => Gate::allows('create', PricingCalculationRow::class)
-                && Gate::allows('update', new PricingCalculationRow)
-                && (! $projectUsing || Gate::allows('update', $projectUsing())))
+            ->visible(function () use ($projectUsing): bool {
+                $project = $projectUsing ? $projectUsing() : null;
+
+                return Gate::allows('create', PricingCalculationRow::class)
+                    && Gate::allows('update', new PricingCalculationRow)
+                    && (! $projectUsing || ($project && $project->isOpenForPricing() && Gate::allows('update', $project)));
+            })
             ->modalHeading('HUF bruttó kisker árak számítása')
             ->modalDescription('A mentett végleges bekerülési értékből számolunk, a Kisker szorzó és a kisker kerekítési szabály alapján. A jóváhagyott és manuális árakat megtartjuk; eltérésnél felülvizsgálatot jelzünk.')
             ->schema([
                 Select::make('pricing_project_id')->label('Árprojekt')
-                    ->options(fn (): array => PricingProject::query()->where('active', true)
-                        ->where('status', '!=', PricingProject::STATUS_CLOSED)->pluck('name', 'id')->all())
+                    ->options(fn (): array => PricingProject::query()->openForPricing()->pluck('name', 'id')->all())
                     ->visible(! $projectUsing)->required(! $projectUsing)->searchable()->live()
                     ->afterStateUpdated(fn ($set) => $set('price_list_id', null)),
                 Select::make('price_list_id')->label('HUF kisker árlista')
@@ -45,6 +48,7 @@ class CalculateHufRetailAction
             ])
             ->action(function (array $data, $livewire) use ($projectUsing): void {
                 $project = $projectUsing ? $projectUsing() : PricingProject::findOrFail($data['pricing_project_id']);
+                abort_unless($project && $project->isOpenForPricing(), 403);
                 Gate::authorize('update', $project);
                 Gate::authorize('create', PricingCalculationRow::class);
                 Gate::authorize('update', new PricingCalculationRow);

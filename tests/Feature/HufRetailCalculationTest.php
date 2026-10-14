@@ -212,7 +212,8 @@ class HufRetailCalculationTest extends TestCase
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Livewire::test(PricingHufRetailCalculations::class)
-            ->callAction('calculateHufRetail', ['pricing_project_id' => $project->id, 'price_list_id' => $this->list->id])
+            ->call('selectPricingProject', $project->id)
+            ->callAction('calculateHufRetail', ['price_list_id' => $this->list->id])
             ->assertHasNoErrors();
 
         $this->assertSame('1990.0000', $this->retail()->final_price);
@@ -931,7 +932,7 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame(PricingCalculationRow::STATUS_APPROVED, $allowed->fresh()->status);
     }
 
-    public function test_closed_or_inactive_project_rows_cannot_be_selected(): void
+    public function test_project_status_controls_selectability_not_the_legacy_active_flag(): void
     {
         $this->calculate();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -940,7 +941,7 @@ class HufRetailCalculationTest extends TestCase
         $this->project->update(['status' => PricingProject::STATUS_CLOSED]);
         $this->assertFalse($page->instance()->getTable()->isRecordSelectable($this->retail()));
         $this->project->update(['status' => PricingProject::STATUS_ACTIVE, 'active' => false]);
-        $this->assertFalse($page->instance()->getTable()->isRecordSelectable($this->retail()));
+        $this->assertTrue($page->instance()->getTable()->isRecordSelectable($this->retail()));
     }
 
     public function test_bulk_select_all_uses_all_filtered_pages_and_respects_deselected_rows(): void

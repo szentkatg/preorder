@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -27,6 +28,16 @@ class PricingProject extends Model
         return [
             'active' => 'boolean',
         ];
+    }
+
+    public function scopeOpenForPricing(Builder $query): Builder
+    {
+        return $query->whereIn('status', [self::STATUS_DRAFT, self::STATUS_ACTIVE]);
+    }
+
+    public function isOpenForPricing(): bool
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_ACTIVE], true);
     }
 
     public function season(): BelongsTo

@@ -11,7 +11,7 @@ class CostCalculationAuthorization
 {
     public static function canRecalculate(PricingProject $project): bool
     {
-        return Gate::allows('update', $project)
+        return $project->isOpenForPricing() && Gate::allows('update', $project)
             && Gate::allows('create', PricingCalculationRow::class)
             && Gate::allows('update', new PricingCalculationRow);
     }
@@ -21,6 +21,7 @@ class CostCalculationAuthorization
         Gate::authorize('update', $project);
         Gate::authorize('create', PricingCalculationRow::class);
         Gate::authorize('update', new PricingCalculationRow);
+        abort_unless($project->isOpenForPricing(), 403, 'Lezárt árprojekt nem számítható újra.');
     }
 
     public static function canAdjustParameter(PricingCalculationRow $row): bool

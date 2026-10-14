@@ -20,8 +20,8 @@ class HufRetailCalculationService
 
     public function recalculate(PricingProject $project, ?PriceList $priceList = null): array
     {
-        if (! $project->active || $project->status === PricingProject::STATUS_CLOSED) {
-            throw new DomainException('Csak aktív, nem lezárt árprojekt számítható újra.');
+        if (! $project->isOpenForPricing()) {
+            throw new DomainException('Csak nem lezárt árprojekt számítható újra.');
         }
 
         $huf = Currency::query()->where('code', 'HUF')->first();
@@ -44,8 +44,8 @@ class HufRetailCalculationService
         DB::transaction(function () use ($project, $huf, $lists, &$result): void {
             // Serialize calculations for the same project, including concurrent requests.
             $project = PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
-            if (! $project->active || $project->status === PricingProject::STATUS_CLOSED) {
-                throw new DomainException('Az árprojekt időközben inaktív vagy lezárt lett.');
+            if (! $project->isOpenForPricing()) {
+                throw new DomainException('Az árprojekt időközben lezárt lett.');
             }
             $costs = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
                 ->where('price_type', PricingCalculationRow::TYPE_COST)->where('currency_id', $huf->id)

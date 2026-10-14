@@ -1,5 +1,29 @@
 <x-filament-panels::page>
     <div class="space-y-4">
+        <div class="pricing-project-selection">
+            <label>
+                <span>Árprojekt</span>
+                <select wire:change="selectPricingProject($event.target.value)" wire:loading.attr="disabled">
+                    <option value="" @selected($this->pricingProjectId === null)>Válassz árprojektet…</option>
+                    @foreach ($this->pricingProjectOptions as $projectOption)
+                        <option value="{{ $projectOption->id }}" @selected($this->pricingProjectId === (int) $projectOption->id)>
+                            {{ $projectOption->name }} — {{ $projectOption->season?->name }}
+                            ({{ $projectOption->status === 'closed' ? 'Lezárt' : ($projectOption->status === 'draft' ? 'Tervezet' : 'Aktív') }})
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="pricing-archive-toggle">
+                <input type="checkbox" @checked($this->pricingArchive)
+                    wire:change="setPricingArchive($event.target.checked)" wire:loading.attr="disabled">
+                Archív megtekintés
+            </label>
+            @if ($this->pricingArchive)
+                <span>Lezárt árprojektek — csak olvasható, exportálható nézet.</span>
+            @elseif (! $this->pricingSelectedProject)
+                <span>Válassz egy nem lezárt árprojektet. Kiválasztás nélkül nem töltünk be tételeket.</span>
+            @endif
+        </div>
         <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
             {{ $this->pricingWorkspaceDescription() }}
             A jobb felső oszlopkezelővel ki/be kapcsolhatók és átrendezhetők az oszlopok,
@@ -88,6 +112,45 @@
     </div>
 
     <style>
+        .pricing-project-selection {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem 1.5rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid rgb(209 213 219);
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .pricing-project-selection label {
+            display: flex;
+            min-width: 0;
+            max-width: 100%;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pricing-project-selection select {
+            max-width: 100%;
+            min-width: min(18rem, 100%);
+            border: 1px solid rgb(156 163 175);
+            border-radius: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background-color: white;
+            color: rgb(17 24 39);
+        }
+
+        .dark .pricing-project-selection {
+            border-color: rgb(55 65 81);
+        }
+
+        .dark .pricing-project-selection select {
+            background-color: rgb(17 24 39);
+            color: rgb(229 231 235);
+        }
+
         [data-pricing-resizable-columns] .fi-ta-table {
             width: max-content;
             min-width: 100%;

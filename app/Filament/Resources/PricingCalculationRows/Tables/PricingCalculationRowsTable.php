@@ -202,14 +202,18 @@ class PricingCalculationRowsTable
                         fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record)
                     ),
                 EditAction::make()
-                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record))
-                    ->authorize('update'),
+                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record)
+                        && ($record->pricingProject?->isOpenForPricing() ?? false))
+                    ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record)
+                        && ($record->pricingProject?->isOpenForPricing() ?? false)),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->visible(fn (): bool => Gate::allows('deleteAny', PricingCalculationRow::class))
-                        ->authorize(fn (): bool => Gate::allows('deleteAny', PricingCalculationRow::class)),
+                        ->visible(fn ($livewire): bool => Gate::allows('deleteAny', PricingCalculationRow::class)
+                            && (! method_exists($livewire, 'pricingWorkspaceIsEditable') || $livewire->pricingWorkspaceIsEditable()))
+                        ->authorize(fn ($livewire): bool => Gate::allows('deleteAny', PricingCalculationRow::class)
+                            && (! method_exists($livewire, 'pricingWorkspaceIsEditable') || $livewire->pricingWorkspaceIsEditable())),
                 ]),
             ]);
     }

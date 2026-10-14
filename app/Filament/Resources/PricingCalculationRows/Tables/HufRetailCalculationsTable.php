@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
 use App\Models\PricingCalculationRow;
-use App\Models\PricingProject;
 use App\Services\Pricing\RetailPriceReviewService;
 use Closure;
 use DomainException;
@@ -180,7 +179,8 @@ class HufRetailCalculationsTable
 
     private static function canApproveBulk($livewire): bool
     {
-        return $livewire::canAccess() && Gate::allows('update', new PricingCalculationRow);
+        return $livewire::canAccess() && $livewire->pricingWorkspaceIsEditable()
+            && Gate::allows('update', new PricingCalculationRow);
     }
 
     private static function formatPrice(mixed $state): string
@@ -228,7 +228,6 @@ class HufRetailCalculationsTable
 
     private static function canEdit(PricingCalculationRow $record): bool
     {
-        return Gate::allows('update', $record) && $record->pricingProject?->active
-            && $record->pricingProject->status !== PricingProject::STATUS_CLOSED;
+        return Gate::allows('update', $record) && ($record->pricingProject?->isOpenForPricing() ?? false);
     }
 }
