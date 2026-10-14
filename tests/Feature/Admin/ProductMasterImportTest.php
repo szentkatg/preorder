@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ProductMasterImportTest extends TestCase
@@ -74,6 +75,34 @@ class ProductMasterImportTest extends TestCase
         $invalidRow['promised_delivery_date'] = '2027-02-31';
 
         $this->assertNotEmpty($this->importPage()->validateProductRows([$invalidRow]));
+    }
+
+    #[DataProvider('deliveryDateFormats')]
+    public function test_hyphenated_and_dotted_dates_are_accepted_from_spreadsheet_rows_and_saved_identically(string $input): void
+    {
+        $this->createProductReferences();
+        $sheet = (new Spreadsheet)->getActiveSheet();
+        $sheet->fromArray([
+            ['model_code', 'name_hu', 'season_code', 'brand_code', 'order_sheet_type_code', 'item_main_group_code', 'promised_delivery_date'],
+            ['DATE-TEST', 'Dátum teszt', 'S01', 'BR', 'STD', 'TST', $input],
+        ]);
+        $page = $this->importPage();
+        $rows = $page->rowsFromSheet($sheet);
+        $this->assertSame([], $page->validateProductRows($rows));
+        $page->importProductRows($rows);
+        $this->assertSame('2026-09-30', Product::where('model_code', 'DATE-TEST')->firstOrFail()->promised_delivery_date);
+
+        $rows[0]['promised_delivery_date'] = '2026.09.31';
+        $this->assertNotEmpty($page->validateProductRows($rows));
+        $this->assertSame('2026-09-30', Product::where('model_code', 'DATE-TEST')->firstOrFail()->promised_delivery_date);
+    }
+
+    public static function deliveryDateFormats(): array
+    {
+        return [
+            'hyphenated' => ['2026-09-30'],
+            'dotted' => ['2026.09.30'],
+        ];
     }
 
     private function importPage(): ProductMasterImport
