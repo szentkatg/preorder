@@ -33,6 +33,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumn('partners', 'sales_rep_erp_partner_code'));
         $this->assertFalse(Schema::hasColumn('products', 'serial_number'));
         $this->assertTrue(Schema::hasColumn('products', 'material_composition'));
+        $this->assertTrue(Schema::hasColumns('products', ['previous_season_product_id', 'previous_season_match_override']));
+        $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', ['source_retail_row_id', 'source_retail_price', 'retail_exchange_rate']));
         $this->assertTrue(Schema::hasColumn('suppliers', 'country_code'));
         $this->assertTrue(Schema::hasColumn('skus', 'sku_name'));
         $this->assertTrue(Schema::hasColumn('price_list_items', 'product_id'));

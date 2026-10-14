@@ -118,6 +118,7 @@ class RetailPriceReviewService
         $row->calculation_snapshot = array_replace($snapshot, ['approval' => [
             'price' => $price, 'user_id' => auth()->id(), 'approved_at' => now()->toISOString(),
             'source_cost_row_id' => $snapshot['source_cost_row_id'] ?? null,
+            'source_retail_row_id' => $snapshot['source_retail_row_id'] ?? null,
             'source_cost_inputs' => $snapshot['source_cost_inputs'] ?? [],
             'inputs' => $snapshot['inputs'] ?? [], 'rounding' => $snapshot['rounding'] ?? [],
             'retail_parameter' => $snapshot['retail_parameter'] ?? [],
@@ -136,9 +137,10 @@ class RetailPriceReviewService
             $stored = PricingCalculationRow::query()->lockForUpdate()->findOrFail($row->id);
             Gate::authorize('update', $stored);
 
-            if ($stored->price_type !== PricingCalculationRow::TYPE_RETAIL || $stored->currency?->code !== 'HUF'
+            if ($stored->price_type !== PricingCalculationRow::TYPE_RETAIL
+                || ! in_array($stored->currency?->code, ['HUF', ...ForeignRetailCalculator::CURRENCIES], true)
                 || ! ($stored->pricingProject?->isOpenForPricing() ?? false)) {
-                throw new DomainException('Csak nem lezárt árprojekt HUF kisker ára módosítható.');
+                throw new DomainException('Csak nem lezárt árprojekt kisker ára módosítható.');
             }
 
             app(RetailCalculationDependencyService::class)->assertCalculationCurrent($stored);

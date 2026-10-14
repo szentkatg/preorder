@@ -1,5 +1,16 @@
 <x-filament-panels::page>
     <div class="space-y-4">
+        @if (method_exists($this, 'selectRetailCurrency'))
+            <div class="pricing-project-selection" role="group" aria-label="Kisker árak pénzneme">
+                @foreach (\App\Services\Pricing\ForeignRetailCalculator::CURRENCIES as $currencyCode)
+                    <button type="button" wire:click="selectRetailCurrency('{{ $currencyCode }}')" wire:loading.attr="disabled"
+                        aria-pressed="{{ $this->retailCurrencyCode() === $currencyCode ? 'true' : 'false' }}"
+                        style="padding: .375rem .75rem; border: 1px solid currentColor; border-radius: .5rem; {{ $this->retailCurrencyCode() === $currencyCode ? 'font-weight:700; text-decoration:underline' : '' }}">
+                        {{ $currencyCode }}
+                    </button>
+                @endforeach
+            </div>
+        @endif
         <div class="pricing-project-selection">
             <label>
                 <span>Árprojekt</span>

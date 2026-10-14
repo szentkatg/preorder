@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Filament\Support\Actions\PairPreviousSeasonProductAction;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\RetailPriceReviewService;
 use Closure;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Gate;
 
 class HufRetailCalculationsTable
 {
-    public static function configure(Table $table): Table
+    public static function configure(Table $table, string $currency = 'HUF'): Table
     {
         return $table->columns([
             TextColumn::make('pricingProject.name')->label('Árprojekt'),
@@ -32,6 +33,16 @@ class HufRetailCalculationsTable
             TextColumn::make('product.model_code')->label('Modell kód'),
             TextColumn::make('product.name_hu')->label('Modell név'),
             TextColumn::make('color.name_hu')->label('Szín'),
+            TextColumn::make('previous_season_price')->label('Előző szezon kisker '.$currency)
+                ->numeric()->placeholder('-')
+                ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'previous_season_price'))
+                ->tooltip(fn (PricingCalculationRow $record): string => match (true) {
+                    (bool) $record->product?->previous_season_match_override && ! $record->product?->previous_season_product_id => 'Kézzel megjelölve: nincs előző szezonbeli pár.',
+                    ! $record->product?->previous_season_match_override && $record->previous_season_match_count > 1 => 'Több névegyezés az előző szezonban ('.$record->previous_season_match_count.'). Válassz kézi párosítást.',
+                    ! $record->matched_previous_product_id => 'Nincs egyértelmű termékpár az előző azonos típusú szezonban.',
+                    $record->previous_season_price === null => 'A termékpár megvan, de az azonos árlistában nincs előző szezonbeli árlistatétel.',
+                    default => ($record->product?->previous_season_match_override ? 'Kézi' : 'Automatikus').' párosítás. Az azonos árlista előző szezonbeli aktuális ára.',
+                }),
             TextColumn::make('supplier.erp_partner_code')->label('Beszállító kód')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('supplier.name')->label('Beszállító neve')
@@ -41,8 +52,12 @@ class HufRetailCalculationsTable
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('purchaseCurrency.code')->label('Besz. pénznem')
                 ->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('base_price')->label('Bekerülési HUF')->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'base_price')),
-            TextColumn::make('multiplier')->label('Kisker szorzó')
+            TextColumn::make('source_retail_price')->label('Forrás HUF kisker')
+                ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'source_retail_price'))->visible($currency !== 'HUF'),
+            TextColumn::make('retail_exchange_rate')->label('Kisker árfolyam (HUF/'.$currency.')')
+                ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'retail_exchange_rate', 6))->visible($currency !== 'HUF'),
+            TextColumn::make('base_price')->label($currency === 'HUF' ? 'Bekerülési HUF' : 'Átváltott HUF kisker ('.$currency.')')->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'base_price')),
+            TextColumn::make('multiplier')->label($currency === 'HUF' ? 'Kisker szorzó' : 'Országszorzó (kerekítés után)')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->effective_multiplier)
                 ->extraAttributes(['data-pricing-derived-multiplier' => true])
                 ->extraHeaderAttributes(fn ($livewire) => [
@@ -56,15 +71,15 @@ class HufRetailCalculationsTable
                 ->tooltip(fn (PricingCalculationRow $record) => 'Kalkulációs szorzó: '.self::formatMultiplier($record->multiplier)
                     .'. Kerekítés utáni szorzó: '.self::formatMultiplier(
                         (float) $record->base_price > 0 ? (float) $record->calculated_price / (float) $record->base_price : null,
-                    ).'. A kijelzett szorzó minden esetben a végleges ár / bekerülési érték. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
+                    ).'. A kijelzett szorzó a végleges ár / '.($currency === 'HUF' ? 'bekerülési érték' : 'devizára átváltott HUF kisker ár').'. A nyíl a kalkulált, kerekített árhoz viszonyított eltérést jelzi.'),
             TextColumn::make('calculation_multiplier')->label('Kalkulációs szorzó')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier === null ? null : (float) $record->multiplier)
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'calculation_multiplier', 6, true, ''))
                 ->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('unrounded_price')->label('Kerekítés előtti HUF')->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'unrounded_price')),
+            TextColumn::make('unrounded_price')->label('Kerekítés előtti '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'unrounded_price')),
             TextColumn::make('pricingRoundingRule.name')->label('Kerekítési szabály')->toggleable(isToggledHiddenByDefault: true),
-            TextColumn::make('calculated_price')->label('Kalkulált kisker HUF')->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'calculated_price')),
-            TextInputColumn::make('manual_price')->label('Manuális HUF')->type('text')->inputMode('decimal')
+            TextColumn::make('calculated_price')->label('Kalkulált kisker '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'calculated_price')),
+            TextInputColumn::make('manual_price')->label('Manuális '.$currency)->type('text')->inputMode('decimal')
                 ->extraInputAttributes(fn (PricingCalculationRow $record) => [
                     'class' => 'pricing-retail-manual-input pricing-retail-manual-'.($record->manual_price === null ? 'equal' : ($record->finalPriceDifferenceDirection() ?? 'equal')),
                 ])
@@ -87,11 +102,12 @@ class HufRetailCalculationsTable
                         $livewire->resetTable();
                     }
                 }),
-            TextColumn::make('final_price')->label('Végleges kisker HUF')->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'final_price'))
+            TextColumn::make('final_price')->label('Végleges kisker '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'final_price'))
                 ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
                 ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
                 ->color(fn (PricingCalculationRow $record) => self::differenceColor($record)),
             TextColumn::make('target_purchase_price')->label('Cél besz. ár')
+                ->visible($currency === 'HUF')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->target_purchase_price === null ? null : (float) $record->target_purchase_price)
                 ->placeholder('-')
                 ->formatStateUsing(fn ($state, PricingCalculationRow $record, $livewire) => $state === null
@@ -116,9 +132,10 @@ class HufRetailCalculationsTable
             SelectFilter::make('price_list_id')->label('Árlista')->relationship('priceList', 'code')->searchable()->preload(),
             TernaryFilter::make('requires_review')->label('Felülvizsgálandó'),
         ])->recordActions([
+            PairPreviousSeasonProductAction::make(),
             Action::make('retailDetails')->label('Részletek')->icon('heroicon-o-document-magnifying-glass')
                 ->visible(fn (PricingCalculationRow $record) => Gate::allows('view', $record))
-                ->modalWidth(Width::Screen)->modalHeading('HUF kisker kalkuláció részletei')
+                ->modalWidth(Width::Screen)->modalHeading($currency.' kisker kalkuláció részletei')
                 ->modalSubmitAction(false)->modalCancelActionLabel('Bezárás')
                 ->modalContent(fn (PricingCalculationRow $record) => view('filament.pricing.retail-calculation-details', ['record' => $record])),
             Action::make('approveRetail')->label(fn (PricingCalculationRow $record) => $record->requires_review ? 'Ár megtartása és jóváhagyása' : 'Jóváhagyás')

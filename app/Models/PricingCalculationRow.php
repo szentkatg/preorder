@@ -49,6 +49,9 @@ class PricingCalculationRow extends Model
 
     protected $fillable = [
         'pricing_project_id',
+        'source_retail_row_id',
+        'source_retail_price',
+        'retail_exchange_rate',
         'product_id',
         'color_id',
         'product_purchase_price_id',
@@ -82,6 +85,8 @@ class PricingCalculationRow extends Model
     protected function casts(): array
     {
         return [
+            'source_retail_price' => 'decimal:4',
+            'retail_exchange_rate' => 'decimal:6',
             'calculated_price' => 'decimal:4',
             'manual_price' => 'decimal:4',
             'final_price' => 'decimal:4',
@@ -120,12 +125,21 @@ class PricingCalculationRow extends Model
                 && $row->wasChanged(RetailCalculationDependencyService::COST_INPUT_FIELDS)) {
                 app(RetailCalculationDependencyService::class)->invalidateForCostChange($row);
             }
+            if ($row->price_type === self::TYPE_RETAIL && $row->wasChanged(['final_price', 'base_price', 'requires_review'])
+                && $row->currency?->code === 'HUF') {
+                app(RetailCalculationDependencyService::class)->invalidateForRetailChange($row);
+            }
         });
     }
 
     public function pricingProject(): BelongsTo
     {
         return $this->belongsTo(PricingProject::class);
+    }
+
+    public function sourceRetailRow(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_retail_row_id');
     }
 
     public function product(): BelongsTo

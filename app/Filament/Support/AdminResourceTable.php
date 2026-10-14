@@ -9,6 +9,7 @@ use App\Models\PartnerUser;
 use App\Models\PricingCalculationRow;
 use App\Models\Translation;
 use App\Models\User;
+use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\Column;
@@ -94,9 +95,21 @@ class AdminResourceTable
             'purchase_price', 'exchange_rate', 'shipping_cost_percent', 'customs_percent', 'candidate_count',
             'base_price', 'multiplier', 'calculation_multiplier', 'unrounded_price',
             'calculated_price', 'manual_price', 'retained_price', 'final_price', 'target_purchase_price',
+            'source_retail_price', 'retail_exchange_rate', 'previous_season_price',
         ], true)) {
             // Filament applies the alignment to the header, cell content and editable input.
             $column->alignEnd();
+        }
+
+        if ($modelClass === PricingCalculationRow::class && $column->getName() === 'previous_season_price') {
+            $column->sortable(query: fn (Builder $query, string $direction, $livewire): Builder => $query->orderBy(
+                app(PreviousSeasonRetailPriceService::class)->priceQuery($livewire->pricingSelectedProject?->season_id), $direction,
+            ))->searchable(query: function (Builder $query, string $search, $livewire): Builder {
+                $priceQuery = app(PreviousSeasonRetailPriceService::class)->priceQuery($livewire->pricingSelectedProject?->season_id);
+
+                return $query->whereRaw('CAST(('.$priceQuery->toSql().') AS CHAR) LIKE ?',
+                    [...$priceQuery->getBindings(), '%'.str_replace(',', '.', $search).'%']);
+            }, isIndividual: true);
         }
 
         if ($modelClass === Order::class) {

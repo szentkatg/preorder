@@ -20,7 +20,17 @@ class RetailCalculationDependencyService
         'purchase_price', 'exchange_rate', 'shipping_cost_percent', 'customs_percent',
     ];
 
-    public function __construct(private readonly HufRetailCalculator $calculator) {}
+    public function __construct(
+        private readonly HufRetailCalculator $calculator,
+        private readonly ForeignRetailCalculator $foreignCalculator,
+    ) {}
+
+    public function invalidateForRetailChange(PricingCalculationRow $source): void
+    {
+        PricingCalculationRow::query()->where('source_retail_row_id', $source->id)
+            ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
+            ->update(['requires_review' => true]);
+    }
 
     public function invalidateForCostChange(PricingCalculationRow $cost): void
     {
@@ -35,6 +45,11 @@ class RetailCalculationDependencyService
             array_pop($contexts);
         }
         foreach ($contexts as $context) {
+            $sources = PricingCalculationRow::query()->where($context)
+                ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
+                ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))->pluck('id');
+            PricingCalculationRow::query()->whereIn('source_retail_row_id', $sources)
+                ->update(['requires_review' => true]);
             PricingCalculationRow::query()->where($context)
                 ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                 ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))
@@ -107,6 +122,19 @@ class RetailCalculationDependencyService
 
     public function assertCalculationCurrent(PricingCalculationRow $row): void
     {
+        if ($row->currency?->code !== 'HUF') {
+            $source = $row->sourceRetailRow;
+            if (! $source || ! $row->priceList || $source->product_id != $row->product_id
+                || $source->color_key != $row->color_key || $row->priceList->currency_id != $row->currency_id) {
+                throw new DomainException('A devizás kisker ár HUF forráskalkulációja vagy árlistája hiányzik. Újraszámítás szükséges.');
+            }
+            $calculation = $this->foreignCalculator->calculate($row->pricingProject, $source, $row->priceList);
+            if ($this->foreignInputsChanged($row, $calculation)) {
+                throw new DomainException('A devizás kisker kalkuláció bemenetei megváltoztak. Előbb futtasd a devizás kisker újraszámítást; a korábbi ár megmarad.');
+            }
+
+            return;
+        }
         $cost = PricingCalculationRow::query()->where('pricing_project_id', $row->pricing_project_id)
             ->where('product_id', $row->product_id)->where('color_key', $row->color_key)
             ->where('price_type', PricingCalculationRow::TYPE_COST)->where('price_list_key', 0)
@@ -121,6 +149,37 @@ class RetailCalculationDependencyService
         if ($this->calculationInputsChanged($row, $cost, $calculation)) {
             throw new DomainException('A kisker kalkuláció bemenetei megváltoztak. Előbb futtasd a HUF kisker árak újraszámítását; a korábbi végleges ár megmarad.');
         }
+    }
+
+    public function foreignInputsChanged(PricingCalculationRow $row, array $calculation): bool
+    {
+        foreach (['source_retail_row_id' => 0, 'source_retail_price' => 4, 'retail_exchange_rate' => 6,
+            'base_price' => 4, 'multiplier' => 6, 'unrounded_price' => 4, 'calculated_price' => 4] as $field => $precision) {
+            if (! $this->sameNumber($row->{$field}, $calculation[$field] ?? null, $precision)) {
+                return true;
+            }
+        }
+
+        return $this->roundingChanged($row->calculation_snapshot['rounding'] ?? [], $calculation['snapshot']['rounding'] ?? []);
+    }
+
+    public function foreignApprovalInputsChanged(PricingCalculationRow $row, array $calculation): bool
+    {
+        $approval = $row->calculation_snapshot['approval'] ?? null;
+        if (! is_array($approval)) {
+            return false;
+        }
+        if (($approval['source_retail_row_id'] ?? null) != $calculation['source_retail_row_id']) {
+            return true;
+        }
+        foreach ($calculation['snapshot']['inputs'] as $field => $value) {
+            if (! $this->sameNumber($approval['inputs'][$field] ?? null, $value, in_array($field, ['multiplier', 'retail_exchange_rate'], true) ? 6 : 4)) {
+                return true;
+            }
+        }
+
+        return ! $this->sameNumber($approval['calculated_price'] ?? null, $calculation['calculated_price'], 4)
+            || $this->roundingChanged($approval['rounding'] ?? [], $calculation['snapshot']['rounding'] ?? []);
     }
 
     private function sameNumber(mixed $left, mixed $right, int $precision = 6): bool

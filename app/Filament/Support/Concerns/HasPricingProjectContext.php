@@ -112,7 +112,7 @@ trait HasPricingProjectContext
         ], ['value' => ['project_id' => $this->pricingProjectId, 'archive' => $this->pricingArchive]]);
     }
 
-    private function clearPricingContextInteractions(): void
+    protected function clearPricingContextInteractions(): void
     {
         if ($this->mountedActions) {
             $this->unmountAction();
@@ -126,7 +126,7 @@ trait HasPricingProjectContext
         $this->deselectAllTableRecords();
     }
 
-    private function refreshPricingContextTable(): void
+    protected function refreshPricingContextTable(): void
     {
         unset($this->pricingSelectedProject);
         if (method_exists($this, 'averageRetailMultiplier')) {

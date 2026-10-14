@@ -3,6 +3,8 @@
     $inputs = $snapshot['inputs'] ?? [];
     $rounding = $snapshot['rounding'] ?? [];
     $parameter = $snapshot['retail_parameter'] ?? [];
+    $currency = $snapshot['currency'] ?? $record->currency?->code ?? 'HUF';
+    $foreign = $currency !== 'HUF';
     $scope = match ($parameter['scope_type'] ?? '') {
         'product' => 'Modell', 'item_main_group' => 'Főcsoport', 'supplier_country' => 'Beszállító ország', default => 'Globális',
     };
@@ -22,23 +24,31 @@
     </style>
     <p class="mb-3">{{ $record->product?->model_code }} · {{ $snapshot['price_list']['code'] ?? $record->priceList?->code }} · Kalkulálva: {{ $snapshot['calculated_at'] ?? '-' }}</p>
     @if ($record->requires_review)
-        <p class="mb-3 font-semibold">A bemeneti adatok megváltoztak. A korábbi végleges ár megmaradt. A HUF kisker újraszámítás frissíti a kalkulációt; ezután dönthetsz az ár megtartásáról vagy az új kalkulált ár elfogadásáról. A felülvizsgálat akkor is szükséges lehet, ha a kerekített ár változatlan.</p>
+        <p class="mb-3 font-semibold">A bemeneti adatok megváltoztak. A korábbi végleges ár megmaradt. A {{ $currency }} kisker újraszámítás frissíti a kalkulációt; ezután dönthetsz az ár megtartásáról vagy az új kalkulált ár elfogadásáról. A felülvizsgálat akkor is szükséges lehet, ha a kerekített ár változatlan.</p>
     @endif
     <div class="retail-details-wrap">
         <table>
             <thead><tr><th>Lépés / bemeneti adat</th><th>Szabály / szűkítés</th><th class="numeric">Érték</th></tr></thead>
             <tbody>
+                @if ($foreign)
+                <tr><td>Végleges forrás HUF kisker ár</td><td>{{ $snapshot['source_retail_price_list']['code'] ?? '-' }} · HUF kisker sor #{{ $snapshot['source_retail_row_id'] ?? '-' }}</td><td class="numeric">{{ number_format((float) ($inputs['source_retail_price'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
+                <tr><td>Szezonárfolyam</td><td>1 {{ $currency }} értéke HUF-ban</td><td class="numeric">{{ number_format((float) ($inputs['retail_exchange_rate'] ?? 0), 6, ',', ' ') }}</td></tr>
+                <tr><td>Átváltott HUF kisker ár</td><td>Végleges HUF kisker ár ÷ árfolyam</td><td class="numeric">{{ number_format((float) ($inputs['base_price'] ?? 0), 4, ',', ' ') }} {{ $currency }}</td></tr>
+                @else
                 <tr><td>Végleges bekerülési érték</td><td>Mentett HUF kalkulációs sor #{{ $snapshot['source_cost_row_id'] ?? '-' }}</td><td class="numeric">{{ number_format((float) ($inputs['base_price'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
-                <tr><td>Kisker szorzó</td><td>{{ $scope }} · Paraméter #{{ $parameter['id'] ?? '-' }}</td><td class="numeric">{{ rtrim(rtrim(number_format((float) ($inputs['multiplier'] ?? 0), 6, ',', ''), '0'), ',') }}</td></tr>
-                <tr><td>Kerekítés előtti bruttó kisker ár</td><td>Bekerülési érték × szorzó</td><td class="numeric">{{ number_format((float) ($inputs['unrounded_price'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
-                <tr><td>Kerekítés</td><td>{{ $rounding['name'] ?? '-' }} · {{ $mode }} · {{ $rounding['round_to'] ?? ('Tizedes: ' . ($rounding['decimal_places'] ?? '-')) }}</td><td class="numeric">{{ number_format((float) ($rounding['rounded_before_adjustment'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
-                <tr><td>Kerekítés utáni korrekció</td><td>Hozzáadás / levonás</td><td class="numeric">{{ number_format((float) ($rounding['adjustment'] ?? 0), 4, ',', ' ') }} HUF</td></tr>
-                <tr class="retail-total"><td>Kalkulált bruttó kisker ár</td><td>Kerekített érték + korrekció</td><td class="numeric">{{ number_format((float) $record->calculated_price, 4, ',', ' ') }} HUF</td></tr>
-                <tr><td>Manuális ár</td><td>Felhasználói eltérés</td><td class="numeric">{{ $record->manual_price === null ? '-' : number_format((float) $record->manual_price, 4, ',', ' ') . ' HUF' }}</td></tr>
-                <tr><td>Érvényes kisker szorzó</td><td>Végleges, kerekítés utáni ár ÷ bekerülési érték</td><td class="numeric">{{ $record->effective_multiplier === null ? '-' : rtrim(rtrim(number_format($record->effective_multiplier, 6, ',', ''), '0'), ',') }}</td></tr>
+                @endif
+                <tr><td>{{ $foreign ? 'Országszorzó' : 'Kisker szorzó' }}</td><td>{{ $scope }} · Paraméter #{{ $parameter['id'] ?? '-' }}</td><td class="numeric">{{ rtrim(rtrim(number_format((float) ($inputs['multiplier'] ?? 0), 6, ',', ''), '0'), ',') }}</td></tr>
+                <tr><td>Kerekítés előtti bruttó kisker ár</td><td>{{ $foreign ? 'Átváltott HUF kisker ár × országszorzó' : 'Bekerülési érték × szorzó' }}</td><td class="numeric">{{ number_format((float) ($inputs['unrounded_price'] ?? 0), 4, ',', ' ') }} {{ $currency }}</td></tr>
+                <tr><td>Kerekítés</td><td>{{ $rounding['name'] ?? '-' }} · {{ $mode }} · {{ $rounding['round_to'] ?? ('Tizedes: ' . ($rounding['decimal_places'] ?? '-')) }}</td><td class="numeric">{{ number_format((float) ($rounding['rounded_before_adjustment'] ?? 0), 4, ',', ' ') }} {{ $currency }}</td></tr>
+                <tr><td>Kerekítés utáni korrekció</td><td>Hozzáadás / levonás</td><td class="numeric">{{ number_format((float) ($rounding['adjustment'] ?? 0), 4, ',', ' ') }} {{ $currency }}</td></tr>
+                <tr class="retail-total"><td>Kalkulált bruttó kisker ár</td><td>Kerekített érték + korrekció</td><td class="numeric">{{ number_format((float) $record->calculated_price, 4, ',', ' ') }} {{ $currency }}</td></tr>
+                <tr><td>Manuális ár</td><td>Felhasználói eltérés</td><td class="numeric">{{ $record->manual_price === null ? '-' : number_format((float) $record->manual_price, 4, ',', ' ') . ' ' . $currency }}</td></tr>
+                <tr><td>{{ $foreign ? 'Effektív országszorzó' : 'Érvényes kisker szorzó' }}</td><td>Végleges, kerekítés utáni ár ÷ {{ $foreign ? 'átváltott HUF kisker ár' : 'bekerülési érték' }}</td><td class="numeric">{{ $record->effective_multiplier === null ? '-' : rtrim(rtrim(number_format($record->effective_multiplier, 6, ',', ''), '0'), ',') }}</td></tr>
+                @unless ($foreign)
                 <tr><td>Cél-beszerzési ár</td><td>Az eredeti beszerzési ár arányos csökkentése a kalkulációs szorzó eléréséhez, felfelé nem módosítva</td><td class="numeric" @if ($record->needsPurchasePriceNegotiation()) style="color: rgb(220 38 38)" @endif>{{ $record->target_purchase_price === null ? '-' : rtrim(rtrim(number_format((float) $record->target_purchase_price, 4, ',', ' '), '0'), ',') . ' ' . ($record->purchaseCurrency?->code ?? '') }}</td></tr>
-                <tr><td>Korábban jóváhagyott, megtartott ár</td><td>Újraszámításkor megőrizve</td><td class="numeric">{{ $record->retained_price === null ? '-' : number_format((float) $record->retained_price, 4, ',', ' ') . ' HUF' }}</td></tr>
-                <tr class="retail-total"><td>Végleges bruttó kisker ár</td><td>Manuális → megtartott → kalkulált</td><td class="numeric">{{ number_format((float) $record->final_price, 4, ',', ' ') }} HUF</td></tr>
+                @endunless
+                <tr><td>Korábban jóváhagyott, megtartott ár</td><td>Újraszámításkor megőrizve</td><td class="numeric">{{ $record->retained_price === null ? '-' : number_format((float) $record->retained_price, 4, ',', ' ') . ' ' . $currency }}</td></tr>
+                <tr class="retail-total"><td>Végleges bruttó kisker ár</td><td>Manuális → megtartott → kalkulált</td><td class="numeric">{{ number_format((float) $record->final_price, 4, ',', ' ') }} {{ $currency }}</td></tr>
             </tbody>
         </table>
     </div>
@@ -47,7 +57,7 @@
         <div class="retail-details-wrap mt-4">
             <table>
                 <caption class="mb-2 text-left">Legutóbbi átnézés / jóváhagyás · {{ $approval['approved_at'] ?? '-' }}</caption>
-                <thead><tr><th>Jóváhagyáskori bekerülési HUF</th><th>Kisker szorzó</th><th>Kalkulált HUF</th><th>Jóváhagyott végleges HUF</th></tr></thead>
+                <thead><tr><th>{{ $foreign ? 'Jóváhagyáskori átváltott HUF kisker' : 'Jóváhagyáskori bekerülési HUF' }}</th><th>{{ $foreign ? 'Országszorzó' : 'Kisker szorzó' }}</th><th>Kalkulált {{ $currency }}</th><th>Jóváhagyott végleges {{ $currency }}</th></tr></thead>
                 <tbody><tr>
                     <td class="numeric">{{ number_format((float) ($approval['inputs']['base_price'] ?? 0), 4, ',', ' ') }}</td>
                     <td class="numeric">{{ rtrim(rtrim(number_format((float) ($approval['inputs']['multiplier'] ?? 0), 6, ',', ''), '0'), ',') }}</td>

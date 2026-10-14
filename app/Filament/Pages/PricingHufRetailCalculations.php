@@ -8,6 +8,7 @@ use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
+use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -100,25 +101,33 @@ class PricingHufRetailCalculations extends Page implements HasTable
             'multiplier' => 'Kisker szorzó és átlaga', 'calculation_multiplier' => 'Kalkulációs szorzó',
             'unrounded_price' => 'Kerekítés előtti HUF', 'calculated_price' => 'Kalkulált kisker HUF',
             'final_price' => 'Végleges kisker HUF', 'target_purchase_price' => 'Cél beszerzési ár',
+            'previous_season_price' => 'Előző szezon kisker ár',
         ];
     }
 
     public function table(Table $table): Table
     {
-        $table = HufRetailCalculationsTable::configure($table);
+        $table = HufRetailCalculationsTable::configure($table, $this->retailCurrencyCode());
         $filters = $table->getFilters();
         unset($filters['pricing_project_id']);
         $table->filters(array_values($filters))
-            ->modifyQueryUsing(fn (Builder $query) => $this->scopePricingProjectContext($query));
+            ->modifyQueryUsing(fn (Builder $query) => app(PreviousSeasonRetailPriceService::class)->addColumns(
+                $this->scopePricingProjectContext($query), $this->pricingSelectedProject?->season_id,
+            ));
 
         return AdminResourceTable::configure(
             $table->query(
                 PricingCalculationRow::query()->where('price_type', PricingCalculationRow::TYPE_RETAIL)
-                    ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))
+                    ->whereHas('currency', fn ($query) => $query->where('code', $this->retailCurrencyCode()))
                     ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency'])
             ),
             PricingCalculationRow::class,
             withViewAction: false,
         );
+    }
+
+    public function retailCurrencyCode(): string
+    {
+        return 'HUF';
     }
 }

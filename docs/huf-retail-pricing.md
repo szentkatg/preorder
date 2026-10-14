@@ -7,6 +7,129 @@ HUF pénznemű kisker árlistára futtatható. Az árlistatörzs szezonfüggetle
 a kalkuláció szezonját az árprojekt határozza meg. Ugyanaz az árlista
 több szezonban is használható, a publikált árak szezonja a tételekhez tartozik.
 
+## Devizás kisker árak: EUR, CZK, RON, PLN
+
+Az **Árképzés → Devizás kisker árak** egyetlen munkafelület, pénznemgombokkal.
+A kiválasztott pénznem felhasználónként megmarad. Az árprojekt-választó és
+archív mód közös a bekerülési, HUF és devizás oldallal; egyszerre csak egy
+projekt egy pénznemének sorai töltődnek be. Pénznemváltáskor a kijelölés,
+szűrés és nyitott művelet törlődik, az oszlopbeállítások megmaradnak.
+
+Az **újraszámítás** ablakában külön választjuk a **forrás HUF kisker árlistát**
+és a kijelölt deviza **célárlistáját**. Több HUF árlistánál sem találgatunk.
+Minden deviza közvetlenül a HUF-ból képződik, nem az EUR-ból:
+
+`végleges HUF kisker ár / szezonárfolyam (HUF/deviza) × országszorzó → kerekítés → korrekció`
+
+- A HUF forrás manuális/megtartott végleges ára az alap, nem feltétlenül a
+  kalkulált HUF ár. A forrássornak aktuálisnak és felülvizsgálattól mentesnek kell lennie.
+- Az árfolyam az `exchange_rates` táblából jön, a projekt szezonjára és a
+  célpénznemre: aktív, pozitív `rate_to_huf`. Hiányzó adatnál nem számolunk 1-es árfolyammal.
+- Az **Országszorzó** a meglévő árképzési paraméter, nem százalék:
+  például `1,10` = 10%-kal magasabb ár, `1` = változatlan.
+  A meglévő globális → ország → főcsoport → modell hierarchia,
+  valamint árlista/pénznem-specifikus beállítás érvényesül.
+- A kisker kerekítési szabályt a devizához vagy célárlistához kell rögzíteni.
+  A globális HUF 1000/-10 szabályt nem használjuk automatikusan devizákhoz.
+  EUR példa: `round_to = 1`, mód = legközelebbi, korrekció = `-0,05`.
+  A CZK/RON/PLN szabályait külön, a kívánt árképzés szerint kell megadni.
+- Nem hozunk létre automatikusan devizát, árlistát, árfolyamot, szorzót vagy
+  kerekítési szabályt, és nem írunk felül meglévő beállítást.
+- Hibás/hiányzó bemenetnél a sor kimarad, az ok a **Kalkulációs hibák** menüben
+  megmarad. Meglévő árát nem írjuk át; felülvizsgálandónak jelöljük.
+- A **Részletek** valódi táblázatban mutatja a mentett HUF forrásárat,
+  forrásárlistát, árfolyamot, országszorzót, kerekítést és eredményt.
+  Az átlagolt szorzó a devizás oldalon effektív **országszorzó**:
+  végleges devizás ár / átváltott HUF kisker ár, nem bekerülési haszonkulcs.
+- Manuális ár, piros/zöld eltérésnyíl, kijelölés, tömeges/egyedi jóváhagyás,
+  tizedesbeállítás, oszlopválasztás, oszlopszélesség és numerikus Excel-export megmarad.
+  A HUF-ban értelmezett cél-beszerzési ár oszlopot a devizás oldalon nem mutatjuk.
+- Bekerülési/HUF forrásváltozás jelöli az érintett devizás sorokat is.
+  Jóváhagyott/manuális ár megmarad, az új kalkulált ár csak felhasználói döntéssel válik véglegessé.
+  Árfolyam vagy paraméter változtatás után újraszámítás szükséges;
+  elavult kalkulációval nem lehet jóváhagyni vagy manuális árat menteni.
+- A kalkuláció továbbra sem publikál automatikusan a `price_list_items` táblába.
+  Lezárt projekt csak archív megtekintésre/exportálásra választható.
+
+### Előző szezon kisker árának összehasonlító oszlopa
+
+A HUF és mind a négy devizás listában szerepel az **Előző szezon kisker** oszlop.
+Az aktuális árprojekt szezonkódjából keressük az előző, azonos típusú szezont:
+`W27 → W26`, `S27 → S26`. Nem a szezon ID-ja, sorrendje vagy aktív állapota számít.
+Nem támogatott szezonkód vagy nem létező előző szezon esetén nincs automatikus pár.
+
+A párosítás **Magyar név** (`products.name_hu`) alapján történik:
+csak a saját szezonkóddal egyező utolsó három karaktert vágjuk le, mindkét oldalon.
+`NACKW27` és `NACKW26`, illetve `NACKW27` és első szezonos `NACK` ezért pár lehet.
+`NACKW25` végéről W26-ban nem vágunk le semmit. A név széleit és kis/nagybetűs
+eltéréseit normalizáljuk; azonos márkán belül pontosan egy találat szükséges.
+Hiányzó név vagy több találat esetén nem választunk önkényesen.
+
+A kijelzett érték a pár **azonos árlistához és előző szezonhoz tartozó aktuális
+`price_list_items.net_price` értéke**, nem a régi kalkulált ár, nem más árlista ára,
+és nem számoljuk át másik pénznemről. Hiányzó pár/ár esetén `-` jelenik meg,
+nem nulla. A tooltip megkülönbözteti a többértelmű párt, a kizárt párosítást
+és a meglévő párhoz hiányzó árlistatételt. Az oszlop rendezhető, szűrhető,
+tizedesei beállíthatók és Excelbe valódi számként kerül.
+
+A sor **Előző szezon párosítása** műveletével:
+
+- **Automatikus névegyezés**: visszaállítható, olvasáskor frissen számolt párosítás;
+- **Kézi párosítás**: más nevű termék is választható az előző azonos típusú szezonból;
+- **Nincs előző szezonbeli pár**: az automatikus találat tudatosan kizárható.
+
+A kézi választást a terméken tároljuk (`previous_season_product_id` és
+`previous_season_match_override`), így minden árlistán ugyanaz a termékpár érvényes.
+Az automatikus párosítás megtekintéskor nem ír az adatbázisba. A párosítás
+nem módosítja az árakat, kalkulációt vagy jóváhagyási státuszt.
+Kézi módosításhoz kalkulációs sor **Update** és termék **Update** jog is szükséges.
+
+Ellenőrzés: a teljes csomag 180/182 tesztje sikeres (1285 ellenőrzés).
+A két korábbi admin-resource darabszám-elvárás továbbra is hibás (30 helyett
+32, illetve 31); új funkcionális teszthiba nincs. Az új devizás és szezonpárosítási
+tesztek lefedik a négy pénznemet, manuális/megőrzött árakat, újraszámítást,
+jogosultságokat, archív módot, hiányzó adatokat, kézi és többértelmű párokat,
+ékezetes neveket, Excel-számcellákat, szűrést/rendezést és a 400 modelles lekérdezést.
+A szélességmentés a devizás oldalon sem rendereli újra a táblázatot.
+A tesztek helyi SQLite adatbázison futottak; valódi böngészős és NAS/MariaDB
+ellenőrzés a kihelyezéskor még szükséges. A PHP-formázás és diff-ellenőrzés rendben.
+
+### Telepítés és jogosultságok ehhez a fejlesztéshez
+
+**Új migráció szükséges:**
+`2026_10_14_120000_add_foreign_retail_sources_and_previous_season_pairs`.
+Ez csak új, opcionális forrás/párosítás mezőket ad hozzá. Meglévő árakat,
+árlistatételeket, fordításokat vagy jóváhagyásokat nem ír át.
+Composer install, npm build, kézi assetfeltöltés és .env-módosítás nem szükséges.
+
+A szerepköröknél az új oldaljog **View:PricingForeignRetailCalculations**
+és a kalkulációs sor **View any** joga kell a menühöz/listához. Sorrészletekhez
+**View**, manuális árhoz/jóváhagyáshoz **Update**, újraszámításhoz a kalkulációs
+sor **Create + Update**, valamint árprojekt **Update** kell.
+Nem adunk automatikusan jogot meglévő szerepköröknek. Super admin látja az új oldalt.
+A szerepkör mentésekor a Shield létrehozza a szükséges oldaljogot;
+külön `shield:generate --all` nem szükséges, meglévő policyt nem írunk felül.
+
+Git/NAS, külön kihelyezési kérés után, a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Pages/PricingForeignRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Support/Actions/CalculateForeignRetailAction.php app/Filament/Support/Actions/PairPreviousSeasonProductAction.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingProjectContext.php app/Models/Product.php app/Models/PricingCalculationRow.php app/Services/Pricing/ForeignRetailCalculator.php app/Services/Pricing/ForeignRetailCalculationService.php app/Services/Pricing/PreviousSeasonRetailPriceService.php app/Services/Pricing/RetailCalculationDependencyService.php app/Services/Pricing/RetailPriceReviewService.php database/migrations/2026_10_14_120000_add_foreign_retail_sources_and_previous_season_pairs.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/retail-calculation-details.blade.php tests/Feature/ForeignRetailCalculationTest.php tests/Feature/PreviousSeasonRetailPriceTest.php tests/Feature/DatabaseMigrationTest.php docs/huf-retail-pricing.md
+git commit -m "Add foreign retail pricing and previous-season product comparisons"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+A NAS-frissítő futtatja a `migrate --force`, `optimize:clear` és `optimize`
+lépéseket. Ez a mellékág fejlesztése, az éles rendszer nem változik.
+WePanelen csak külön jóváhagyott élesítés és az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan migrate --force
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Közös árprojekt-választó és archív nézet
 
 A **Bekerülési értékek** és **HUF kisker árak** munkafelületen először
@@ -32,8 +155,8 @@ Az árprojekt korábbi `active` jelölője sem feltétele a kalkulációnak.
   sem írhat. A kalkulációs szolgáltatások a tranzakcióban ellenőrzik a lezárást,
   így egy korábban megnyitott oldal sem menthet már lezárt projektet.
 
-Ez a devizás kiskerárak előkészítésének első lépése. Az EUR/CZK/RON/PLN
-kalkuláció és közös pénznemes munkafelület még nem része ennek a változtatásnak.
+Ez eredetileg a devizás kiskerárak előkészítésének első lépése volt;
+az EUR/CZK/RON/PLN munkafelület már szintén ezt a projektkontextust használja.
 Nem zárunk le automatikusan régi projekteket: amelyeket ki szeretnénk venni
 a feldolgozásból, azokat az **Árprojektek** törzsben **Lezárt** státuszra kell állítani.
 Az archív korlátozás a két munkafelületre és kalkulációs szolgáltatásaikra

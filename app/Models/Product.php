@@ -1,18 +1,17 @@
 <?php
 
 namespace App\Models;
-use App\Models\Season;
-use App\Models\ItemMainGroup;
-use App\Models\SizeRange;
-use App\Models\Color;
-use App\Models\Sku;
+
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
     protected $fillable = [
         'season_id',
+        'previous_season_product_id',
+        'previous_season_match_override',
         'item_main_group_id',
         'size_range_id',
         'model_code',
@@ -31,48 +30,61 @@ class Product extends Model
         'active',
     ];
 
-        public function season()
+    protected function casts(): array
+    {
+        return ['previous_season_match_override' => 'boolean'];
+    }
+
+    public function previousSeasonProduct(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_season_product_id');
+    }
+
+    public function season()
     {
         return $this->belongsTo(Season::class);
     }
 
-	public function purchasePrices(): HasMany
-	{
-		return $this->hasMany(ProductPurchasePrice::class);
-	}
+    public function purchasePrices(): HasMany
+    {
+        return $this->hasMany(ProductPurchasePrice::class);
+    }
 
     public function itemMainGroup()
     {
         return $this->belongsTo(ItemMainGroup::class);
     }
-    
+
     public function sizeRange()
     {
         return $this->belongsTo(SizeRange::class);
     }
-    
+
     public function colors()
     {
         return $this->hasMany(Color::class);
     }
-    
+
     public function skus()
     {
         return $this->hasMany(Sku::class);
     }
+
     public function brand()
     {
         return $this->belongsTo(Brand::class);
     }
-    
+
     public function orderSheetType()
     {
         return $this->belongsTo(OrderSheetType::class);
     }
+
     public function colorImages()
     {
         return $this->hasMany(ColorImage::class);
     }
+
     public function roundingRule()
     {
         return $this->belongsTo(
