@@ -4,7 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Filament\Support\Actions\CalculateForeignRetailAction;
 use App\Models\AdminUiPreference;
+use App\Models\PricingCalculationRow;
 use App\Services\Pricing\ForeignRetailCalculator;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
 class PricingForeignRetailCalculations extends PricingHufRetailCalculations
@@ -48,7 +51,16 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Devizás kisker árak: végleges HUF kisker ár ÷ szezonárfolyam × országszorzó, majd kerekítés. Az effektív országszorzó és átlaga már a kerekítés, illetve a manuális ár hatását is mutatja.';
+        return 'Devizás kisker árak: végleges HUF kisker ár ÷ szezonárfolyam × országszorzó, majd kerekítés. A bekerülési szorzó = végleges devizás ár × mentett árfolyam ÷ a HUF forrássor bekerülési alapja. Mindkét szorzó átlaga a szűrt sorok számtani átlaga; a kerekítés és a manuális ár hatását is mutatja.';
+    }
+
+    #[Computed]
+    public function averageCostBasedMultiplier(): ?float
+    {
+        $query = clone $this->getFilteredTableQuery();
+        $average = $query->toBase()->avg(DB::raw(PricingCalculationRow::costBasedMultiplierSql()));
+
+        return $average === null ? null : (float) $average;
     }
 
     protected function pricingPreferencePrefix(): string
@@ -65,7 +77,8 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
     {
         return ['purchase_price' => 'Eredeti beszerzési ár', 'source_retail_price' => 'Forrás HUF kisker',
             'retail_exchange_rate' => 'Kisker árfolyam', 'base_price' => 'Átváltott HUF kisker',
-            'multiplier' => 'Effektív országszorzó és átlaga', 'calculation_multiplier' => 'Kalkulációs országszorzó',
+            'multiplier' => 'Effektív országszorzó', 'cost_based_multiplier' => 'Bekerülési szorzó',
+            'calculation_multiplier' => 'Kalkulációs országszorzó',
             'unrounded_price' => 'Kerekítés előtti ár', 'calculated_price' => 'Kalkulált kisker',
             'final_price' => 'Végleges kisker', 'previous_season_price' => 'Előző szezon kisker ár'];
     }

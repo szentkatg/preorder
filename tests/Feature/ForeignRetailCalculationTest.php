@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Exports\AdminTableExport;
 use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
+use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
@@ -25,6 +27,7 @@ use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -489,6 +492,168 @@ class ForeignRetailCalculationTest extends TestCase
             $this->assertSame('Unexpected failure', $exception->getMessage());
         }
         $this->assertSame(0, PricingCalculationRow::whereHas('currency', fn ($query) => $query->where('code', '!=', 'HUF'))->count());
+    }
+
+    public function test_cost_based_multiplier_uses_final_foreign_price_saved_rate_and_huf_cost(): void
+    {
+        foreach (['EUR' => 400, 'CZK' => 16, 'RON' => 80, 'PLN' => 100] as $currency => $rate) {
+            $list = $currency === 'EUR' ? $this->list : $this->makeList($currency, $rate);
+            $this->calculate($list);
+            $row = $this->retail($list);
+            $expected = (float) $row->final_price * $rate / 460;
+            $this->assertEqualsWithDelta($expected, $row->cost_based_multiplier, 0.0000001);
+            $this->assertEqualsWithDelta($expected, (float) PricingCalculationRow::whereKey($row->id)
+                ->selectRaw(PricingCalculationRow::costBasedMultiplierSql().' AS sql_multiplier')->firstOrFail()->sql_multiplier, 0.0000001);
+        }
+        ExchangeRate::where('currency_id', $this->list->currency_id)->update(['rate_to_huf' => 500]);
+        $this->assertEqualsWithDelta(4.95 * 400 / 460, $this->retail()->cost_based_multiplier, 0.0000001);
+        $row = $this->retail();
+        $row->update(['retained_price' => 3.95]);
+        $this->assertEqualsWithDelta(3.95 * 400 / 460, $row->cost_based_multiplier, 0.0000001);
+        $row->update(['manual_price' => 2.95]);
+        $this->assertEqualsWithDelta(2.95 * 400 / 460, $row->cost_based_multiplier, 0.0000001);
+    }
+
+    public function test_cost_multiplier_sort_search_export_and_two_decimal_average_ignore_display_preferences(): void
+    {
+        $this->calculate();
+        $first = $this->retail();
+        $first->update(['calculated_price' => 2]);
+        $product = $this->source->product->replicate();
+        $product->model_code = 'SECOND-MODEL';
+        $product->save();
+        $source = $this->source->replicate();
+        $source->product_id = $product->id;
+        $source->base_price = 1000;
+        $source->save();
+        $second = $first->replicate();
+        $second->product_id = $product->id;
+        $second->source_retail_row_id = $source->id;
+        $second->calculated_price = 10;
+        $second->save();
+        $page = Livewire::test(PricingForeignRetailCalculations::class);
+        $expected = (2 * 400 / 460 + 4) / 2;
+        $this->assertEqualsWithDelta($expected, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 2,87"', false);
+        $page->sortTable('cost_based_multiplier', 'asc')->assertCanSeeTableRecords([$first, $second], inOrder: true);
+        $page->sortTable('cost_based_multiplier', 'desc')->assertCanSeeTableRecords([$second, $first], inOrder: true);
+        $page->searchTableColumns(['cost_based_multiplier' => '4'])
+            ->assertCanSeeTableRecords([$second])->assertCanNotSeeTableRecords([$first]);
+        $this->assertSame(4.0, $page->instance()->averageCostBasedMultiplier);
+        $page->callAction('decimalPlaces', ['multiplier' => 6, 'cost_based_multiplier' => 3])->assertHasNoErrors();
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 4,00"', false);
+        $column = $page->instance()->getTable()->getColumn('cost_based_multiplier')->record($second);
+        $this->assertSame('4,000', $column->formatState($column->getState()));
+        $export = new AdminTableExport($page->instance()->getTableQueryForExport(), [$column]);
+        $this->assertSame([4.0], $export->map($second));
+        $this->assertSame(['A' => '#,##0.000'], $page->instance()->pricingDecimalExportFormats([$column]));
+        $page->searchTableColumns(['product.model_code' => 'NO-SUCH-MODEL']);
+        $this->assertNull($page->instance()->averageCostBasedMultiplier);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: -"', false);
+    }
+
+    public function test_cost_multiplier_average_covers_all_filtered_pages_and_avoids_per_row_queries(): void
+    {
+        $czk = $this->makeList('CZK', 16);
+        $this->calculate($czk);
+        $this->calculate();
+        $this->source->update(['base_price' => 400]);
+        $first = $this->retail();
+        $first->update(['calculated_price' => 2]);
+        for ($index = 1; $index <= 50; $index++) {
+            $color = Color::create(['product_id' => $first->product_id, 'code' => 'C'.$index, 'name_hu' => 'Szín '.$index, 'active' => true]);
+            $source = $this->source->replicate();
+            $source->color_id = $color->id;
+            $source->base_price = 300;
+            $source->save();
+            $copy = $first->replicate();
+            $copy->color_id = $color->id;
+            $copy->source_retail_row_id = $source->id;
+            $copy->calculated_price = 3;
+            $copy->save();
+        }
+        $page = Livewire::test(PricingForeignRetailCalculations::class)->set('tableRecordsPerPage', 50);
+        $this->assertSame(50, $page->instance()->getTableRecords()->count());
+        $this->assertEqualsWithDelta(202 / 51, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $records = $page->instance()->getTableRecords();
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        foreach ($records as $record) {
+            $this->assertNotNull($record->cost_based_multiplier);
+        }
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+        $this->assertCount(0, $queries);
+        $page->call('selectRetailCurrency', 'CZK');
+        $this->assertEqualsWithDelta((float) $this->retail($czk)->final_price * 16 / 400, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $page->call('selectRetailCurrency', 'EUR')->searchTableColumns(['color.name_hu' => 'Szín 50']);
+        $this->assertSame(4.0, $page->instance()->averageCostBasedMultiplier);
+    }
+
+    public function test_cost_multiplier_handles_invalid_inputs_and_mismatched_sources_consistently_in_sql(): void
+    {
+        $this->calculate();
+        foreach ([[null, 400], [0, 400], [-10, 400], [460, null], [460, 0], [460, -400]] as [$cost, $rate]) {
+            $this->source->update(['base_price' => $cost]);
+            $row = $this->retail();
+            $row->update(['retail_exchange_rate' => $rate]);
+            $this->assertNull($row->cost_based_multiplier);
+            $this->assertNull(PricingCalculationRow::whereKey($row->id)
+                ->selectRaw(PricingCalculationRow::costBasedMultiplierSql().' AS sql_multiplier')->firstOrFail()->sql_multiplier);
+        }
+        $this->source->update(['base_price' => 460, 'color_id' => Color::create([
+            'product_id' => $this->source->product_id, 'code' => 'MISMATCH', 'name_hu' => 'Más szín', 'active' => true,
+        ])->id]);
+        $row = $this->retail();
+        $row->update(['retail_exchange_rate' => 400]);
+        $this->assertNull($row->cost_based_multiplier);
+        $this->assertNull(PricingCalculationRow::whereKey($row->id)
+            ->selectRaw(PricingCalculationRow::costBasedMultiplierSql().' AS sql_multiplier')->firstOrFail()->sql_multiplier);
+        $row->update(['source_retail_row_id' => null]);
+        $row->unsetRelation('retailCostSource');
+        $this->assertNull($row->cost_based_multiplier);
+        $this->assertNull(Livewire::test(PricingForeignRetailCalculations::class)->instance()->averageCostBasedMultiplier);
+    }
+
+    public function test_manual_edit_refreshes_cost_multiplier_and_its_average_and_huf_hides_the_new_column(): void
+    {
+        $this->calculate();
+        $page = Livewire::test(PricingForeignRetailCalculations::class);
+        $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '3.95')->assertHasNoErrors();
+        $this->assertEqualsWithDelta(3.95 * 400 / 460, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,43"', false);
+        $this->assertTrue(Livewire::test(PricingHufRetailCalculations::class)->instance()->getTable()->getColumn('cost_based_multiplier')->isHidden());
+    }
+
+    public function test_cost_multiplier_average_is_scoped_to_the_selected_project_and_target_list(): void
+    {
+        $this->calculate();
+        $page = Livewire::test(PricingForeignRetailCalculations::class);
+        $other = $this->project->replicate();
+        $other->name = 'Másik árprojekt';
+        $other->save();
+        $source = $this->source->replicate();
+        $source->pricing_project_id = $other->id;
+        $source->base_price = 100;
+        $source->save();
+        $foreign = $this->retail()->replicate();
+        $foreign->pricing_project_id = $other->id;
+        $foreign->source_retail_row_id = $source->id;
+        $foreign->calculated_price = 2;
+        $foreign->save();
+        $page->call('$refresh');
+        $this->assertEqualsWithDelta(4.95 * 400 / 460, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $page->call('selectPricingProject', $other->id);
+        $this->assertSame(8.0, $page->instance()->averageCostBasedMultiplier);
+        $secondList = $this->makeSameCurrencyTarget('OTHER-EUR');
+        $copy = $foreign->replicate();
+        $copy->price_list_id = $secondList->id;
+        $copy->calculated_price = 3;
+        $copy->save();
+        $page->call('$refresh');
+        $this->assertSame(10.0, $page->instance()->averageCostBasedMultiplier);
+        $page->filterTable('price_list_id', $this->list->id);
+        $this->assertSame(8.0, $page->instance()->averageCostBasedMultiplier);
     }
 
     private function makeHufSource(string $code): PriceList

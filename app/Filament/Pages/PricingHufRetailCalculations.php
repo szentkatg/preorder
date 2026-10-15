@@ -98,7 +98,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
     {
         return [
             'purchase_price' => 'Eredeti beszerzési ár', 'base_price' => 'Bekerülési HUF',
-            'multiplier' => 'Kisker szorzó és átlaga', 'calculation_multiplier' => 'Kalkulációs szorzó',
+            'multiplier' => 'Kisker szorzó', 'calculation_multiplier' => 'Kalkulációs szorzó',
             'unrounded_price' => 'Kerekítés előtti HUF', 'calculated_price' => 'Kalkulált kisker HUF',
             'final_price' => 'Végleges kisker HUF', 'target_purchase_price' => 'Cél beszerzési ár',
             'previous_season_price' => 'Előző szezon kisker ár',
@@ -119,7 +119,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
             $table->query(
                 PricingCalculationRow::query()->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                     ->whereHas('currency', fn ($query) => $query->where('code', $this->retailCurrencyCode()))
-                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency'])
+                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency', 'retailCostSource'])
             ),
             PricingCalculationRow::class,
             withViewAction: false,

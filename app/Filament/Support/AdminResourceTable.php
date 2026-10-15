@@ -95,7 +95,7 @@ class AdminResourceTable
             'purchase_price', 'exchange_rate', 'shipping_cost_percent', 'customs_percent', 'candidate_count',
             'base_price', 'multiplier', 'calculation_multiplier', 'unrounded_price',
             'calculated_price', 'manual_price', 'retained_price', 'final_price', 'target_purchase_price',
-            'source_retail_price', 'retail_exchange_rate', 'previous_season_price',
+            'source_retail_price', 'retail_exchange_rate', 'previous_season_price', 'cost_based_multiplier',
         ], true)) {
             // Filament applies the alignment to the header, cell content and editable input.
             $column->alignEnd();
@@ -123,11 +123,13 @@ class AdminResourceTable
         if (($modelClass === PricingCalculationRow::class)
             && (($column->getName() === 'calculation_multiplier')
                 || ($column->getName() === 'target_purchase_price')
+                || ($column->getName() === 'cost_based_multiplier')
                 || (($column->getName() === 'multiplier')
                     && ($column->getExtraAttributes()['data-pricing-derived-multiplier'] ?? false)))) {
             $expression = match ($column->getName()) {
                 'calculation_multiplier' => 'multiplier',
                 'target_purchase_price' => PricingCalculationRow::targetPurchasePriceSql(),
+                'cost_based_multiplier' => PricingCalculationRow::costBasedMultiplierSql(),
                 default => PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL,
             };
             $column

@@ -799,7 +799,7 @@ class HufRetailCalculationTest extends TestCase
         $this->assertEqualsWithDelta(16 / 3, $page->instance()->averageRetailMultiplier, 0.0000001);
         $page->filterTable('price_list_id', $this->list->id);
         $this->assertSame(3.0, $page->instance()->averageRetailMultiplier);
-        $page->assertSee('data-pricing-average-multiplier="Átlag: 3"', false);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,00"', false);
         $this->assertNotSame(3.5, $page->instance()->averageRetailMultiplier); // Sum(price) / sum(cost) would be weighted.
         $page->searchTableColumns(['product.model_code' => 'SECOND-MODEL']);
         $this->assertSame(4.0, $page->instance()->averageRetailMultiplier);

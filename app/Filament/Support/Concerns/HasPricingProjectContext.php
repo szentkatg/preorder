@@ -132,6 +132,9 @@ trait HasPricingProjectContext
         if (method_exists($this, 'averageRetailMultiplier')) {
             unset($this->averageRetailMultiplier);
         }
+        if (method_exists($this, 'averageCostBasedMultiplier')) {
+            unset($this->averageCostBasedMultiplier);
+        }
         $this->tableFilters = [];
         $this->tableColumnSearches = [];
         $this->tableSearch = '';

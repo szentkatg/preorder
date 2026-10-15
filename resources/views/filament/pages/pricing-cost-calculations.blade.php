@@ -188,15 +188,25 @@
         [data-pricing-resizable-columns] th[data-pricing-average-multiplier]::before {
             content: attr(data-pricing-average-multiplier);
             display: block;
+            width: fit-content;
+            max-width: 100%;
             margin-bottom: 0.125rem;
-            color: rgb(75 85 99);
-            font-size: 0.75rem;
-            font-weight: 600;
-            line-height: 1rem;
+            margin-inline-start: auto;
+            padding: 0.125rem 0.375rem;
+            border: 1px solid rgb(147 197 253);
+            border-radius: 0.375rem;
+            background-color: rgb(239 246 255);
+            color: rgb(30 64 175);
+            font-size: 0.8125rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.125rem;
         }
 
         .dark [data-pricing-resizable-columns] th[data-pricing-average-multiplier]::before {
-            color: rgb(209 213 219);
+            border-color: rgb(59 130 246);
+            background-color: rgb(30 58 138 / 0.35);
+            color: rgb(191 219 254);
         }
 
         [data-pricing-resizable-columns] .fi-ta-table > tbody > tr > .fi-ta-cell {

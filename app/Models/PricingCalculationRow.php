@@ -13,6 +13,21 @@ class PricingCalculationRow extends Model
     // Keep the displayed multiplier sortable/searchable without changing the stored calculation input.
     public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price, calculated_price) / NULLIF(base_price, 0)) ELSE NULL END';
 
+    public static function costBasedMultiplierSql(): string
+    {
+        // The foreign row's base_price is converted HUF retail, not its HUF cost.
+        $cost = '(SELECT huf_source.base_price FROM pricing_calculation_rows AS huf_source'
+            .' WHERE huf_source.id = pricing_calculation_rows.source_retail_row_id'
+            .' AND huf_source.pricing_project_id = pricing_calculation_rows.pricing_project_id'
+            .' AND huf_source.product_id = pricing_calculation_rows.product_id'
+            .' AND huf_source.color_key = pricing_calculation_rows.color_key'
+            ." AND huf_source.price_type = 'retail' AND huf_source.base_price > 0)";
+
+        return 'CASE WHEN retail_exchange_rate > 0 THEN'
+            .' 1.0 * COALESCE(manual_price, retained_price, calculated_price) * retail_exchange_rate'
+            .' / NULLIF('.$cost.', 0) ELSE NULL END';
+    }
+
     public static function targetPurchasePriceSql(): string
     {
         $price = 'COALESCE(manual_price, retained_price, calculated_price)';
@@ -142,6 +157,14 @@ class PricingCalculationRow extends Model
         return $this->belongsTo(self::class, 'source_retail_row_id');
     }
 
+    public function retailCostSource(): BelongsTo
+    {
+        // A separate read-only projection avoids loading every source snapshot for the grid,
+        // without giving calculation/approval services a partially loaded sourceRetailRow.
+        return $this->belongsTo(self::class, 'source_retail_row_id')
+            ->select(['id', 'pricing_project_id', 'product_id', 'color_key', 'price_type', 'base_price']);
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
@@ -212,6 +235,20 @@ class PricingCalculationRow extends Model
         return $price !== null && $this->base_price !== null && (float) $this->base_price > 0
             ? (float) $price / (float) $this->base_price
             : null;
+    }
+
+    public function getCostBasedMultiplierAttribute(): ?float
+    {
+        $price = $this->manual_price ?? $this->retained_price ?? $this->calculated_price;
+        $source = $this->retailCostSource;
+        if ($price === null || (float) $this->retail_exchange_rate <= 0 || ! $source
+            || $source->pricing_project_id != $this->pricing_project_id || $source->product_id != $this->product_id
+            || $source->color_key != $this->color_key || $source->price_type !== self::TYPE_RETAIL
+            || (float) $source->base_price <= 0) {
+            return null;
+        }
+
+        return (float) $price * (float) $this->retail_exchange_rate / (float) $source->base_price;
     }
 
     public function getTargetPurchasePriceAttribute(): ?string

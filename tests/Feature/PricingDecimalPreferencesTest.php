@@ -72,7 +72,7 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->assertSame('496,13', $this->formatted($page, 'final_price', $this->retail));
         $this->assertSame('8,800000', $this->formatted($page, 'purchase_price', $this->retail));
         $this->assertSame('4', $this->formatted($page, 'multiplier', $this->retail));
-        $page->assertSee('data-pricing-average-multiplier="Átlag: 4"', false);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 4,02"', false);
         $this->assertSame($before, $this->retail->fresh()->getAttributes());
         $this->assertSame(0, PricingParameter::count());
         $input = $page->instance()->getTable()->getColumn('manual_price')->record($this->retail);

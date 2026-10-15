@@ -74,7 +74,61 @@ dátumteszt öt esete külön futtatva sikeres (15 assertion); a teljes futásba
 jelentkező eltérés oka további vizsgálatot igényel. Az importkódot és az
 admin-darabszámteszteket ez a bővítés nem módosítja. Pint és diff-ellenőrzés sikeres.
 
-### Kalkulációs bemenetek és védelem
+### Bekerülési szorzó és kiemelt átlagok (2026-10-15)
+
+A devizás kisker listák új **Bekerülési szorzó** oszlopa:
+
+`végleges devizás kisker ár × mentett HUF/deviza árfolyam ÷ a kapcsolt HUF kisker sor bekerülési alapja`
+
+Ez nem az országszorzó: a bekerülési értékhez viszonyított teljes szorzó,
+a kerekítés és a manuális/megtartott ár hatásával együtt. A meglévő
+országszorzó oszlop megmarad. A devizás sor `base_price` mezője átváltott
+HUF kisker árat tárol, ezért nem abból osztunk. A HUF forrás `base_price`
+értékét használjuk; az a HUF újraszámításkor frissül. A visszaváltás mentett
+árfolyama csak devizás újraszámításkor frissül, nem egy árfolyamtörzs-szerkesztéstől.
+
+- Az új oszlop rendezhető, kereshető, ki/be kapcsolható és Excelbe
+  számként exportálható. A sorok tizedesjegyei a Tizedesjegyek ablakban állíthatók.
+- Mindkét devizás szorzó és a HUF kisker szorzó fejléce a teljes szűrt
+  találathalmaz számtani átlagát mutatja, nem csak az aktuális lapot és
+  nem árösszegek hányadosát. Projekt-, pénznem-, árlista- és keresési szűrésre frissül.
+- Az átlagok mindig **két tizedesjeggyel**, félkövér, keretezett, világos/sötét
+  témához igazodó kék jelzésben látszanak. Az egyedi sorok tizedesbeállítása
+  nem változtatja az átlagok két tizedesét vagy a számítás pontosságát.
+- Hiányzó/nem pozitív bekerülési alap vagy árfolyam, illetve hiányzó vagy
+  más projekt/termék/szín forrása esetén `-` jelenik meg; ezek nem kerülnek az átlagba.
+- Az átlag, rendezés és keresés SQL-ben történik; a cellákhoz a források
+  hat szükséges mezője egy közös lekérdezéssel töltődik. Nincs soronkénti
+  lekérdezés vagy új adatbázismező. A kalkulációs és jóváhagyási adatok változatlanok.
+
+Migráció, Composer install, npm build, kézi feltöltés, jogosultság- vagy
+konfigurációmódosítás **nem szükséges**. A Blade-ben lévő CSS miatt sem kell
+Vite build. A szokásos Laravel cache-törlés/újraépítés szükséges telepítéskor.
+
+Ellenőrzés: 39 devizás kalkulációs teszt (316 assertion), valamint 78
+kapcsolódó HUF/tizedesbeállítás/árprojekt-kontextus/teljesítmény teszt
+(722 assertion) sikeres. Összesen 117 teszt / 1038 assertion. Pint és
+`git diff --check` sikeres. A valódi Filament-táblázat világos témájú,
+tesztadatokból renderelt képernyőképén a két szorzó és a két tizedes,
+félkövér, keretezett átlagjelzés vizuálisan ellenőrizve. A teljes tesztcsomagot
+ebben a körben nem futtattuk újra.
+
+```powershell
+git add -- app/Models/PricingCalculationRow.php app/Filament/Pages/PricingForeignRetailCalculations.php app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingProjectContext.php resources/views/filament/pages/pricing-cost-calculations.blade.php tests/Feature/ForeignRetailCalculationTest.php tests/Feature/HufRetailCalculationTest.php tests/Feature/PricingDecimalPreferencesTest.php docs/huf-retail-pricing.md
+git commit -m "Show foreign retail cost multipliers and highlight filtered averages"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedélyezett élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Devizás kalkulációs bemenetek
 
 - A HUF forrás manuális/megtartott végleges ára az alap, nem feltétlenül a
   kalkulált HUF ár. A forrássornak aktuálisnak és felülvizsgálattól mentesnek kell lennie.
