@@ -107,15 +107,16 @@ class PricingAuthorizationTest extends TestCase
     {
         $this->signInWith(self::READ_PERMISSIONS);
         $page = Livewire::test(PricingCostCalculations::class)->assertSuccessful()
-            ->assertCanSeeTableRecords([$this->cost])->assertTableActionVisible('calculationDetails', $this->cost)
-            ->assertTableActionHidden('updateShippingCostPercent', $this->cost)
-            ->assertTableActionHidden('updateCustomsPercent', $this->cost)
-            ->assertTableActionHidden('edit', $this->cost)
+            ->assertCanSeeTableRecords([$this->cost])->assertTableActionDoesNotExist('calculationDetails')
+            ->assertTableActionDoesNotExist('updateShippingCostPercent')
+            ->assertTableActionDoesNotExist('updateCustomsPercent')
+            ->assertTableActionDoesNotExist('edit')
             ->assertTableBulkActionHidden('delete')
             ->assertTableActionVisible('exportExcel');
         foreach (['shipping_cost_percent', 'customs_percent'] as $field) {
-            $this->assertTrue($page->instance()->getTable()->getColumn($field)->record($this->cost)->isDisabled());
+            $this->assertSame('false', $page->instance()->getTable()->getColumn($field)->record($this->cost)->getExtraCellAttributes()['data-cost-editable']);
         }
+        $page->call('openCostDetails', $this->cost->id)->assertActionMounted('costDetails');
         $retail = Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()
             ->assertCanSeeTableRecords([$this->retail])->assertTableActionVisible('retailDetails', $this->retail)
             ->assertTableActionHidden('approveRetail', $this->retail)
@@ -128,7 +129,8 @@ class PricingAuthorizationTest extends TestCase
     public function test_details_also_require_record_view_permission(): void
     {
         $this->signInWith(['View:PricingCostCalculations', 'View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow']);
-        Livewire::test(PricingCostCalculations::class)->assertSuccessful()->assertTableActionHidden('calculationDetails', $this->cost);
+        Livewire::test(PricingCostCalculations::class)->assertSuccessful()->call('openCostDetails', $this->cost->id)->assertForbidden();
+        Livewire::test(PricingCostCalculations::class)->call('mountAction', 'costDetails', ['record_id' => $this->cost->id])->assertForbidden();
         Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()->assertTableActionHidden('retailDetails', $this->retail);
     }
 
@@ -196,19 +198,20 @@ class PricingAuthorizationTest extends TestCase
         }
     }
 
-    public function test_editor_role_can_change_parameter_and_recalculate_from_inline_and_modal_actions(): void
+    public function test_editor_role_can_change_parameter_and_recalculate_from_on_demand_cell_editor(): void
     {
         $this->signInWith(array_merge(self::READ_PERMISSIONS, self::COST_WRITE_PERMISSIONS));
         $page = Livewire::test(PricingCostCalculations::class)
-            ->assertTableActionVisible('updateCustomsPercent', $this->cost);
-        $this->assertFalse($page->instance()->getTable()->getColumn('customs_percent')->record($this->cost)->isDisabled());
+            ->assertTableActionDoesNotExist('updateCustomsPercent');
+        $this->assertSame('true', $page->instance()->getTable()->getColumn('customs_percent')->record($this->cost)->getExtraCellAttributes()['data-cost-editable']);
         $page->call('startInlineCostPercentParameterAdjustment', $this->cost->id, PricingParameter::TYPE_CUSTOMS_PERCENT, 12)
             ->set('pendingParameterScope', PricingParameter::SCOPE_GLOBAL)
             ->call('confirmPendingParameterAdjustment')->assertHasNoErrors();
         $this->assertSame('12.0000', $this->cost->fresh()->customs_percent);
         $this->assertSame('112.0000', $this->cost->fresh()->final_price);
         $this->assertSame('12.000000', PricingParameter::sole()->value);
-        $page->callTableAction('updateCustomsPercent', $this->cost, ['scope_type' => PricingParameter::SCOPE_GLOBAL, 'value' => 10])
+        $page->call('startInlineCostPercentParameterAdjustment', $this->cost->id, PricingParameter::TYPE_CUSTOMS_PERCENT, '10,0')
+            ->set('pendingParameterScope', PricingParameter::SCOPE_GLOBAL)->call('confirmPendingParameterAdjustment')
             ->assertHasNoErrors();
         $this->assertSame('10.000000', PricingParameter::sole()->value);
         $this->assertSame('110.0000', $this->cost->fresh()->final_price);

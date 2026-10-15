@@ -12,8 +12,10 @@ use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\PricingParameterAdjustmentService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -87,10 +89,11 @@ class PricingCostCalculations extends Page implements HasTable
     ): void {
         abort_unless(static::canAccess(), 403);
         abort_unless($this->pricingWorkspaceIsEditable(), 403);
-        if (! is_numeric($value) || (float) $value < 0) {
+        $value = is_string($value) ? str_replace(',', '.', trim($value)) : $value;
+        if (! is_numeric($value) || ! is_finite((float) $value) || (float) $value < 0 || round((float) $value, 4) > 9999.9999) {
             Notification::make()
                 ->title('Érvénytelen érték')
-                ->body('A százalékos érték csak 0 vagy annál nagyobb szám lehet.')
+                ->body('A százalékos érték 0 és 9999,9999 közötti szám lehet.')
                 ->danger()
                 ->send();
 
@@ -239,9 +242,41 @@ class PricingCostCalculations extends Page implements HasTable
         $this->resetTable();
     }
 
+    public function openCostDetails(int $recordId): void
+    {
+        $this->costDetailsRecord($recordId);
+        $this->mountAction('costDetails', ['record_id' => $recordId]);
+    }
+
+    public function costDetailsAction(): Action
+    {
+        return Action::make('costDetails')->label('Kalkuláció részletei')
+            ->modalHeading('Kalkuláció részletei')->modalWidth(Width::Screen)
+            ->modalSubmitAction(false)->modalCancelActionLabel('Bezárás')
+            ->mountUsing(fn (array $arguments) => $this->costDetailsRecord($arguments['record_id'] ?? null))
+            ->modalContent(fn (array $arguments) => view('filament.pricing.calculation-details', [
+                'record' => $this->costDetailsRecord($arguments['record_id'] ?? null),
+            ]));
+    }
+
+    private function costDetailsRecord(mixed $recordId): PricingCalculationRow
+    {
+        abort_unless(static::canAccess(), 403);
+        abort_unless(is_scalar($recordId) && ctype_digit((string) $recordId) && (int) $recordId > 0, 422);
+        $record = $this->scopePricingProjectContext(PricingCalculationRow::query())
+            ->where('price_type', PricingCalculationRow::TYPE_COST)
+            ->with(['pricingProject', 'product.itemMainGroup', 'supplier', 'purchaseCurrency', 'currency', 'color'])
+            ->find((int) $recordId);
+        abort_unless($record, 404);
+        Gate::authorize('view', $record);
+
+        return $record;
+    }
+
     public function table(Table $table): Table
     {
-        $table = PricingCalculationRowsTable::configure($table)
+        $table = PricingCalculationRowsTable::configure($table, lightweightCost: true)
+            ->recordAction(null)->recordUrl(null)
             ->query(
                 PricingCalculationRow::query()
                     ->where('price_type', PricingCalculationRow::TYPE_COST)
@@ -284,7 +319,7 @@ class PricingCostCalculations extends Page implements HasTable
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Ez a munkafelület a bekerülési érték kalkuláció áttekintésére szolgál.';
+        return 'A szállítási és vám% dupla kattintással szerkeszthető (Enter: érvényességi szint kiválasztása, Esc: mégse). A sor többi részén dupla kattintás nyitja a kalkuláció részleteit. A kijelölt soron Enterrel is megnyithatók a részletek.';
     }
 
     protected function pricingPreferencePrefix(): string

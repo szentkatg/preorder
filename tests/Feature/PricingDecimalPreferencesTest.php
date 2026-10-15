@@ -135,8 +135,12 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->assertSame('380,123456', $this->formatted($page, 'exchange_rate', $this->cost));
         $this->assertSame('123', $this->formatted($page, 'calculated_price', $this->cost));
         $this->assertSame('123,457', $this->formatted($page, 'final_price', $this->cost));
-        $this->assertSame('8.125', $page->instance()->getTable()->getColumn('shipping_cost_percent')->record($this->cost)->getState());
-        $this->assertSame('12.125', $page->instance()->getTable()->getColumn('customs_percent')->record($this->cost)->getState());
+        $shipping = $page->instance()->getTable()->getColumn('shipping_cost_percent')->record($this->cost);
+        $customs = $page->instance()->getTable()->getColumn('customs_percent')->record($this->cost);
+        $this->assertSame('8.1250', $shipping->getState());
+        $this->assertSame('12.1250', $customs->getState());
+        $this->assertSame('8.125', $shipping->getExtraCellAttributes()['data-cost-value']);
+        $this->assertSame('12.125', $customs->getExtraCellAttributes()['data-cost-value']);
         $this->assertSame($before, $this->cost->fresh()->getAttributes());
     }
 
@@ -263,7 +267,16 @@ class PricingDecimalPreferencesTest extends TestCase
                 $this->assertNotNull($header, 'Missing header: '.$name);
                 $this->assertStringContainsString('fi-align-end', $header->getAttribute('class'), $name);
             }
-            $inputNames = $pageClass === PricingCostCalculations::class ? ['shipping_cost_percent', 'customs_percent'] : ['manual_price'];
+            if ($pageClass === PricingCostCalculations::class) {
+                foreach (['shipping_cost_percent', 'customs_percent'] as $name) {
+                    $key = str_replace('_', '-', $name);
+                    $cell = $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]')->item(0);
+                    $this->assertStringContainsString('fi-align-end', $cell->getAttribute('class'));
+                    $this->assertTrue($cell->hasAttribute('data-cost-value'));
+                    $this->assertSame(0, $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input')->length);
+                }
+            }
+            $inputNames = $pageClass === PricingCostCalculations::class ? [] : ['manual_price'];
             foreach ($inputNames as $name) {
                 $key = str_replace('_', '-', $name);
                 $input = $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input[contains(@class, "fi-input")]')->item(0);

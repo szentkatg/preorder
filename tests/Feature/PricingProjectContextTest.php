@@ -128,9 +128,10 @@ class PricingProjectContextTest extends TestCase
         $cost = Livewire::test(PricingCostCalculations::class)->assertSet('pricingArchive', true)
             ->assertSet('pricingProjectId', $this->closed->id);
         $costRow = $this->row($this->closed, 'cost');
-        $cost->assertTableActionHidden('edit', $costRow)->assertTableActionHidden('updateShippingCostPercent', $costRow)
+        $cost->assertTableActionDoesNotExist('edit')->assertTableActionDoesNotExist('updateShippingCostPercent')
             ->assertTableBulkActionHidden('delete');
-        $this->assertTrue($cost->instance()->getTable()->getColumn('shipping_cost_percent')->record($costRow)->isDisabled());
+        $this->assertSame('false', $cost->instance()->getTable()->getColumn('shipping_cost_percent')->record($costRow)->getExtraCellAttributes()['data-cost-editable']);
+        $cost->call('openCostDetails', $costRow->id)->assertActionMounted('costDetails');
         $this->assertSame($before, $row->fresh()->getAttributes());
         $this->travelBack();
     }

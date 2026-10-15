@@ -24,7 +24,7 @@ use InvalidArgumentException;
 
 class PricingCalculationRowsTable
 {
-    public static function configure(Table $table): Table
+    public static function configure(Table $table, bool $lightweightCost = false): Table
     {
         return $table
             ->columns([
@@ -53,7 +53,7 @@ class PricingCalculationRowsTable
                     ->label('Árfolyam')
                     ->numeric(decimalPlaces: 4)
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextInputColumn::make('shipping_cost_percent')
+                $lightweightCost ? self::costPercentColumn('shipping_cost_percent', 'Száll. %', PricingParameter::TYPE_SHIPPING_COST_PERCENT) : TextInputColumn::make('shipping_cost_percent')
                     ->getStateUsing(
                         fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->shipping_cost_percent)
                     )
@@ -81,7 +81,7 @@ class PricingCalculationRowsTable
                         return self::formatPercentInput($state);
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextInputColumn::make('customs_percent')
+                $lightweightCost ? self::costPercentColumn('customs_percent', 'Vám %', PricingParameter::TYPE_CUSTOMS_PERCENT) : TextInputColumn::make('customs_percent')
                     ->getStateUsing(
                         fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->customs_percent)
                     )
@@ -163,7 +163,11 @@ class PricingCalculationRowsTable
             ->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
-            ->recordActions([
+            ->recordClasses($lightweightCost ? fn (PricingCalculationRow $record): array => [
+                'pricing-cost-row', 'pricing-cost-row-id-'.$record->getKey(),
+                Gate::allows('view', $record) ? 'pricing-cost-details-enabled' : '',
+            ] : null)
+            ->recordActions($lightweightCost ? [] : [
                 Action::make('calculationDetails')
                     ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
                     ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
@@ -216,6 +220,26 @@ class PricingCalculationRowsTable
                             && (! method_exists($livewire, 'pricingWorkspaceIsEditable') || $livewire->pricingWorkspaceIsEditable())),
                 ]),
             ]);
+    }
+
+    private static function costPercentColumn(string $field, string $label, string $parameterType): TextColumn
+    {
+        return TextColumn::make($field)->label($label)->numeric(decimalPlaces: 4)->width('6.25rem')
+            ->formatStateUsing(fn ($state): string => $state === null ? '-' : str_replace('.', ',', self::formatPercentInput($state)).' %')
+            ->extraCellAttributes(function (PricingCalculationRow $record) use ($field, $label, $parameterType): array {
+                $editable = CostCalculationAuthorization::canAdjustParameter($record);
+
+                return [
+                    'data-cost-parameter' => $parameterType,
+                    'data-cost-record-id' => $record->getKey(),
+                    'data-cost-value' => self::formatPercentInput($record->{$field}),
+                    'data-cost-label' => $label,
+                    'data-cost-editable' => $editable ? 'true' : 'false',
+                    'title' => $editable ? 'Dupla kattintás vagy Enter: százalék szerkesztése. Esc: mégse.' : 'Csak olvasható érték.',
+                    'tabindex' => '0',
+                ];
+            })
+            ->toggleable(isToggledHiddenByDefault: true);
     }
 
     private static function formatPercentInput(mixed $state): ?string

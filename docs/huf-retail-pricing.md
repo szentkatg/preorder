@@ -1,5 +1,82 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Bekerülési érték: igény szerinti szerkesztés és részletezés (2026-10-15)
+
+Első kísérleti lépésként **csak a Bekerülési értékek munkafelület** változik:
+
+- A szállítási és vám% alapból egyszerű, jobbra igazított szöveg. Dupla
+  kattintásra vagy a cellára fókuszálva Enter/F2-re egyetlen helyi input
+  jön létre; az értéket kijelöljük. Megnyitáskor még nincs szerverkérés.
+- Enter vagy a mező elhagyása előkészíti a módosítást; Esc visszavonja.
+  Azonos értéknél nem küldünk felesleges kérést. Pont és vessző elfogadott,
+  negatív/üres/nem véges, illetve a tárolható 9999,9999 fölötti százalék nem.
+  A beviteli mező a művelet után eltűnik, nem tartunk fenn rejtett inputot
+  minden sorhoz. A megjelenített százalék tizedeselválasztója vessző.
+- Megmarad a meglévő szűkítésválasztó, az érintett sorok száma, valamint a
+  **Mentés és újraszámítás** és **Mégse** lépés. A cellából kilépve még nem
+  írunk paramétert; adatbázis-módosítás csak külön megerősítés után történik.
+- Nincs soronkénti Szállítás/Vám paramétergomb, Szerkesztés vagy Részletek gomb,
+  és az ezekhez tartozó akciók sincsenek felépítve a tábla háttér-regiszterében.
+- A sor nem szerkeszthető részén dupla kattintás nyitja a korábbi táblázatos
+  részletező modalt. A fókuszálható soron Enter/F2 is működik. Szerkesztés
+  közben az input dupla kattintása nem nyit részleteket. Checkbox, link,
+  gomb, legördülő és az oszlopméretező nem indít részletező hívást.
+- A részletező egyetlen lusta oldal-akció; csak megnyitásakor tölt adatot.
+  A szerver minden hívásnál vizsgálja az oldaljogot, a rekord View jogát,
+  a választott projektet/archív állapotot és a cost típust. Közvetlenül
+  meghamisított modalhívással sem lehet más projekt vagy más árszint sorát elérni.
+- Read-only/archív módban a százalék szövegként megtekinthető, nem szerkeszthető.
+  A módosítás előkészítése és megerősítése továbbra is friss szerveroldali
+  költség-/projekt-/paraméter-jogosultságellenőrzést végez.
+
+Az általános **Árkalkulációs sorok** resource, valamint a HUF/devizás kisker,
+nagyker és disztribútori munkalapok gombjai/beviteli mezői nem változnak.
+A szűrés, rendezés, számtípusú Excel-export, személyes oszlopok/szélességek,
+fejléctördelés és a tömeges kijelölési műveletek megmaradnak.
+
+### Helyi mérés és böngészős ellenőrzés
+
+27 azonos tesztsorral, azonos látható oszlopokkal (mindkét százalékos oszlop
+bekapcsolva), váltott sorrendben renderelt régi és új munkalap összehasonlítása:
+
+- Egy futásban régi: **638–671 ms**, új: **236–248 ms** (kb. 2,7-szer gyorsabb).
+- Másik futásban régi: 966–973 ms, új: 329–371 ms; a futási környezet ingadozik.
+- Komponens-HTML: **1161809 → 789954 bájt**, kb. **32% csökkenés**.
+
+Ez helyi Livewire render-összehasonlítás, **nem NAS HTTP-válaszidő-mérés**,
+és nem ígéret az összes menüváltás ugyanilyen gyorsulására. Nem csökkentettük
+a látható sorok vagy oszlopok számát a két összehasonlított változat között.
+
+A tesztadatból generált valódi Filament HTML helyi headless böngészőpróbája
+induláskor 0 szerkesztő inputot és 0 sorműveleti gombot talált. Ellenőrizve:
+dupla kattintásra input/fókusz, megnyitáskor 0 szerverkérés, Esc-visszavonás,
+Enter/blur egyszeri kérés, input dupla kattintásának elhatárolása, checkbox
+kihagyása, sor-részletezés és billentyűzetes szerkesztés. A klienshívásokat
+ebben a helyi böngészőpróbában tesztstub fogta; a valódi PHP-végpontokat,
+jogosultságokat, scope-megerősítést és exportot külön Laravel-tesztek ellenőrzik.
+A kapcsolódó regressziós csomag eredménye: **152 sikeres teszt, 1249 ellenőrzés**.
+
+**Nincs új migráció, Composer install, npm build, kézi fájlfeltöltés, új
+szerepkörjog vagy .env módosítás.** Az új JS/CSS Blade-nézetben van.
+A kísérleti fejlesztés önmagában nem futtat kalkulációt, és nem módosít NAS-adatot.
+
+Git/NAS, csak külön telepítési kéréskor a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/PricingCostCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/PricingCalculationRowsTable.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/cost-grid-interactions.blade.php tests/Feature/PricingCostDoubleClickTest.php tests/Feature/PricingAuthorizationTest.php tests/Feature/PricingDecimalPreferencesTest.php tests/Feature/PricingProjectContextTest.php docs/huf-retail-pricing.md
+git commit -m "Render cost grid editors and details only on double click"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedéllyel, éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Betöltésjelző javítása és NAS-válaszidő vizsgálata (2026-10-15)
 
 A fejléctördelés SVG-szabálya túl tág volt: `display: inline-block` megjelenítést
