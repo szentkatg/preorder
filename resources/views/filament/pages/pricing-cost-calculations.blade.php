@@ -252,7 +252,7 @@
             overflow-wrap: anywhere;
         }
 
-        [data-pricing-resizable-columns] .fi-ta-header-cell-sort-btn > svg {
+        [data-pricing-resizable-columns] .fi-ta-header-cell-sort-btn > svg:not(.fi-loading-indicator) {
             display: inline-block;
             vertical-align: middle;
         }

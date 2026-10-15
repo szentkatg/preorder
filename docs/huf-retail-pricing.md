@@ -1,5 +1,71 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Betöltésjelző javítása és NAS-válaszidő vizsgálata (2026-10-15)
+
+A fejléctördelés SVG-szabálya túl tág volt: `display: inline-block` megjelenítést
+adott a Livewire alapból rejtett betöltésjelzőinek is. Most csak a
+`svg:not(.fi-loading-indicator)` rendezési ikonokra érvényes. Nem használunk
+globális spinner-elrejtést: nyugalomban rejtett marad, betöltés közben a Livewire
+továbbra is megjelenítheti, majd újra elrejtheti. A fejléc tördelése megmarad.
+
+Ellenőrzés: 3 payload-/regressziós teszt, 23 assertion sikeres. A tényleges
+Filament-nézet és Livewire alapstílusok helyi böngészős próbájában a nagyker
+fejléc 3, a disztribútori 4 betöltésjelzőjéből nyugalomban **0 látható**;
+az inline megjelenítés/elrejtés működik, és a 110 px-es fejlécek tovább törnek.
+
+### A lassú menüváltás mérése — nem teljesítményjavítás
+
+A kapott HAR egyetlen normál GET-et tartalmaz a bekerülési oldalra:
+teljes kérés **4863 ms**, első bájtig várakozás **4673 ms**, fogadás **190 ms**.
+A gzip jelen van; ebből nem vezethető le, hogy az összes menü ugyanilyen lassú.
+A HAR szöveges törzsében 528046 NUL karakteres sérült rész található, ezért
+ennek DOM-/sorszámlálására nem támaszkodtunk. A méret/meta és időzítési adatok
+mellett a NAS-on külön reprodukáltuk a választ.
+
+A NAS-on, a meglévő super_admin nevében, a már futó CLI Laravelből indított
+HTTP-kernel renderpróba 200-as választ adott. A teljes DB-tranzakció minden
+próba végén visszagörgetődött; nincs telepített profiler, nem változtattunk
+szerepkört, árat vagy konfigurációt. A teljes hálózati kérés és a CLI renderpróba
+nem azonos mérés, de az ~5 másodperc itt is reprodukálható:
+
+- Alapválasz: **5094 ms**, **29 SQL**, összes SQL-idő **17,7 ms**,
+  **1314478 bájt HTML**. További próbákban 14–15 ms SQL-idő mellett is 4,7–5,6 s.
+- A Blade motor ideiglenes burkolásával: a Filament táblázat kb. **4651 ms saját**
+  és **4706 ms inkluzív** renderidő; az oldalsáv kb. 153 ms saját idő.
+- 27 tényleges táblázatsorhoz a szállítási és vám beviteli cella előállítása
+  külön mérésben összesen kb. **713 ms** volt.
+- Csak a mérőfolyamatban, soronkénti műveletek nélkül: **1317 ms**;
+  műveletek és szerkeszthető cellák nélkül: **391 ms**.
+  Ez izolációs próba, nem az eltérő funkciójú oldalra ígért gyorsulás.
+- A lekérdezésben a limit-paraméteres próbák során is 100 maradt a tényleges
+  SQL-limit; ezekből nem állítunk lapméret szerinti gyorsulást.
+
+Következtetés: a vizsgált oldal fő szűk keresztmetszete a Filament soronkénti
+műveleteinek és szerkeszthető celláinak PHP/HTML-előállítása, nem a MySQL ideje
+vagy a 190 ms-os letöltés. A mért futtatókörnyezetben OPcache betöltve,
+`opcache.enable=1`, CLI-re `enable_cli=0`, Xdebug nincs; ebből nem állítunk
+FPM OPcache-hibát. A következő külön fejlesztési lépés a soronként ismétlődő
+akció-/jogosultság-/sémaépítés és cella-renderelés optimalizálása lehet, a
+funkciók és szerveroldali engedélyezés megőrzésével. Ezt most nem implementáltuk.
+
+**Csak az ikonjavítás kerül ki:** nincs új migráció, Composer install, npm
+build, kézi feltöltés, .env vagy szerverkonfiguráció-módosítás.
+
+```powershell
+git add -- resources/views/filament/pages/pricing-cost-calculations.blade.php tests/Feature/PricingPayloadPerformanceTest.php docs/huf-retail-pricing.md
+git commit -m "Preserve Livewire loading visibility in wrapped pricing headers"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedéllyel, éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Külön nagyker és disztribútori menü, tördelhető fejlécek (2026-10-15)
 
 Ez a lépés felváltja a lentebb dokumentált, korábbi összevont EUR munkalapot:

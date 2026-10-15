@@ -89,6 +89,14 @@ class PricingPayloadPerformanceTest extends TestCase
         $this->assertNotEmpty(token_get_all('<?php '.$matches[1], TOKEN_PARSE));
     }
 
+    public function test_header_wrapping_does_not_override_livewire_loading_indicator_visibility(): void
+    {
+        $view = file_get_contents(resource_path('views/filament/pages/pricing-cost-calculations.blade.php'));
+        $this->assertStringContainsString('.fi-ta-header-cell-sort-btn > svg:not(.fi-loading-indicator)', $view);
+        $this->assertStringNotContainsString('.fi-ta-header-cell-sort-btn > svg {', $view);
+        $this->assertStringNotContainsString('.fi-loading-indicator {', $view);
+    }
+
     private function assertCompressionRoundTrip(string $payload): void
     {
         // Compression estimate, not an assertion about the live Nginx transport.
