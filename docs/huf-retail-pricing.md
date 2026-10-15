@@ -1,4 +1,234 @@
-# HUF bruttó kisker kalkuláció
+# Kisker, nagyker és disztribútori árkalkuláció
+
+## EUR disztribútori árak a nagyker munkalapon (2026-10-15)
+
+Az **Árképzés → Nagyker árak → EUR** fülön a nagyker sor mellett külön,
+kapcsolható disztribútori oszlopok és önálló műveletek jelennek meg.
+A HUF fülön nincsenek disztribútori oszlopok. Nem keletkezik külön menüpont.
+
+### Beállítás és képlet
+
+1. Az árlistatörzsben hozz létre **Disztribútori (EUR)** típusú, EUR pénznemű
+   aktív árlistát. A **Forrás nagyker árlista** egy aktív, EUR nagyker árlista legyen.
+   Ez külön kapcsolat (`source_wholesale_price_list_id`); nem a partnerportálon
+   használt kapcsolt kisker árlista mezőjét értelmezzük át.
+2. Rögzíts **Disztribútori kedvezmény** (`distributor_discount`) paramétert.
+   Például **20** jelent 20%-ot. A megengedett tartomány 0-tól 100 alattig tart;
+   a meglévő árlista/pénznem/főcsoport/modell szűkítések használhatók.
+   Azonos elsőbbségű aktív paramétereknél hiba keletkezik, nem önkényes választás.
+3. Adj meg saját, **distributor** típusú kerekítési szabályt, kifejezetten EUR-ra
+   vagy a disztribútori árlistára. Nem használjuk automatikusan a nagyker vagy
+   egy általános HUF-szabály kerekítését.
+4. Az EUR munkalapon válaszd ki az árlistát, majd indítsd a
+   **Disztribútori újraszámítás** műveletet. Egyetlen árlistánál automatikus
+   a választás; többnél kifejezetten választani kell. A választás személyes beállítás.
+   A táblázat ekkor a kiválasztott árlista forrás-nagyker sorait mutatja,
+   nem sokszorozza meg a nagyker sorokat a disztribútori árlisták száma szerint.
+
+`Végleges nettó nagyker ár × (1 − kedvezmény% / 100) → saját kerekítés = nettó disztribútori ár`
+
+Példa: `1,98 EUR × (1 − 20 / 100) = 1,584 EUR → 0,01-re kerekítve 1,58 EUR`.
+A forrás a manuális vagy tudatosan megtartott nagyker árat is figyelembe veszi.
+A nagyker és az egész kisker-forráslánc legyen aktuális és felülvizsgálatmentes;
+elavult forrásból nem készül jóváhagyható új kalkuláció.
+
+### Saját ár, jóváhagyás és követhetőség
+
+- Külön kedvezmény, kalkulált/manuális/végleges nettó EUR ár, státusz,
+  felülvizsgálatjelzés és nettó/nettó szorzó kapcsolható be. A manuális eltérést
+  piros/zöld szín és nyíl jelzi. A részletező ablak a bemeneteket, kerekítést és
+  a saját jóváhagyási adatokat táblázatosan mutatja.
+- A disztribútori manuális módosítás és az egyedi vagy **kijelölt sorok tömeges
+  jóváhagyása** nem változtatja meg a nagyker árat vagy annak jóváhagyását.
+  Külön művelet a disztribútori kalkulált ár elfogadása is.
+- Az újraszámítás megőrzi a manuális/jóváhagyott végleges árakat. Megváltozott
+  nagyker forrás, kedvezmény vagy kerekítés felülvizsgálatot kér, akkor is,
+  ha a kerekített eredmény azonos. A forráslánc hibás újraszámításának jelzése
+  is továbbterjed; a régi ár ettől még megmarad.
+- A nettó/nettó szorzó: `bruttó EUR kisker / (1 + személyes ÁFA% / 100)
+  / végleges nettó disztribútori ár`. A nagyker fül személyes ÁFA-mezőjét
+  használja, kizárólag összehasonlításra; nem módosít árat/jóváhagyást.
+  Üres ÁFA-nál nincs mutató. A szűrt számtani átlag két tizedessel,
+  félkövér keretben látszik, nem csak az aktuális lapot veszi figyelembe.
+- Rendezés, oszlopszűrés, numerikus Excel-export, tizedesjegyek és személyes
+  oszlopbeállítások rendelkezésre állnak. A kapcsolódó sorokat kötegelve töltjük;
+  nem indul minden táblázatsorhoz külön lekérdezés.
+- A kalkulációs törzs általános szerkesztőlapja nem engedi megkerülni a kezelt
+  kisker/nagyker/disztribútori árak saját manuális és jóváhagyási munkafolyamatát.
+- Nincs automatikus publikálás a `price_list_items` táblába, és nem változik
+  a partnerportál árazása. Lezárt árprojekt csak archív megtekintésre/exportálásra használható.
+
+Az árlistafej-import új, **opcionális** oszlopa:
+`source_wholesale_price_list_code`. Disztribútori árlistánál érvényes aktív EUR
+nagyker kód szükséges. A fájlon belüli későbbi sorra hivatkozás is működik.
+Ha meglévő disztribútori árlista importjából maga az oszlop hiányzik, a kapcsolat
+megmarad; a kifejezetten üres vagy hibás kapcsolatot viszont nem fogadjuk el.
+
+### Együttes telepítés: nagyker és disztribútor
+
+**Új adatbázis-migráció szükséges:**
+`2026_10_15_100000_add_distributor_pricing_sources`.
+Két nullable forráshivatkozást és a kedvezmény mentett százalékát adja hozzá;
+nem tölti át és nem írja felül a meglévő árakat/fordításokat.
+Az alábbi nagyker fejezet migrációmentessége csak az önálló nagyker lépésre
+vonatkozott; a mostani együttes csomagra már ez az új migráció érvényes.
+
+Nem kell Composer install, npm build, kézi fájl-/assetfeltöltés vagy `.env` módosítás.
+A használat előtt a fenti disztribútori árlistakapcsolatot, paramétert és
+kerekítési szabályt be kell állítani. Új külön disztribútori oldaljog nincs;
+a nagyker oldal és a kalkulációs sorok alább leírt jogosultságai érvényesek.
+`shield:generate --all` nem szükséges.
+
+A helyi nagyker és disztribútori módosításokat együtt kell telepíteni.
+Csak külön kérésre, a pricing worktree-ben, a változáslista ellenőrzése után
+(a `.tmp` ellenőrzési fájljait nem szabad hozzáadni):
+
+```powershell
+git add -- app/Filament/Pages/PriceListImport.php app/Filament/Pages/PricingWholesaleCalculations.php app/Filament/Resources/PriceLists app/Filament/Resources/PricingCalculationRows app/Filament/Resources/PricingParameters/Schemas/PricingParameterForm.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingProjectContext.php app/Filament/Support/Actions/CalculateWholesaleAction.php app/Filament/Support/Actions/CalculateDistributorAction.php app/Filament/Support/Actions/DistributorReviewActions.php app/Models/PriceList.php app/Models/PricingCalculationRow.php app/Services/Pricing database/migrations/2026_10_15_100000_add_distributor_pricing_sources.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/wholesale-calculation-details.blade.php resources/views/filament/pricing/distributor-calculation-details.blade.php tests/Feature/WholesaleCalculationTest.php tests/Feature/DistributorCalculationTest.php tests/Feature/DatabaseMigrationTest.php docs/huf-retail-pricing.md
+git commit -m "Add wholesale and EUR distributor pricing workflows"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+A NAS-telepítő futtatja a migrációt és a cache-frissítést.
+WePanelen csak külön jóváhagyott élesítéskor, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan migrate --force
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+Ellenőrzés: mind a **46 célzott nagyker/disztribútori teszt sikeres (271 assertion)**,
+beleértve az általános szerkesztőlap-védelmet is.
+A teljes 258 tesztes futásban 255 sikeres; változatlanul két ismert
+admin-erőforrás-darabszámelvárás és az Excel-dátumképlet teljes csomagban jelentkező
+eltérése hibázik (1777 assertion összesen). A disztribútori Filament-nézet világos és sötét
+képernyőképe is ellenőrizve; ez tesztadatokból előállított helyi nézet, nem NAS-próba.
+
+## Nettó nagyker árak — HUF és EUR (2026-10-15)
+
+Új menü: **Árképzés → Nagyker árak**, közös árprojekt-választóval, HUF/EUR
+fülekkel. Az árprojekt státusza szabályozza a feldolgozhatóságot; a lezárt
+projektek archív, csak olvasható nézetben listázhatók/exportálhatók.
+
+### Képlet és árlistakapcsolat
+
+`Bruttó, végleges kisker ár ÷ Nagyker szorzó → nagyker kerekítés → korrekció = nettó nagyker ár`
+
+- A **Nagyker szorzó** a partner bruttó kisker / nettó nagyker aránya.
+  A korábbi `wholesale_margin` paraméterkód megmarad; a felületi elnevezés
+  változik. Például **2.5** szorzót kell megadni, nem 150-et vagy 2.5%-ot.
+  A paramétereket/árlistákat és meglévő értékeiket nem alakítjuk át automatikusan.
+- Nincs külön ÁFA-levonás a nagyker ár számításában. HUF példa:
+  `1990 / 2.5 = 796 → százasra kerekítve 800 Ft nettó nagyker`.
+- A forrás a nagyker árlista meglévő **Kapcsolt kisker árlista**
+  (`retail_price_list_id`) mezője. Aktív, azonos pénznemű kisker kapcsolat
+  kötelező; nem találgatunk és nem írjuk át a partnerportálon is használt kapcsolatot.
+  HUF kiskerből HUF nagyker, EUR kiskerből EUR nagyker készül.
+- A forrás az adott árprojekt aktuális végleges kisker kalkulációs sora,
+  beleértve a manuális/megtartott árat. Nem a publikált árlistatételből számolunk.
+  Felülvizsgálandó vagy elavult kisker forrás nem használható.
+- A szorzó feloldása árprojekt/árlista/pénznem és a meglévő szűkítési
+  hierarchia alapján történik; a főcsoport- és modellfelülbírálás is működik.
+  Azonos elsőbbségű aktív nagyker paramétereknél hibát naplózunk, nem választunk önkényesen.
+- Nagyker típusú kerekítési szabály kell. HUF-nál lehet globális (például
+  százasra kerekítés); EUR-nál kifejezetten EUR-hoz vagy a célárlistához
+  tartozó szabály kell, nehogy a globális HUF-kerekítés érvényesüljön.
+
+### Tényleges és nettó/nettó szorzó
+
+`Tényleges nagyker szorzó = bruttó kisker ár / végleges nettó nagyker ár`
+
+`Nettó/nettó szorzó = bruttó kisker ár / (1 + ÁFA% / 100) / végleges nettó nagyker ár`
+
+- A HUF összehasonlításnál a kért, rögzített **27%** nettósítást használjuk.
+- Az EUR fülön, a kisker árakat tartalmazó táblázat fölött külön **ÁFA %**
+  mező van. Bevitelt lezárva az összehasonlítás frissül. Pontot és vesszőt
+  is elfogad; 0–100 közötti érték adható meg, a 0% is érvényes.
+- Az EUR ÁFA **felhasználónként megjegyzett** megtekintési beállítás,
+  nem közös árképzési paraméter. Más kolléga beállítását nem változtatja.
+  Üresen hagyva nincs nettó/nettó szorzó/átlag; nem feltételezünk országot vagy kulcsot.
+- Az ÁFA módosítása nem ír át árat, kalkulációs snapshotot, státuszt,
+  jóváhagyást, és nem indít újraszámítást. Archív vagy csak olvasási
+  hozzáféréssel is megadható a saját összehasonlító kulcs.
+- A nettósítást teljes pontossággal használjuk a mutatóhoz, köztes
+  árkerekítés nélkül. A kijelzett tizedesek állítása nem módosít számítást.
+- A két tényleges mutató szűrt számtani átlaga a fejlécben két tizedessel,
+  félkövér, keretezett jelzésként jelenik meg. Nem csak az aktuális lapot
+  számolja, és nem összesített árak hányadosát képezi.
+
+### Munkafolyamat és védelem
+
+- Pénznemenként egy kiválasztott nagyker árlista, illetve az **Összes nagyker
+  ár újraszámítása** gombbal minden aktív HUF/EUR nagyker árlista számolható.
+  Egyetlen célárlistánál automatikus a választás; többnél választót kapunk.
+- A teljes futás az összes árlistakapcsolatot és a forrássorok meglétét
+  az első módosítás előtt ellenőrzi, és egy tranzakcióban fut. Váratlan
+  hiba visszaállítja a műveletet. Sorhibát kihagy és a **Kalkulációs hibák**
+  menüben közös futásazonosítóval naplóz.
+- A megszokott manuális ár, piros/zöld eltérés és nyíl, egyedi/tömeges
+  jóváhagyás, kalkulált ár elfogadása és részletező táblázatos ablak elérhető.
+- A manuális és jóváhagyott végleges árak újraszámításkor megmaradnak.
+  Változó forrás, paraméter vagy kerekítési feltétel felülvizsgálatot igényel,
+  akkor is, ha a kerekített új ár ugyanaz lenne. Újraszámítás után tudatosan
+  megtartható/jóváhagyható a régi ár, vagy elfogadható az új kalkulált ár.
+- HUF kisker és bekerülési módosításnál a közvetlen HUF nagyker, továbbá
+  a közvetett EUR kisker → EUR nagyker függőségek is jelölést kapnak.
+  EUR kisker változása az ahhoz kapcsolt nagyker árakat jelöli.
+- Elavult bemenetnél a manuális átírás/jóváhagyás/elfogadás is blokkolt,
+  újraszámítás szükséges. A szerver a jogosultságot és projektstátuszt frissen ellenőrzi.
+- Rendezés, mezőnkénti szűrés, numerikus Excel-export, oszlopválasztás,
+  sorrend/szélesség és tizedesbeállítások rendelkezésre állnak. A nagyker
+  megjelenítési beállításai a kisker beállításoktól függetlenek.
+- A kalkuláció **nem publikálja** a nagyker árakat a `price_list_items`
+  táblába, és nem módosítja a partnerportál árait. A publikálás külön későbbi lépés.
+
+### Telepítés és szerepkörök
+
+Ellenőrzés: a 20 új nagyker teszt sikeres (114 assertion), beleértve a bruttó/nettó
+képletet, személyes EUR ÁFA-t és változatlan ár/jóváhagyás adatokat, felülbírálást,
+forrásváltozás/árfolyam/költség függőségeket, ármegőrzést, tömeges jóváhagyást,
+szerepköröket, archív módot, szűrt/lapozástól független átlagokat és numerikus exportot.
+A teljes csomag 233 tesztjéből 230 sikeres (1628 assertion összesen); a korábban
+is hibázó két admin-erőforrás-darabszámellenőrzés és a teljes futásban jelentkező
+Excel-dátumképlet-eltérés megmaradt. Ezek kódját ebben a fejlesztésben nem módosítjuk.
+A HUF és EUR Filament-táblázat tesztadatokból készült képernyőképe ellenőrizve,
+az EUR ÁFA-mező és a két átlag világos/sötét témában is olvasható.
+
+**Nincs új migráció, Composer install, npm build, kézi fájlfeltöltés vagy
+.env módosítás.** A meglévő kalkulációs táblát, `wholesale` típust és forráshivatkozást
+használjuk; az EUR ÁFA az `admin_ui_preferences` táblában személyes beállítás.
+
+Új oldaljog: **View:PricingWholesaleCalculations** az Oldalak fülön.
+Mellé `ViewAny:PricingCalculationRow` szükséges; a részletekhez `View`,
+a manuális árhoz/jóváhagyáshoz `Update:PricingCalculationRow`, újraszámításhoz
+ezen felül `Create:PricingCalculationRow` és `Update:PricingProject` is kell.
+A super_admin automatikusan eléri; más szerepköröknek külön kell engedélyezni.
+A szerepkör mentése létrehozza a kijelölt oldaljogot, `shield:generate --all`
+nem szükséges; meglévő policyfájlokat nem generálunk felül.
+
+A használat előtt a nagyker árlisták kapcsolt kisker árlistáját, a **Nagyker
+szorzó** paramétert és a nagyker kerekítési szabályokat kell ellenőrizni/beállítani.
+A telepítés csak külön kérésre történik. Git/NAS a pricing worktree-ben:
+
+```powershell
+git add -- app/Services/Pricing/WholesaleCalculator.php app/Services/Pricing/WholesaleCalculationService.php app/Services/Pricing/WholesalePriceReviewService.php app/Services/Pricing/PricingParameterResolver.php app/Services/Pricing/RetailCalculationDependencyService.php app/Services/Pricing/RetailPriceReviewService.php app/Models/PricingCalculationRow.php app/Filament/Pages/PricingWholesaleCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/WholesaleCalculationsTable.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Resources/PricingParameters/Schemas/PricingParameterForm.php app/Filament/Support/Actions/CalculateWholesaleAction.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingProjectContext.php resources/views/filament/pages/pricing-cost-calculations.blade.php resources/views/filament/pricing/wholesale-calculation-details.blade.php tests/Feature/WholesaleCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Calculate HUF and EUR net wholesale prices with personal VAT comparisons"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedéllyel, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## HUF bruttó kisker kalkuláció
 
 Az **Árképzés → HUF kisker árak** munkafelület az árprojekt szezonjának
 mentett, végleges HUF bekerülési értékeiből számol. Az árprojekt megtekintő

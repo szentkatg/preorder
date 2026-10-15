@@ -1,5 +1,16 @@
 <x-filament-panels::page>
     <div class="space-y-4">
+        @if (method_exists($this, 'selectWholesaleCurrency'))
+            <div class="pricing-project-selection" role="group" aria-label="Nagyker árak pénzneme">
+                @foreach (\App\Services\Pricing\WholesaleCalculator::CURRENCIES as $currencyCode)
+                    <button type="button" wire:click="selectWholesaleCurrency('{{ $currencyCode }}')" wire:loading.attr="disabled"
+                        aria-pressed="{{ $this->retailCurrencyCode() === $currencyCode ? 'true' : 'false' }}"
+                        style="padding:.375rem .75rem;border:1px solid currentColor;border-radius:.5rem;{{ $this->retailCurrencyCode() === $currencyCode ? 'font-weight:700;text-decoration:underline' : '' }}">
+                        {{ $currencyCode }}
+                    </button>
+                @endforeach
+            </div>
+        @endif
         @if (method_exists($this, 'selectRetailCurrency'))
             <div class="pricing-project-selection" role="group" aria-label="Kisker árak pénzneme">
                 @foreach (\App\Services\Pricing\ForeignRetailCalculator::CURRENCIES as $currencyCode)
@@ -49,6 +60,38 @@
                 Oszlopszélességek alaphelyzetbe
             </button>
         </div>
+
+        @if (method_exists($this, 'wholesaleVatPercent'))
+            <div class="pricing-project-selection" data-wholesale-vat-panel>
+                @if ($this->retailCurrencyCode() === 'EUR')
+                    <label>
+                        <span>EUR kisker ár nettósítása — ÁFA %</span>
+                        <input type="text" inputmode="decimal" value="{{ $this->eurVatPercent }}" placeholder="ÁFA % megadása"
+                            wire:change="setEurVatPercent($event.target.value)" wire:loading.attr="disabled"
+                            aria-label="EUR kisker ár ÁFA százalék" style="width:9rem;border:1px solid currentColor;border-radius:.375rem;padding:.25rem .5rem;background:transparent">
+                    </label>
+                    @error('eurVatPercent') <span role="alert">{{ $message }}</span> @enderror
+                    <label data-distributor-price-list-panel>
+                        <span>Disztribútori árlista</span>
+                        <select wire:change="selectDistributorPriceList($event.target.value)" wire:loading.attr="disabled">
+                            <option value="" @selected($this->distributorPriceListId === null)>Válassz disztribútori árlistát…</option>
+                            @foreach ($this->distributorPriceLists as $distributorList)
+                                <option value="{{ $distributorList->id }}" @selected($this->distributorPriceListId === (int) $distributorList->id)>
+                                    {{ $distributorList->code }} ← {{ $distributorList->sourceWholesalePriceList?->code }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    @if ($this->selectedDistributorPriceList)
+                        <span>Forrás: {{ $this->selectedDistributorPriceList->sourceWholesalePriceList?->code }} — csak ennek a nagyker árlistának a sorai. ÁFA csak az összehasonlításhoz.</span>
+                    @else
+                        <span>Válassz disztribútori árlistát, vagy hozz létre újat az Árlisták törzsben. ÁFA csak az összehasonlításhoz; felhasználónként megjegyezzük.</span>
+                    @endif
+                @else
+                    <span>HUF kisker ár nettósítása: 27% ÁFA — csak a nettó/nettó szorzóhoz.</span>
+                @endif
+            </div>
+        @endif
 
         @php($pendingAdjustment = $this->pendingParameterAdjustment ?? null)
         @php($selectedAffectedRows = $pendingAdjustment['scope_counts'][$this->pendingParameterScope ?? ''] ?? null)

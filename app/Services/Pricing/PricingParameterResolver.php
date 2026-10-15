@@ -15,6 +15,7 @@ class PricingParameterResolver
         ?string $supplierCountryCode = null,
         ?int $priceListId = null,
         ?int $currencyId = null,
+        bool $requireUnique = false,
     ): ?PricingParameter {
         $parameters = PricingParameter::query()
             ->where('pricing_project_id', $pricingProjectId)
@@ -51,7 +52,12 @@ class PricingParameterResolver
             })
             ->get();
 
-        return $this->sortBySpecificity($parameters)->first();
+        $sorted = $this->sortBySpecificity($parameters);
+        if ($requireUnique && $sorted->count() > 1 && $this->specificity($sorted[0]) === $this->specificity($sorted[1])) {
+            throw new \DomainException('Több azonos szintű aktív árképzési paraméter van. Csak egy maradjon aktív.');
+        }
+
+        return $sorted->first();
     }
 
     /**
@@ -60,11 +66,12 @@ class PricingParameterResolver
      */
     private function sortBySpecificity(Collection $parameters): Collection
     {
-        return $parameters->sortByDesc(function (PricingParameter $parameter): int {
-            return $this->scopeWeight($parameter)
-                + ($parameter->price_list_id ? 10 : 0)
-                + ($parameter->currency_id ? 5 : 0);
-        })->values();
+        return $parameters->sortByDesc(fn (PricingParameter $parameter): int => $this->specificity($parameter))->values();
+    }
+
+    private function specificity(PricingParameter $parameter): int
+    {
+        return $this->scopeWeight($parameter) + ($parameter->price_list_id ? 10 : 0) + ($parameter->currency_id ? 5 : 0);
     }
 
     private function scopeWeight(PricingParameter $parameter): int

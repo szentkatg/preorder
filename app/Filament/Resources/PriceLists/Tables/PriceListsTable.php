@@ -18,6 +18,10 @@ class PriceListsTable
                 TextColumn::make('code')->searchable()->sortable(),
                 TextColumn::make('name_hu')->label('Név HU')->searchable(),
                 TextColumn::make('currency.code')->label('Pénznem'),
+                TextColumn::make('type')->label('Árlista típusa')->formatStateUsing(fn ($state) => match ($state) {
+                    'retail' => 'Kisker', 'wholesale' => 'Nagyker', 'distributor' => 'Disztribútor', default => $state,
+                }),
+                TextColumn::make('sourceWholesalePriceList.code')->label('Forrás nagyker árlista')->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('active')->boolean(),
             ])
             ->defaultPaginationPageOption(100)

@@ -9,6 +9,7 @@ use App\Models\PartnerUser;
 use App\Models\PricingCalculationRow;
 use App\Models\Translation;
 use App\Models\User;
+use App\Services\Pricing\DistributorComparison;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -91,11 +92,21 @@ class AdminResourceTable
             ->sortable()
             ->searchable(isIndividual: true);
 
+        if ($modelClass === PricingCalculationRow::class && ($column->getExtraAttributes()['data-pricing-distributor-column'] ?? false)) {
+            $expression = fn ($livewire) => DistributorComparison::sql($column->getName(), $livewire->selectedDistributorPriceList?->id, $livewire->wholesaleVatPercent());
+            $column->alignEnd()->sortable(query: fn (Builder $query, string $direction, $livewire) => $query
+                ->orderByRaw('('.$expression($livewire).') '.($direction === 'desc' ? 'desc' : 'asc')))
+                ->searchable(query: fn (Builder $query, string $search, $livewire) => $query->whereRaw(
+                    'CAST(('.$expression($livewire).') AS CHAR) LIKE ?', ['%'.str_replace(',', '.', $search).'%']), isIndividual: true);
+
+            return;
+        }
+
         if ($modelClass === PricingCalculationRow::class && in_array($column->getName(), [
             'purchase_price', 'exchange_rate', 'shipping_cost_percent', 'customs_percent', 'candidate_count',
             'base_price', 'multiplier', 'calculation_multiplier', 'unrounded_price',
             'calculated_price', 'manual_price', 'retained_price', 'final_price', 'target_purchase_price',
-            'source_retail_price', 'retail_exchange_rate', 'previous_season_price', 'cost_based_multiplier',
+            'source_retail_price', 'retail_exchange_rate', 'previous_season_price', 'cost_based_multiplier', 'wholesale_multiplier', 'net_net_multiplier',
         ], true)) {
             // Filament applies the alignment to the header, cell content and editable input.
             $column->alignEnd();
@@ -110,6 +121,15 @@ class AdminResourceTable
                 return $query->whereRaw('CAST(('.$priceQuery->toSql().') AS CHAR) LIKE ?',
                     [...$priceQuery->getBindings(), '%'.str_replace(',', '.', $search).'%']);
             }, isIndividual: true);
+        }
+
+        if ($modelClass === PricingCalculationRow::class && in_array($column->getName(), ['wholesale_multiplier', 'net_net_multiplier'], true)) {
+            $expression = fn ($livewire) => $column->getName() === 'wholesale_multiplier'
+                ? PricingCalculationRow::WHOLESALE_MULTIPLIER_SQL : PricingCalculationRow::netNetMultiplierSql($livewire->wholesaleVatPercent());
+            $column->sortable(query: fn (Builder $query, string $direction, $livewire) => $query->orderByRaw(
+                '('.$expression($livewire).') '.($direction === 'desc' ? 'desc' : 'asc')))
+                ->searchable(query: fn (Builder $query, string $search, $livewire) => $query->whereRaw(
+                    'CAST(ROUND(('.$expression($livewire).'), 6) AS CHAR) LIKE ?', ['%'.str_replace(',', '.', $search).'%']), isIndividual: true);
         }
 
         if ($modelClass === Order::class) {

@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Gate;
 
 class HufRetailCalculationsTable
 {
-    public static function configure(Table $table, string $currency = 'HUF'): Table
+    public static function configure(Table $table, string $currency = 'HUF', string $reviewService = RetailPriceReviewService::class): Table
     {
         return $table->columns([
             TextColumn::make('pricingProject.name')->label('Árprojekt'),
@@ -92,13 +92,13 @@ class HufRetailCalculationsTable
                 ->rules(['nullable', 'numeric', 'gt:0', 'max:99999999999.9999'])
                 ->tooltip('Írd át a manuális árat. Az üres mező visszaállítja a kalkulált árat. A módosítás után új jóváhagyás szükséges.')
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, $livewire) {
+                ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, $livewire) use ($reviewService) {
                     try {
-                        $updated = app(RetailPriceReviewService::class)->setManualPrice($record, $state);
+                        $updated = app($reviewService)->setManualPrice($record, $state);
 
                         return $updated->manual_price === null ? null : rtrim(rtrim($updated->manual_price, '0'), '.');
                     } catch (DomainException $exception) {
-                        self::notifyCalculationError($exception);
+                        self::notifyCalculationError($exception, $reviewService);
 
                         return ['error' => $exception->getMessage()];
                     } finally {
@@ -149,7 +149,8 @@ class HufRetailCalculationsTable
                 ->visible(fn (PricingCalculationRow $record) => Gate::allows('update', $record))
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
                 ->action(fn (PricingCalculationRow $record, array $data) => self::reviewAction(
-                    fn () => app(RetailPriceReviewService::class)->approveCurrentPrice($record, $data['approval_status']),
+                    fn () => app($reviewService)->approveCurrentPrice($record, $data['approval_status']),
+                    $reviewService,
                 ))
                 ->after(fn ($livewire) => $livewire->resetTable()),
             Action::make('acceptCalculatedRetail')->label('Kalkulált ár elfogadása')->icon('heroicon-o-arrow-path')->requiresConfirmation()
@@ -158,7 +159,8 @@ class HufRetailCalculationsTable
                     && ($record->requires_review || $record->manual_price !== null || $record->retained_price !== null))
                 ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
                 ->action(fn (PricingCalculationRow $record) => self::reviewAction(
-                    fn () => app(RetailPriceReviewService::class)->acceptCalculatedPrice($record),
+                    fn () => app($reviewService)->acceptCalculatedPrice($record),
+                    $reviewService,
                 ))
                 ->after(fn ($livewire) => $livewire->resetTable()),
         ])->toolbarActions([
@@ -169,8 +171,8 @@ class HufRetailCalculationsTable
                 ->schema([self::approvalStatusSelect()])
                 ->visible(fn ($livewire) => self::canApproveBulk($livewire))
                 ->authorize(fn ($livewire) => self::canApproveBulk($livewire))
-                ->action(function (Collection $records, array $data): void {
-                    $result = app(RetailPriceReviewService::class)->approveCurrentPrices($records, $data['approval_status']);
+                ->action(function (Collection $records, array $data) use ($reviewService): void {
+                    $result = app($reviewService)->approveCurrentPrices($records, $data['approval_status']);
                     $body = 'Sikeres: '.$result['approved'].' sor. Kihagyott: '.$result['skipped'].' sor.';
                     foreach ($result['reasons'] as $reason => $count) {
                         $body .= ' '.$count.' sor: '.$reason;
@@ -194,7 +196,7 @@ class HufRetailCalculationsTable
         return ['data-pricing-average-multiplier' => 'Átlag: '.$formatted, 'aria-description' => $description.': '.$formatted];
     }
 
-    private static function approvalStatusSelect(): Select
+    public static function approvalStatusSelect(): Select
     {
         return Select::make('approval_status')->label('Átnézés / jóváhagyás szintje')->options([
             PricingCalculationRow::STATUS_REVIEWED => 'Átnézett ár',
@@ -215,18 +217,18 @@ class HufRetailCalculationsTable
         return rtrim(rtrim(number_format((float) $state, 4, ',', ' '), '0'), ',');
     }
 
-    private static function reviewAction(Closure $action): void
+    private static function reviewAction(Closure $action, string $reviewService = RetailPriceReviewService::class): void
     {
         try {
             $action();
         } catch (DomainException $exception) {
-            self::notifyCalculationError($exception);
+            self::notifyCalculationError($exception, $reviewService);
         }
     }
 
-    private static function notifyCalculationError(DomainException $exception): void
+    private static function notifyCalculationError(DomainException $exception, string $reviewService = RetailPriceReviewService::class): void
     {
-        Notification::make()->title('A kisker kalkuláció nem aktuális')
+        Notification::make()->title($reviewService === RetailPriceReviewService::class ? 'A kisker kalkuláció nem aktuális' : 'A nagyker kalkuláció nem aktuális')
             ->body($exception->getMessage())->warning()->send();
     }
 

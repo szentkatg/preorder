@@ -15,7 +15,7 @@ class PricingCalculationRowForm
         return $schema
             ->components([
                 Select::make('pricing_project_id')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Árprojekt')
                     ->relationship('pricingProject', 'name')
                     ->searchable()
@@ -23,7 +23,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('product_id')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Modell')
                     ->relationship('product', 'model_code')
                     ->searchable()
@@ -31,7 +31,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('color_id')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Szín')
                     ->relationship('color', 'name_hu')
                     ->searchable()
@@ -77,14 +77,14 @@ class PricingCalculationRowForm
                     ->disabled(),
 
                 Select::make('price_list_id')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Árlista')
                     ->relationship('priceList', 'code')
                     ->searchable()
                     ->preload(),
 
                 Select::make('price_type')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Ártípus')
                     ->options([
                         PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
@@ -95,7 +95,7 @@ class PricingCalculationRowForm
                     ->required(),
 
                 Select::make('currency_id')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Pénznem')
                     ->relationship('currency', 'code')
                     ->searchable()
@@ -108,7 +108,9 @@ class PricingCalculationRowForm
                     ->disabled(),
 
                 TextInput::make('base_price')->label('Számítás alapja')->numeric()->disabled(),
-                TextInput::make('multiplier')->label('Kisker szorzó')->numeric()->disabled(),
+                TextInput::make('multiplier')->label('Kalkulációs szorzó / kedvezmény-együttható')->numeric()->disabled(),
+                TextInput::make('source_wholesale_row_id')->label('Forrás nagyker kalkulációs sor')->numeric()->disabled(),
+                TextInput::make('distributor_discount_percent')->label('Disztribútori kedvezmény %')->numeric()->disabled(),
                 TextInput::make('unrounded_price')->label('Kerekítés előtti ár')->numeric()->disabled(),
                 Select::make('pricing_rounding_rule_id')->label('Kalkuláció kerekítési szabálya')
                     ->relationship('pricingRoundingRule', 'name')->disabled(),
@@ -116,14 +118,14 @@ class PricingCalculationRowForm
                 Toggle::make('requires_review')->label('Felülvizsgálat szükséges')->disabled(),
 
                 TextInput::make('manual_price')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
-                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedRetail($record) ? 'A HUF kisker árak munkafelületen szerkeszthető.' : null)
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
+                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedPrice($record) ? 'Az árszint saját kisker/nagyker munkafelületén szerkeszthető.' : null)
                     ->label('Manuális ár')
                     ->numeric(),
 
                 Select::make('status')
-                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedRetail($record))
-                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedRetail($record) ? 'A HUF kisker árak munkafelület Jóváhagyás műveletével állítható.' : null)
+                    ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
+                    ->helperText(fn (?PricingCalculationRow $record) => self::isManagedPrice($record) ? 'Az árszint saját munkafelületének Jóváhagyás műveletével állítható.' : null)
                     ->label('Státusz')
                     ->options([
                         PricingCalculationRow::STATUS_CALCULATED => 'Kalkulált ár',
@@ -139,9 +141,13 @@ class PricingCalculationRowForm
             ->columns(2);
     }
 
-    private static function isManagedRetail(?PricingCalculationRow $record): bool
+    private static function isManagedPrice(?PricingCalculationRow $record): bool
     {
-        return $record?->exists && $record->price_type === PricingCalculationRow::TYPE_RETAIL
-            && $record->currency?->code === 'HUF';
+        return $record?->exists && match ($record->price_type) {
+            PricingCalculationRow::TYPE_RETAIL => in_array($record->currency?->code, ['HUF', 'EUR', 'CZK', 'RON', 'PLN'], true),
+            PricingCalculationRow::TYPE_WHOLESALE => in_array($record->currency?->code, ['HUF', 'EUR'], true),
+            PricingCalculationRow::TYPE_DISTRIBUTOR => $record->currency?->code === 'EUR',
+            default => false,
+        };
     }
 }

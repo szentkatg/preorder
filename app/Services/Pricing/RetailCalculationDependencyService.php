@@ -27,8 +27,16 @@ class RetailCalculationDependencyService
 
     public function invalidateForRetailChange(PricingCalculationRow $source): void
     {
-        PricingCalculationRow::query()->where('source_retail_row_id', $source->id)
-            ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
+        $this->invalidateRetailDependents([$source->id]);
+    }
+
+    public function invalidateRetailDependents(array $sourceIds): void
+    {
+        // HUF retail -> foreign retail -> wholesale, including query updates which do not emit model events.
+        $foreign = PricingCalculationRow::query()->whereIn('source_retail_row_id', $sourceIds)
+            ->where('price_type', PricingCalculationRow::TYPE_RETAIL)->pluck('id')->all();
+        PricingCalculationRow::query()->whereIn('source_retail_row_id', [...$sourceIds, ...$foreign])
+            ->whereIn('price_type', [PricingCalculationRow::TYPE_RETAIL, PricingCalculationRow::TYPE_WHOLESALE, PricingCalculationRow::TYPE_DISTRIBUTOR])
             ->update(['requires_review' => true]);
     }
 
@@ -48,8 +56,7 @@ class RetailCalculationDependencyService
             $sources = PricingCalculationRow::query()->where($context)
                 ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                 ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))->pluck('id');
-            PricingCalculationRow::query()->whereIn('source_retail_row_id', $sources)
-                ->update(['requires_review' => true]);
+            $this->invalidateRetailDependents($sources->all());
             PricingCalculationRow::query()->where($context)
                 ->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                 ->whereHas('currency', fn ($query) => $query->where('code', 'HUF'))

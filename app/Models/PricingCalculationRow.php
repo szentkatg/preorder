@@ -7,11 +7,21 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PricingCalculationRow extends Model
 {
     // Keep the displayed multiplier sortable/searchable without changing the stored calculation input.
     public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price, calculated_price) / NULLIF(base_price, 0)) ELSE NULL END';
+
+    public const WHOLESALE_MULTIPLIER_SQL = 'CASE WHEN base_price > 0 AND COALESCE(manual_price, retained_price, calculated_price) > 0 THEN 1.0 * base_price / NULLIF(COALESCE(manual_price, retained_price, calculated_price), 0) ELSE NULL END';
+
+    public static function netNetMultiplierSql(?float $vat): string
+    {
+        return $vat !== null && is_finite($vat) && $vat >= 0 && $vat <= 100
+            ? '('.self::WHOLESALE_MULTIPLIER_SQL.') / '.json_encode(1 + $vat / 100, JSON_PRESERVE_ZERO_FRACTION)
+            : 'NULL';
+    }
 
     public static function costBasedMultiplierSql(): string
     {
@@ -65,6 +75,8 @@ class PricingCalculationRow extends Model
     protected $fillable = [
         'pricing_project_id',
         'source_retail_row_id',
+        'source_wholesale_row_id',
+        'distributor_discount_percent',
         'source_retail_price',
         'retail_exchange_rate',
         'product_id',
@@ -100,6 +112,7 @@ class PricingCalculationRow extends Model
     protected function casts(): array
     {
         return [
+            'distributor_discount_percent' => 'decimal:6',
             'source_retail_price' => 'decimal:4',
             'retail_exchange_rate' => 'decimal:6',
             'calculated_price' => 'decimal:4',
@@ -140,9 +153,22 @@ class PricingCalculationRow extends Model
                 && $row->wasChanged(RetailCalculationDependencyService::COST_INPUT_FIELDS)) {
                 app(RetailCalculationDependencyService::class)->invalidateForCostChange($row);
             }
-            if ($row->price_type === self::TYPE_RETAIL && $row->wasChanged(['final_price', 'base_price', 'requires_review'])
-                && $row->currency?->code === 'HUF') {
+            if ($row->price_type === self::TYPE_RETAIL && $row->wasChanged(['final_price', 'base_price', 'requires_review'])) {
                 app(RetailCalculationDependencyService::class)->invalidateForRetailChange($row);
+            }
+            if ($row->price_type === self::TYPE_WHOLESALE && $row->wasChanged([
+                'final_price', 'base_price', 'requires_review', 'source_retail_row_id', 'pricing_project_id', 'product_id', 'color_key', 'currency_id',
+            ])) {
+                $row->distributorRows()->update(['requires_review' => true]);
+            }
+        });
+        static::deleting(function (PricingCalculationRow $row): void {
+            if ($row->price_type === self::TYPE_RETAIL) {
+                app(RetailCalculationDependencyService::class)->invalidateForRetailChange($row);
+            } elseif ($row->price_type === self::TYPE_WHOLESALE) {
+                $row->distributorRows()->update(['requires_review' => true]);
+            } elseif ($row->price_type === self::TYPE_COST && (int) $row->price_list_key === 0) {
+                app(RetailCalculationDependencyService::class)->invalidateForCostChange($row);
             }
         });
     }
@@ -155,6 +181,16 @@ class PricingCalculationRow extends Model
     public function sourceRetailRow(): BelongsTo
     {
         return $this->belongsTo(self::class, 'source_retail_row_id');
+    }
+
+    public function sourceWholesaleRow(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_wholesale_row_id');
+    }
+
+    public function distributorRows(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_wholesale_row_id')->where('price_type', self::TYPE_DISTRIBUTOR);
     }
 
     public function retailCostSource(): BelongsTo
@@ -235,6 +271,13 @@ class PricingCalculationRow extends Model
         return $price !== null && $this->base_price !== null && (float) $this->base_price > 0
             ? (float) $price / (float) $this->base_price
             : null;
+    }
+
+    public function getEffectiveWholesaleMultiplierAttribute(): ?float
+    {
+        $price = $this->manual_price ?? $this->retained_price ?? $this->calculated_price;
+
+        return (float) $this->base_price > 0 && (float) $price > 0 ? (float) $this->base_price / (float) $price : null;
     }
 
     public function getCostBasedMultiplierAttribute(): ?float

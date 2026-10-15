@@ -91,6 +91,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $spreadsheet) {
                 $this->syncValidationErrors();
+
                 return;
             }
 
@@ -182,11 +183,13 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
         if (! $file) {
             $this->addFatalError('Nincs kiválasztott fájl.');
+
             return null;
         }
 
         if (! method_exists($file, 'getRealPath')) {
             $this->addFatalError('A feltöltött fájl nem olvasható. Töltsd fel újra az Excel fájlt.');
+
             return null;
         }
 
@@ -208,11 +211,12 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
     {
         if (! $sheet) {
             $this->addFatalError("Hiányzó vagy nem olvasható munkalap: {$sheetName}");
+
             return;
         }
 
         $headerRow = $sheet->rangeToArray(
-            'A1:' . $sheet->getHighestColumn() . '1',
+            'A1:'.$sheet->getHighestColumn().'1',
             null,
             true,
             true,
@@ -261,6 +265,9 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             ->values();
 
         $seenPriceListCodes = [];
+        $definitions = PriceList::query()->with(['currency', 'sourceWholesalePriceList'])->get()->keyBy('code');
+        $incomingDefinitions = collect($this->sheets['price_lists'] ?? [])->keyBy('code');
+        $distributorSources = [];
 
         foreach ($this->sheets['price_lists'] ?? [] as $index => $row) {
             $rowNumber = $index + 2;
@@ -272,6 +279,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $code) {
                 $this->addRowError(null, "price_lists {$rowNumber}. sor: hiányzó code");
+
                 continue;
             }
 
@@ -288,6 +296,20 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             if (! $type) {
                 $this->addRowError($code, "price_lists {$rowNumber}. sor: hiányzó type");
             }
+            if ($type === 'distributor') {
+                $sourceCode = array_key_exists('source_wholesale_price_list_code', $row)
+                    ? $this->nullIfEmpty($row['source_wholesale_price_list_code'])
+                    : $definitions->get($code)?->sourceWholesalePriceList?->code;
+                $sourceDefinition = $sourceCode ? $incomingDefinitions->get($sourceCode) : null;
+                $sourceModel = $sourceCode ? $definitions->get($sourceCode) : null;
+                $sourceType = $sourceDefinition['type'] ?? $sourceModel?->type;
+                $sourceCurrency = $sourceDefinition['currency_code'] ?? $sourceModel?->currency?->code;
+                $sourceActive = $sourceDefinition !== null ? $this->boolValue($sourceDefinition['active'] ?? true) : $sourceModel?->active;
+                if ($currencyCode !== 'EUR' || ! $sourceCode || $sourceType !== 'wholesale' || $sourceCurrency !== 'EUR' || ! $sourceActive || $sourceCode === $code) {
+                    $this->addRowError($code, "price_lists {$rowNumber}. sor: a disztribútori árlistához EUR pénznem és aktív EUR nagyker source_wholesale_price_list_code szükséges.");
+                }
+                $distributorSources[$code] = $sourceCode;
+            }
 
             if (! $currencyCode) {
                 $this->addRowError($code, "price_lists {$rowNumber}. sor: hiányzó currency_code");
@@ -297,6 +319,12 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if ($retailPriceListCode && ! $validPriceListCodes->contains($retailPriceListCode)) {
                 $this->addRowError($code, "price_lists {$rowNumber}. sor: nem létező retail_price_list_code: {$retailPriceListCode}");
+            }
+        }
+
+        foreach ($distributorSources as $code => $sourceCode) {
+            if ($sourceCode && $this->isInvalidPriceList($sourceCode)) {
+                $this->addRowError($code, 'Hibás disztribútori forrásárlista az importban: '.$sourceCode);
             }
         }
 
@@ -311,6 +339,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $priceListCode) {
                 $this->addRowError(null, "price_list_items {$rowNumber}. sor: hiányzó price_list_code");
+
                 continue;
             }
 
@@ -360,6 +389,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $code || $this->isInvalidPriceList($code)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -385,6 +415,22 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             $exists ? $updated++ : $created++;
         }
 
+        // Resolve after every valid header exists, so forward references are supported.
+        foreach ($rows as $row) {
+            $code = $this->nullIfEmpty($row['code'] ?? null);
+            if (! $code || $this->isInvalidPriceList($code)) {
+                continue;
+            }
+            if (($row['type'] ?? null) === 'wholesale' && array_key_exists('retail_price_list_code', $row)) {
+                $retailCode = $this->nullIfEmpty($row['retail_price_list_code']);
+                $priceLists->get($code)?->update(['retail_price_list_id' => $retailCode ? $priceLists->get($retailCode)?->id : null]);
+            }
+            if (($row['type'] ?? null) === 'distributor' && array_key_exists('source_wholesale_price_list_code', $row)) {
+                $sourceCode = $this->nullIfEmpty($row['source_wholesale_price_list_code']);
+                $priceLists->get($code)?->update(['source_wholesale_price_list_id' => $sourceCode ? $priceLists->get($sourceCode)?->id : null]);
+            }
+        }
+
         $this->statistics['Árlisták létrehozva'] = $created;
         $this->statistics['Árlisták frissítve'] = $updated;
         $this->statistics['Árlisták kihagyva'] = $skipped;
@@ -404,6 +450,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $priceListCode || $this->isInvalidPriceList($priceListCode)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -413,6 +460,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             if (! $priceList || ! $season || ! $product) {
                 $skipped++;
+
                 continue;
             }
 

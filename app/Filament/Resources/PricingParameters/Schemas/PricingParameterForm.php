@@ -28,7 +28,7 @@ class PricingParameterForm
                         PricingParameter::TYPE_CUSTOMS_PERCENT => 'Vám %',
                         PricingParameter::TYPE_RETAIL_MULTIPLIER => 'Kisker szorzó',
                         PricingParameter::TYPE_COUNTRY_MULTIPLIER => 'Ország / pénznem szorzó',
-                        PricingParameter::TYPE_WHOLESALE_MARGIN => 'Nagyker haszonkulcs',
+                        PricingParameter::TYPE_WHOLESALE_MARGIN => 'Nagyker szorzó',
                         PricingParameter::TYPE_DISTRIBUTOR_DISCOUNT => 'Disztribútor kedvezmény %',
                     ])
                     ->required(),
@@ -81,6 +81,7 @@ class PricingParameterForm
 
                 TextInput::make('value')
                     ->label('Érték')
+                    ->helperText('Nagyker szorzó esetén például 2,5: bruttó kisker ár ÷ 2,5 = nettó nagyker ár. Nem százalék.')
                     ->numeric()
                     ->required(),
 

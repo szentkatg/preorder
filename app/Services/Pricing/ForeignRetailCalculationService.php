@@ -76,10 +76,13 @@ class ForeignRetailCalculationService
                 try {
                     $calculation = $this->calculator->calculate($project, $source, $targetList);
                 } catch (DomainException $exception) {
-                    PricingCalculationRow::query()->where('pricing_project_id', $project->id)
+                    $failed = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
                         ->where('product_id', $source->product_id)->where('color_key', $source->color_key)
                         ->where('price_list_key', $targetList->id)->where('price_type', 'retail')
-                        ->where('currency_id', $targetList->currency_id)->update(['requires_review' => true]);
+                        ->where('currency_id', $targetList->currency_id);
+                    $failedIds = (clone $failed)->pluck('id')->all();
+                    $failed->update(['requires_review' => true]);
+                    $this->dependencies->invalidateRetailDependents($failedIds);
                     $message = $targetList->code.' / '.$source->product->model_code.': '.$exception->getMessage();
                     $result['skipped']++;
                     $result['errors'][] = $message;

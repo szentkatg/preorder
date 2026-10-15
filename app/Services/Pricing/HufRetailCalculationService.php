@@ -62,6 +62,11 @@ class HufRetailCalculationService
                     try {
                         $calculation = $this->calculator->calculate($project, $cost, $list);
                     } catch (DomainException $exception) {
+                        $failed = PricingCalculationRow::where('pricing_project_id', $project->id)->where('product_id', $cost->product_id)
+                            ->where('color_key', $cost->color_key)->where('price_list_key', $list->id)->where('price_type', 'retail')->where('currency_id', $huf->id);
+                        $failedIds = (clone $failed)->pluck('id')->all();
+                        $failed->update(['requires_review' => true]);
+                        $this->dependencies->invalidateRetailDependents($failedIds);
                         $message = $list->code.' / '.$cost->product->model_code.': '.$exception->getMessage();
                         $result['errors'][] = $message;
                         $result['skipped']++;
