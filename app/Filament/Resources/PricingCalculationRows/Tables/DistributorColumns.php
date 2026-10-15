@@ -2,14 +2,10 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Filament\Support\PricingGrid;
 use App\Models\PricingCalculationRow;
-use App\Services\Pricing\DistributorPriceReviewService;
-use DomainException;
-use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\TextInputColumn;
-use Illuminate\Support\Facades\Gate;
 
 class DistributorColumns
 {
@@ -22,32 +18,7 @@ class DistributorColumns
             TextColumn::make('distributor_calculated_price')->label('Kalkulált disztr. EUR')->numeric()->placeholder('-')
                 ->getStateUsing(fn (PricingCalculationRow $record, $livewire) => $livewire->distributorRow($record)?->calculated_price)
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'distributor_calculated_price')),
-            TextInputColumn::make('distributor_manual_price')->label('Manuális disztr. EUR')->type('text')->inputMode('decimal')
-                ->getStateUsing(fn (PricingCalculationRow $record, $livewire) => $livewire->distributorRow($record)?->manual_price === null
-                    ? null : (float) $livewire->distributorRow($record)->manual_price)
-                ->extraInputAttributes(fn (PricingCalculationRow $record, $livewire) => ['class' => 'pricing-retail-manual-input pricing-retail-manual-'.(self::row($record, $livewire)?->finalPriceDifferenceDirection() ?? 'equal')])
-                ->suffixIcon(fn (PricingCalculationRow $record, $livewire) => self::icon($record, $livewire), true)
-                ->suffixIconColor(fn (PricingCalculationRow $record, $livewire) => self::color($record, $livewire))
-                ->rules(['nullable', 'numeric', 'gt:0', 'max:99999999999.9999'])
-                ->disabled(fn (PricingCalculationRow $record, $livewire) => ! $livewire->pricingWorkspaceIsEditable()
-                    || ! ($row = self::row($record, $livewire)) || Gate::denies('update', $row))
-                ->tooltip('Önálló nettó disztribútori manuális ár. Üres mezővel a kalkulált ár áll vissza. A nagyker árat és jóváhagyást nem módosítja.')
-                ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, $livewire) {
-                    $row = $livewire->distributorRow($record, fresh: true);
-                    abort_unless($row, 404);
-                    try {
-                        $updated = app(DistributorPriceReviewService::class)->setManualPrice($row, $state);
-
-                        return $updated->manual_price === null ? null : (float) $updated->manual_price;
-                    } catch (DomainException $exception) {
-                        Notification::make()->title('A disztribútori kalkuláció nem aktuális')->body($exception->getMessage())->warning()->send();
-
-                        return ['error' => $exception->getMessage()];
-                    } finally {
-                        unset($livewire->averageDistributorNetNetMultiplier);
-                        $livewire->resetTable();
-                    }
-                }),
+            PricingGrid::manualColumn('distributor_manual_price', 'Manuális disztr. EUR'),
             TextColumn::make('distributor_final_price')->label('Végleges disztr. EUR')->numeric()->placeholder('-')
                 ->getStateUsing(fn (PricingCalculationRow $record, $livewire) => self::row($record, $livewire)?->final_price)
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'distributor_final_price'))

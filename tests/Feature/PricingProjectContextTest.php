@@ -114,10 +114,10 @@ class PricingProjectContextTest extends TestCase
         $page = Livewire::test(PricingHufRetailCalculations::class)->call('setPricingArchive', true)
             ->assertSet('pricingProjectId', $this->closed->id)->assertCanSeeTableRecords([$row])
             ->assertActionHidden('calculateHufRetail')->assertTableBulkActionHidden('approveRetailBulk')
-            ->assertTableActionDisabled('approveRetail', $row);
+            ->assertTableActionDoesNotExist('approveRetail');
         $this->assertSame([$this->closed->id], $page->instance()->pricingProjectOptions->pluck('id')->all());
-        $this->assertFalse($page->instance()->getTable()->isSelectionEnabled());
-        $this->assertTrue($page->instance()->getTable()->getColumn('manual_price')->record($row)->isDisabled());
+        $this->assertTrue($page->instance()->getTable()->isSelectionEnabled());
+        $this->assertSame('false', $page->instance()->getTable()->getColumn('manual_price')->record($row)->getExtraCellAttributes()['data-pricing-editable']);
         $page->callAction('decimalPlaces', ['final_price' => 2])->assertHasNoErrors();
         Excel::fake();
         $this->travelTo(now()->setTime(12, 0, 0));
@@ -219,9 +219,9 @@ class PricingProjectContextTest extends TestCase
     {
         $row = $this->row($this->first, 'retail');
         $page = Livewire::test(PricingHufRetailCalculations::class)->call('selectPricingProject', $this->first->id)
-            ->mountTableAction('approveRetail', $row)
-            ->assertSet('mountedActions.0.name', 'approveRetail')
-            ->assertSet('mountedActions.0.context.recordKey', (string) $row->id);
+            ->mountAction('pricingApprove', ['record_id' => $row->id])
+            ->assertSet('mountedActions.0.name', 'pricingApprove')
+            ->assertSet('mountedActions.0.arguments.record_id', $row->id);
         $page->call('selectPricingProject', $this->second->id)->assertSet('mountedActions', [])
             ->assertCanSeeTableRecords([$this->row($this->second, 'retail')]);
         $this->assertNull($this->row($this->first, 'retail')->approved_by);
@@ -273,8 +273,8 @@ class PricingProjectContextTest extends TestCase
         $page = Livewire::test(PricingHufRetailCalculations::class)->call('selectPricingProject', $this->first->id)
             ->assertCanSeeTableRecords([$this->row($this->first, 'retail')])->assertActionHidden('calculateHufRetail')
             ->assertTableBulkActionHidden('approveRetailBulk');
-        $this->assertFalse($page->instance()->getTable()->isSelectionEnabled());
-        $this->assertTrue($page->instance()->getTable()->getColumn('manual_price')->record($this->row($this->first, 'retail'))->isDisabled());
+        $this->assertTrue($page->instance()->getTable()->isSelectionEnabled());
+        $this->assertSame('false', $page->instance()->getTable()->getColumn('manual_price')->record($this->row($this->first, 'retail'))->getExtraCellAttributes()['data-pricing-editable']);
         $this->assertFalse($reader->can('ViewAny:PricingProject'));
         $this->assertFalse($reader->can('Update:PricingCalculationRow'));
     }

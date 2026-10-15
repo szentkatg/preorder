@@ -260,7 +260,7 @@ class HufRetailCalculationTest extends TestCase
         Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()
             ->assertActionHidden('calculateHufRetail')
             ->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '2490')
-            ->callTableAction('approveRetail', $this->retail(), ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->callAction('pricingApprove', ['approval_status' => PricingCalculationRow::STATUS_APPROVED], ['record_id' => $this->retail()->id])
             ->assertHasNoErrors();
         $this->assertSame('2490.0000', $this->retail()->final_price);
         $this->assertSame(PricingCalculationRow::STATUS_MODIFIED_APPROVED, $this->retail()->status);
@@ -594,10 +594,10 @@ class HufRetailCalculationTest extends TestCase
             ->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '2590')
             ->assertNotified('A kisker kalkuláció nem aktuális');
         Livewire::test(PricingHufRetailCalculations::class)
-            ->callTableAction('approveRetail', $this->retail(), ['approval_status' => PricingCalculationRow::STATUS_APPROVED])
+            ->callAction('pricingApprove', ['approval_status' => PricingCalculationRow::STATUS_APPROVED], ['record_id' => $this->retail()->id])
             ->assertNotified('A kisker kalkuláció nem aktuális');
         Livewire::test(PricingHufRetailCalculations::class)
-            ->callTableAction('acceptCalculatedRetail', $this->retail())
+            ->callAction('pricingAccept', [], ['record_id' => $this->retail()->id])
             ->assertNotified('A kisker kalkuláció nem aktuális');
         $this->assertSame('2490.0000', $this->retail()->manual_price);
         $this->assertTrue($this->retail()->requires_review);
@@ -939,7 +939,8 @@ class HufRetailCalculationTest extends TestCase
         $page = Livewire::test(PricingHufRetailCalculations::class);
         $this->assertTrue($page->instance()->getTable()->isRecordSelectable($this->retail()));
         $this->project->update(['status' => PricingProject::STATUS_CLOSED]);
-        $this->assertFalse($page->instance()->getTable()->isRecordSelectable($this->retail()));
+        // Closed rows remain selectable for the read-only bulk details action.
+        $this->assertTrue($page->instance()->getTable()->isRecordSelectable($this->retail()));
         $this->project->update(['status' => PricingProject::STATUS_ACTIVE, 'active' => false]);
         $this->assertTrue($page->instance()->getTable()->isRecordSelectable($this->retail()));
     }

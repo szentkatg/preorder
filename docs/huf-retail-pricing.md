@@ -1,5 +1,77 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Egységes, könnyű árképzési táblák és műveleti menük (2026-10-15)
+
+- A bekerülési érték szállítás%/vám% cellái és az összes árképzési munkalap
+  módosítható manuálisár-cellái halványkék hátteret kapnak. Csak a ténylegesen
+  módosítható cellák színezettek; archív vagy csak olvasható nézetben nem.
+- A HUF/devizás kisker, nagyker és disztribútori oldalon is csak dupla kattintás
+  vagy Enter/F2 után jön létre input. Enter/kilépés ment, Esc visszavon, azonos
+  értéknél nincs kérés. Pont/vessző elfogadott, a pénzösszegnek pozitívnak kell
+  lennie; az üres cella törli a manuális eltérítést, új jóváhagyás nélkül.
+- A sor nem interaktív részén dupla kattintás mutatja a megfelelő ártípus
+  meglévő részletezését. Checkbox, beviteli mező, link, menügomb és
+  oszlopméretező nem nyitja meg véletlenül a részleteket.
+- Az új **Műveletek** oszlop egy hárompontos ikont tartalmaz, melynek menüje
+  kattintásra, helyben jön létre. HUF kiskernél: Jóváhagyás, Kalkulált ár
+  visszaállítása, Előző szezon termékének összekapcsolása, Részletek.
+  A többi munkalapon nincs összekapcsolás, annak eredményét a közös termékadat
+  alapján továbbra is használják. A menü billentyűzettel is kezelhető,
+  Escape/külső kattintás/görgetés/navigáció bezárja, és nem vágja le a táblázat.
+- Nincsenek soronként felépített Filament-akciók és állandó szerkesztőmezők.
+  A közös oldal-akciók csak tényleges megnyitáskor kérik le a scoped rekordot.
+  A műveleti oszlop nem rendezhető/kereshető adatmező és nem kerül az Excelbe;
+  az oszlopválasztóban a többi oszlophoz hasonlóan kapcsolható, áthelyezhető.
+- Kijelöléssel elérhető a meglévő tömeges jóváhagyás mellett a **Kalkulált ár
+  visszaállítása** és a **Kijelölt sorok részletei**. Összekapcsolás nem tömeges.
+  Megtekintési joggal, archív módban is kijelölhetők sorok a részletezéshez,
+  de az írási műveletek ilyenkor nem engedélyezettek.
+- A visszaállítás megtartja a korábbi „kalkulált ár elfogadása” jelentését:
+  a manuális/megtartott ár törlődik, és a legutóbbi kalkulált ár **jóváhagyott**
+  lesz. Ezt az egyedi és tömeges megerősítő ablak is kiírja. A szolgáltatás
+  újraellenőrzi a bemenetek aktualitását; nem számol új árat és nem publikál
+  a partnerportál árlistatételeibe.
+- Tömeges visszaállításkor a szolgáltatás soronként friss jogosultságot,
+  projektállapotot és kalkuláció-aktualitást ellenőriz. Az ismert elutasításokat
+  kihagyja, darabszámmal és okkal jelzi; váratlan hibánál a teljes batch
+  tranzakciója visszagördül. Disztribútori oldalon kizárólag a kiválasztott
+  árlista megfelelő gyermekára módosul, nem a forrás nagykerár.
+- Az összekapcsolási művelet szerveroldalon is csak a HUF kisker munkalapon
+  engedélyezett, és továbbra is termékmódosítási jogot igényel. A részletezés
+  View jogot, az írás Update jogot, megfelelő projektet/pénznemet/ártípust
+  igényel. A régi inline frissítési végpont ugyanazt az új, ellenőrzött mentést
+  használja; a böngésző által küldött rekordazonosító önmagában nem jogosít.
+
+Ellenőrzés: a valódi Filament HTML-ből készült helyi böngészőpróba ellenőrzi
+a színezést, dupla kattintás/Enter/Esc/blur működését, üres értéket, menüopciókat,
+modalhívásokat, újrarenderelés utáni szerkesztést és checkbox-elkülönítést.
+A böngészőpróbában a hálózati hívások tesztstubot használnak; a valódi szerveroldali
+árváltozásokat és jogosultságokat a Laravel regressziós tesztek ellenőrzik.
+A célzott regressziós csomag: **221 sikeres teszt, 1738 ellenőrzés**.
+A böngészőpróba induláskor 0 soronkénti szerkesztő inputot és 0 Filament
+sorműveleti gombot talált, és minden interakciós ellenőrzése sikeres.
+
+Üzemeltetés: **nincs új migráció, Composer install, npm run build, manuális
+fájlfeltöltés, .env módosítás vagy új jogosultság**. A JS/CSS Blade-ben van.
+A NAS telepítő a szokásos migrációellenőrzést és cache-újraépítést futtatja.
+
+Git és NAS a pricing worktree-ben, csak a feladathoz tartozó fájlok stagingje után:
+
+```powershell
+git diff --cached --stat
+git commit -m "Use lazy pricing grid editors and lightweight row operation menus"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles WePanel csak külön kért, éles ágba integrált telepítésnél:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Bekerülési érték: igény szerinti szerkesztés és részletezés (2026-10-15)
 
 Első kísérleti lépésként **csak a Bekerülési értékek munkafelület** változik:

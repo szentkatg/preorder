@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasPricingGridInteractions;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
@@ -24,6 +25,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
     use HasPageShield {
         canAccess as protected canAccessUsingPagePermission;
     }
+    use HasPricingGridInteractions;
     use HasPricingProjectContext;
     use HasPricingTablePreferences, InteractsWithTable {
         HasPricingTablePreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
@@ -90,6 +92,12 @@ class PricingHufRetailCalculations extends Page implements HasTable
     public function updateTableColumnState(string $column, string $record, mixed $input): mixed
     {
         abort_unless(static::canAccess() && $this->pricingWorkspaceIsEditable(), 403);
+
+        if ($column === ($this instanceof PricingDistributorCalculations ? 'distributor_manual_price' : 'manual_price')) {
+            $this->setPricingManualPrice($record, $input);
+
+            return null;
+        }
 
         return $this->updatePricingTableColumnState($column, $record, $input);
     }

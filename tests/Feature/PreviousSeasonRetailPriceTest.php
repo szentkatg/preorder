@@ -200,7 +200,7 @@ class PreviousSeasonRetailPriceTest extends TestCase
 
     public function test_pairing_action_is_available_on_the_retail_workspace(): void
     {
-        Livewire::test(PricingHufRetailCalculations::class)->callTableAction('pairPreviousSeasonProduct', $this->row, ['mode' => 'none'])
+        Livewire::test(PricingHufRetailCalculations::class)->callAction('pairPreviousSeasonProduct', ['mode' => 'none'], ['record_id' => $this->row->id])
             ->assertHasNoErrors();
         $this->assertTrue((bool) $this->product->fresh()->previous_season_match_override);
         $this->assertNull($this->query()->firstOrFail()->previous_season_price);

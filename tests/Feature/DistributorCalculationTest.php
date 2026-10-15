@@ -239,11 +239,19 @@ class DistributorCalculationTest extends TestCase
         $page->call('updateTableColumnState', 'distributor_manual_price', (string) $this->source()->id, '1.4')->assertHasNoErrors();
         $this->assertSame('1.4000', $this->row()->final_price);
         $this->assertSame($before, $this->source()->getAttributes());
-        $page->callTableAction('approveDistributor', $this->source(), ['approval_status' => 'approved'])->assertHasNoErrors();
+        $page->callAction('pricingApprove', ['approval_status' => 'approved'], ['record_id' => $this->source()->id])->assertHasNoErrors();
         $this->assertSame('modified_approved', $this->row()->status);
         $this->assertSame($before, $this->source()->getAttributes());
-        $page->mountTableAction('distributorDetails', $this->source());
+        $page->call('openPricingDetails', $this->source()->id);
         $this->assertStringContainsString('Disztribútori kedvezmény', $page->instance()->getMountedAction()->getModalContent()->render());
+        $this->assertCount(3, $page->instance()->pricingRowOperations($this->source()));
+        $this->assertSame([], $page->instance()->getTable()->getRecordActions());
+        $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->source()])->assertHasNoErrors();
+        $this->assertNull($this->row()->manual_price);
+        $this->assertSame($this->row()->calculated_price, $this->row()->final_price);
+        $this->assertSame($before, $this->source()->getAttributes());
+        Livewire::test(PricingDistributorCalculations::class)
+            ->mountAction('pairPreviousSeasonProduct', ['record_id' => $this->source()->id])->assertActionNotMounted();
     }
 
     public function test_multiple_distributor_lists_require_selection_and_never_duplicate_wholesale_rows(): void
@@ -311,7 +319,7 @@ class DistributorCalculationTest extends TestCase
         $this->actingAs($reader);
         $page = Livewire::test(PricingDistributorCalculations::class);
         $page->assertActionHidden('calculateDistributor')->assertTableBulkActionHidden('approveDistributorBulk');
-        $this->assertTrue($page->instance()->getTable()->getColumn('distributor_manual_price')->record($this->source())->isDisabled());
+        $this->assertSame('false', $page->instance()->getTable()->getColumn('distributor_manual_price')->record($this->source())->getExtraCellAttributes()['data-pricing-editable']);
         $this->project->update(['status' => 'closed']);
         $page->call('setPricingArchive', true)->assertActionHidden('calculateDistributor')->assertTableBulkActionHidden('approveDistributorBulk');
     }
@@ -564,8 +572,9 @@ class DistributorCalculationTest extends TestCase
         $page = Livewire::test(PricingDistributorCalculations::class)->call('setPricingArchive', true);
         $this->assertSame($this->target->id, $page->instance()->selectedDistributorPriceList->id);
         $page->assertCanSeeTableRecords([$this->source()])->assertActionHidden('calculateDistributor')
-            ->assertTableActionDisabled('approveDistributor', $this->source());
-        $this->assertTrue($page->instance()->getTable()->getColumn('distributor_manual_price')->record($this->source())->isDisabled());
+            ->assertTableActionDoesNotExist('approveDistributor');
+        $this->assertSame('false', $page->instance()->getTable()->getColumn('distributor_manual_price')->record($this->source())->getExtraCellAttributes()['data-pricing-editable']);
+        $page->call('mountAction', 'pricingApprove', ['record_id' => $this->source()->id])->assertForbidden();
     }
 
     public function test_failed_wholesale_recalculation_marks_its_distributor_dependents(): void

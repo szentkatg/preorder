@@ -97,6 +97,32 @@ class RetailPriceReviewService
         }
     }
 
+    /** Expected row-level rejections are skipped; unexpected failures roll back the batch. */
+    public function acceptCalculatedPrices(Collection $rows): array
+    {
+        Gate::authorize('update', new PricingCalculationRow);
+
+        return DB::transaction(function () use ($rows): array {
+            $result = ['accepted' => 0, 'skipped' => 0, 'reasons' => []];
+            foreach ($rows->unique('id')->sortBy([['pricing_project_id', 'asc'], ['id', 'asc']]) as $row) {
+                try {
+                    $this->acceptCalculatedPrice($row);
+                    $result['accepted']++;
+                } catch (DomainException|AuthorizationException|ModelNotFoundException $exception) {
+                    $reason = match (true) {
+                        $exception instanceof AuthorizationException => 'Nincs módosítási jogosultság.',
+                        $exception instanceof ModelNotFoundException => 'A sor vagy az árprojekt már nem létezik.',
+                        default => $exception->getMessage(),
+                    };
+                    $result['skipped']++;
+                    $result['reasons'][$reason] = ($result['reasons'][$reason] ?? 0) + 1;
+                }
+            }
+
+            return $result;
+        });
+    }
+
     public function acceptCalculatedPrice(PricingCalculationRow $row): PricingCalculationRow
     {
         return $this->change($row, function (PricingCalculationRow $stored): void {

@@ -118,11 +118,12 @@ class PricingAuthorizationTest extends TestCase
         }
         $page->call('openCostDetails', $this->cost->id)->assertActionMounted('costDetails');
         $retail = Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()
-            ->assertCanSeeTableRecords([$this->retail])->assertTableActionVisible('retailDetails', $this->retail)
-            ->assertTableActionHidden('approveRetail', $this->retail)
-            ->assertTableActionHidden('acceptCalculatedRetail', $this->retail)
+            ->assertCanSeeTableRecords([$this->retail])->assertTableActionDoesNotExist('retailDetails')
+            ->assertTableActionDoesNotExist('approveRetail')
+            ->assertTableActionDoesNotExist('acceptCalculatedRetail')
             ->assertActionHidden('calculateHufRetail');
-        $this->assertTrue($retail->instance()->getTable()->getColumn('manual_price')->record($this->retail)->isDisabled());
+        $this->assertSame('false', $retail->instance()->getTable()->getColumn('manual_price')->record($this->retail)->getExtraCellAttributes()['data-pricing-editable']);
+        $retail->call('openPricingDetails', $this->retail->id)->assertActionMounted('pricingDetails');
         Livewire::test(ViewPricingProject::class, ['record' => $this->project->id])->assertSuccessful()->assertActionHidden('recalculateCost');
     }
 
@@ -131,7 +132,7 @@ class PricingAuthorizationTest extends TestCase
         $this->signInWith(['View:PricingCostCalculations', 'View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow']);
         Livewire::test(PricingCostCalculations::class)->assertSuccessful()->call('openCostDetails', $this->cost->id)->assertForbidden();
         Livewire::test(PricingCostCalculations::class)->call('mountAction', 'costDetails', ['record_id' => $this->cost->id])->assertForbidden();
-        Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()->assertTableActionHidden('retailDetails', $this->retail);
+        Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()->call('openPricingDetails', $this->retail->id)->assertForbidden();
     }
 
     public function test_forged_inline_start_is_rejected_without_writing_data(): void

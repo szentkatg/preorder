@@ -12,17 +12,7 @@ class WholesaleCalculationsTable
     public static function configure(Table $table, string $currency): Table
     {
         $table = HufRetailCalculationsTable::configure($table, $currency, WholesalePriceReviewService::class);
-        $table->recordActions(array_values(array_filter($table->getRecordActions(),
-            fn ($action): bool => $action->getName() !== 'pairPreviousSeasonProduct')));
         $shared = $table->getColumns();
-        foreach ($table->getRecordActions() as $action) {
-            if ($action->getName() === 'retailDetails') {
-                $action->modalHeading('Nettó nagyker kalkuláció részletei')
-                    ->modalContent(fn (PricingCalculationRow $record, $livewire) => view('filament.pricing.wholesale-calculation-details', [
-                        'record' => $record, 'vat' => $livewire->wholesaleVatPercent(),
-                    ]));
-            }
-        }
         foreach ($table->getToolbarActions() as $action) {
             if ($action->getName() === 'approveRetailBulk') {
                 $action->label('Kijelölt nagyker árak jóváhagyása');
@@ -54,6 +44,7 @@ class WholesaleCalculationsTable
             $shared['pricingRoundingRule.name'], $shared['calculated_price']->label('Kalkulált nettó nagyker '.$currency),
             $shared['manual_price']->label('Manuális nettó '.$currency),
             $shared['final_price']->label('Végleges nettó nagyker '.$currency), $shared['requires_review'], $shared['status'],
+            $shared['pricing_operations'],
         ]);
     }
 

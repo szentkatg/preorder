@@ -228,13 +228,20 @@ class ForeignRetailCalculationTest extends TestCase
             ->callAction('calculateForeignRetail', ['source_price_list_id' => $this->hufList->id, 'price_list_id' => $this->list->id])
             ->assertHasNoErrors();
         $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '4.95')
-            ->callTableAction('approveRetail', $this->retail(), ['approval_status' => 'approved'])->assertHasNoErrors();
+            ->callAction('pricingApprove', ['approval_status' => 'approved'], ['record_id' => $this->retail()->id])->assertHasNoErrors();
         $this->assertSame('4.9500', $this->retail()->final_price);
         $this->assertSame('modified_approved', $this->retail()->status);
-        $page->mountTableAction('retailDetails', $this->retail());
+        $page->call('openPricingDetails', $this->retail()->id);
         $html = $page->instance()->getMountedAction()->getModalContent()->render();
         $this->assertStringContainsString('Szezonárfolyam', $html);
         $this->assertStringContainsString('Országszorzó', $html);
+        $this->assertCount(3, $page->instance()->pricingRowOperations($this->retail()));
+        $this->assertSame([], $page->instance()->getTable()->getRecordActions());
+        $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->retail()])->assertHasNoErrors();
+        $this->assertNull($this->retail()->manual_price);
+        $this->assertSame($this->retail()->calculated_price, $this->retail()->final_price);
+        Livewire::test(PricingForeignRetailCalculations::class)
+            ->mountAction('pairPreviousSeasonProduct', ['record_id' => $this->retail()->id])->assertActionNotMounted();
     }
 
     public function test_failed_recalculation_keeps_existing_price_but_marks_it_for_review(): void

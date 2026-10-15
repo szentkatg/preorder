@@ -181,11 +181,18 @@ class WholesaleCalculationTest extends TestCase
         $this->assertEquals(1.99, $this->row()->effective_wholesale_multiplier);
         $page->callTableBulkAction('approveRetailBulk', [$this->row()], ['approval_status' => 'approved'])->assertHasNoErrors();
         $this->assertSame('modified_approved', $this->row()->status);
-        $page->mountTableAction('retailDetails', $this->row());
+        $page->call('openPricingDetails', $this->row()->id);
         $html = $page->instance()->getMountedAction()->getModalContent()->render();
         $this->assertStringContainsString('Nagyker szorzó', $html);
         $this->assertStringContainsString('Nettó/nettó szorzó', $html);
         $this->assertStringContainsString('1000', str_replace(' ', '', strip_tags($html)));
+        $this->assertCount(3, $page->instance()->pricingRowOperations($this->row()));
+        $this->assertSame([], $page->instance()->getTable()->getRecordActions());
+        $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->row()])->assertHasNoErrors();
+        $this->assertNull($this->row()->manual_price);
+        $this->assertSame($this->row()->calculated_price, $this->row()->final_price);
+        Livewire::test(PricingWholesaleCalculations::class)
+            ->mountAction('pairPreviousSeasonProduct', ['record_id' => $this->row()->id])->assertActionNotMounted();
     }
 
     public function test_approved_price_is_retained_when_retail_changes_and_can_be_reapproved_after_recalculation(): void

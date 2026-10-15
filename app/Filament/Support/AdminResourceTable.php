@@ -48,7 +48,7 @@ class AdminResourceTable
         }
 
         if (! $table->hasAction('exportExcel')) {
-            $columns = array_values($table->getColumns());
+            $columns = array_values(array_filter($table->getColumns(), fn (Column $column) => $column->getName() !== 'pricing_operations'));
             $tableName = (new $modelClass)->getTable();
 
             $table->pushHeaderActions([
@@ -84,6 +84,12 @@ class AdminResourceTable
      */
     private static function configureColumn(Column $column, string $modelClass): void
     {
+        if ($modelClass === PricingCalculationRow::class && $column->getName() === 'pricing_operations') {
+            $column->sortable(false)->searchable(false)->toggleable();
+
+            return;
+        }
+
         if (! $column->isToggleable()) {
             $column->toggleable();
         }

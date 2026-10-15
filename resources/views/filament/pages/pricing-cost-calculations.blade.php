@@ -50,8 +50,8 @@
             {{ $this->pricingWorkspaceDescription() }}
             A jobb felső oszlopkezelővel ki/be kapcsolhatók és átrendezhetők az oszlopok,
             az oszlopszélességek a fejléc jobb szélén húzással állíthatók,
-            @if (method_exists($this, 'openCostDetails'))
-                a teljes számítási háttér pedig a soron dupla kattintással érhető el.
+            @if (method_exists($this, 'openCostDetails') || method_exists($this, 'openPricingDetails'))
+                a színezett cellák dupla kattintással szerkeszthetők, a sor többi részén dupla kattintás mutatja a részleteket.
             @else
                 a soroknál pedig a <span class="font-semibold">Részletek</span> gomb mutatja a teljes számítási hátteret.
             @endif
@@ -167,6 +167,7 @@
         <div
             data-pricing-resizable-columns
             @if (method_exists($this, 'openCostDetails')) data-pricing-cost-grid @endif
+            @if (method_exists($this, 'openPricingDetails')) data-pricing-price-grid @endif
             data-pricing-storage-key="{{ $this->pricingColumnStorageKey() }}"
             data-pricing-server-widths="{{ json_encode($this->pricingColumnWidths) }}"
         >
@@ -174,7 +175,7 @@
         </div>
     </div>
 
-    @if (method_exists($this, 'openCostDetails'))
+    @if (method_exists($this, 'openCostDetails') || method_exists($this, 'openPricingDetails'))
         @include('filament.pricing.cost-grid-interactions')
     @endif
 

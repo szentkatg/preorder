@@ -276,12 +276,14 @@ class PricingDecimalPreferencesTest extends TestCase
                     $this->assertSame(0, $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input')->length);
                 }
             }
-            $inputNames = $pageClass === PricingCostCalculations::class ? [] : ['manual_price'];
-            foreach ($inputNames as $name) {
+            $editableNames = $pageClass === PricingCostCalculations::class ? [] : ['manual_price'];
+            foreach ($editableNames as $name) {
                 $key = str_replace('_', '-', $name);
-                $input = $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input[contains(@class, "fi-input")]')->item(0);
-                $this->assertNotNull($input, 'Missing input: '.$name);
-                $this->assertStringContainsString('fi-align-end', $input->getAttribute('class'));
+                $cell = $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]')->item(0);
+                $this->assertNotNull($cell, 'Missing editable cell: '.$name);
+                $this->assertStringContainsString('fi-align-end', $cell->getAttribute('class'));
+                $this->assertTrue($cell->hasAttribute('data-pricing-value'));
+                $this->assertSame(0, $xpath->query('//td[contains(@class, "fi-ta-cell-'.$key.'")]//input')->length);
             }
         }
         $this->assertSame('496.1299', $this->retail->fresh()->final_price);

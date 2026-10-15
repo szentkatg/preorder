@@ -2,19 +2,14 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
-use App\Filament\Support\Actions\PairPreviousSeasonProductAction;
+use App\Filament\Support\PricingGrid;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\RetailPriceReviewService;
-use Closure;
-use DomainException;
-use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -25,7 +20,7 @@ class HufRetailCalculationsTable
 {
     public static function configure(Table $table, string $currency = 'HUF', string $reviewService = RetailPriceReviewService::class): Table
     {
-        return $table->columns([
+        return PricingGrid::rows($table)->columns([
             TextColumn::make('pricingProject.name')->label('Árprojekt'),
             TextColumn::make('priceList.code')->label('Árlista'),
             TextColumn::make('product.catalog_group_name_hu')->label('Katalógus csoport'),
@@ -82,29 +77,7 @@ class HufRetailCalculationsTable
             TextColumn::make('unrounded_price')->label('Kerekítés előtti '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'unrounded_price')),
             TextColumn::make('pricingRoundingRule.name')->label('Kerekítési szabály')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('calculated_price')->label('Kalkulált kisker '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'calculated_price')),
-            TextInputColumn::make('manual_price')->label('Manuális '.$currency)->type('text')->inputMode('decimal')
-                ->extraInputAttributes(fn (PricingCalculationRow $record) => [
-                    'class' => 'pricing-retail-manual-input pricing-retail-manual-'.($record->manual_price === null ? 'equal' : ($record->finalPriceDifferenceDirection() ?? 'equal')),
-                ])
-                ->suffixIcon(fn (PricingCalculationRow $record) => $record->manual_price === null ? null : self::differenceIcon($record), true)
-                ->suffixIconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
-                ->getStateUsing(fn (PricingCalculationRow $record) => $record->manual_price === null ? null : rtrim(rtrim($record->manual_price, '0'), '.'))
-                ->rules(['nullable', 'numeric', 'gt:0', 'max:99999999999.9999'])
-                ->tooltip('Írd át a manuális árat. Az üres mező visszaállítja a kalkulált árat. A módosítás után új jóváhagyás szükséges.')
-                ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, $livewire) use ($reviewService) {
-                    try {
-                        $updated = app($reviewService)->setManualPrice($record, $state);
-
-                        return $updated->manual_price === null ? null : rtrim(rtrim($updated->manual_price, '0'), '.');
-                    } catch (DomainException $exception) {
-                        self::notifyCalculationError($exception, $reviewService);
-
-                        return ['error' => $exception->getMessage()];
-                    } finally {
-                        $livewire->resetTable();
-                    }
-                }),
+            PricingGrid::manualColumn('manual_price', 'Manuális '.$currency),
             TextColumn::make('final_price')->label('Végleges kisker '.$currency)->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'final_price'))
                 ->icon(fn (PricingCalculationRow $record) => self::differenceIcon($record))
                 ->iconColor(fn (PricingCalculationRow $record) => self::differenceColor($record))
@@ -130,39 +103,11 @@ class HufRetailCalculationsTable
                 PricingCalculationRow::STATUS_APPROVED_ROUND_3 => '3. körös jóváhagyott',
                 default => $state,
             }),
+            PricingGrid::operationsColumn(),
         ])->filters([
             SelectFilter::make('pricing_project_id')->label('Árprojekt')->relationship('pricingProject', 'name')->searchable()->preload(),
             SelectFilter::make('price_list_id')->label('Árlista')->relationship('priceList', 'code')->searchable()->preload(),
             TernaryFilter::make('requires_review')->label('Felülvizsgálandó'),
-        ])->recordActions([
-            PairPreviousSeasonProductAction::make(),
-            Action::make('retailDetails')->label('Részletek')->icon('heroicon-o-document-magnifying-glass')
-                ->visible(fn (PricingCalculationRow $record) => Gate::allows('view', $record))
-                ->modalWidth(Width::Screen)->modalHeading($currency.' kisker kalkuláció részletei')
-                ->modalSubmitAction(false)->modalCancelActionLabel('Bezárás')
-                ->modalContent(fn (PricingCalculationRow $record) => view('filament.pricing.retail-calculation-details', ['record' => $record])),
-            Action::make('approveRetail')->label(fn (PricingCalculationRow $record) => $record->requires_review ? 'Ár megtartása és jóváhagyása' : 'Jóváhagyás')
-                ->icon('heroicon-o-check')->requiresConfirmation()
-                ->schema([
-                    self::approvalStatusSelect(),
-                ])
-                ->visible(fn (PricingCalculationRow $record) => Gate::allows('update', $record))
-                ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->action(fn (PricingCalculationRow $record, array $data) => self::reviewAction(
-                    fn () => app($reviewService)->approveCurrentPrice($record, $data['approval_status']),
-                    $reviewService,
-                ))
-                ->after(fn ($livewire) => $livewire->resetTable()),
-            Action::make('acceptCalculatedRetail')->label('Kalkulált ár elfogadása')->icon('heroicon-o-arrow-path')->requiresConfirmation()
-                ->modalDescription('A végleges ár a legutóbbi kalkulált ár lesz. A manuális vagy korábban megtartott ár helyett ezt hagyod jóvá.')
-                ->visible(fn (PricingCalculationRow $record) => Gate::allows('update', $record)
-                    && ($record->requires_review || $record->manual_price !== null || $record->retained_price !== null))
-                ->disabled(fn (PricingCalculationRow $record) => ! self::canEdit($record))
-                ->action(fn (PricingCalculationRow $record) => self::reviewAction(
-                    fn () => app($reviewService)->acceptCalculatedPrice($record),
-                    $reviewService,
-                ))
-                ->after(fn ($livewire) => $livewire->resetTable()),
         ])->toolbarActions([
             BulkAction::make('approveRetailBulk')->label('Kijelölt árak jóváhagyása')->icon('heroicon-o-check')
                 ->requiresConfirmation()->modalHeading('Kijelölt árak tömeges jóváhagyása')
@@ -182,8 +127,10 @@ class HufRetailCalculationsTable
                 })
                 ->deselectRecordsAfterCompletion()
                 ->after(fn ($livewire) => $livewire->resetTable()),
-        ])->selectable(fn ($livewire) => self::canApproveBulk($livewire))
-            ->checkIfRecordIsSelectableUsing(fn (PricingCalculationRow $record) => self::canEdit($record))
+            $table->getLivewire()->pricingAcceptBulkAction(),
+            $table->getLivewire()->pricingDetailsBulkAction(),
+        ])->selectable(fn ($livewire) => self::canApproveBulk($livewire) || Gate::allows('view', new PricingCalculationRow))
+            ->checkIfRecordIsSelectableUsing(fn (PricingCalculationRow $record) => self::canEdit($record) || Gate::allows('view', $record))
             ->deselectAllRecordsWhenFiltered()
             ->defaultSort('updated_at', 'desc')->reorderableColumns()->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
@@ -215,21 +162,6 @@ class HufRetailCalculationsTable
     private static function formatPrice(mixed $state): string
     {
         return rtrim(rtrim(number_format((float) $state, 4, ',', ' '), '0'), ',');
-    }
-
-    private static function reviewAction(Closure $action, string $reviewService = RetailPriceReviewService::class): void
-    {
-        try {
-            $action();
-        } catch (DomainException $exception) {
-            self::notifyCalculationError($exception, $reviewService);
-        }
-    }
-
-    private static function notifyCalculationError(DomainException $exception, string $reviewService = RetailPriceReviewService::class): void
-    {
-        Notification::make()->title($reviewService === RetailPriceReviewService::class ? 'A kisker kalkuláció nem aktuális' : 'A nagyker kalkuláció nem aktuális')
-            ->body($exception->getMessage())->warning()->send();
     }
 
     private static function formatMultiplier(mixed $state): string
