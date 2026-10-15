@@ -15,11 +15,66 @@ archív mód közös a bekerülési, HUF és devizás oldallal; egyszerre csak e
 projekt egy pénznemének sorai töltődnek be. Pénznemváltáskor a kijelölés,
 szűrés és nyitott művelet törlődik, az oszlopbeállítások megmaradnak.
 
-Az **újraszámítás** ablakában külön választjuk a **forrás HUF kisker árlistát**
-és a kijelölt deviza **célárlistáját**. Több HUF árlistánál sem találgatunk.
+Az **újraszámítás** ablakában a **forrás HUF kisker árlistát** és a kijelölt
+deviza **célárlistáját** automatikusan választjuk ki, ha csak egy-egy aktív
+kisker árlista lehetséges. Csak a nem egyértelmű oldalon jelenik meg választó.
+Több HUF árlistánál sem találgatunk; a megerősítés előtt választani kell.
 Minden deviza közvetlenül a HUF-ból képződik, nem az EUR-ból:
 
 `végleges HUF kisker ár / szezonárfolyam (HUF/deviza) × országszorzó → kerekítés → korrekció`
+
+### Összes devizás árlista újraszámítása
+
+Az **Összes devizás kisker újraszámítása** gomb a kiválasztott, nem lezárt
+árprojekt minden aktív EUR/CZK/RON/PLN kisker célárlistáját feldolgozza.
+Nem csak az aktuális pénznemfül, táblázatszűrés vagy lapozás sorait számolja.
+Egy pénznem több országárlistája is külön cél: például az EUR-os RETAIL_SK
+és RETAIL_EU egyaránt szerepel. A pénznemet a kapcsolt devizatörzs alapján
+azonosítjuk, nem az árlistakód végéből. A HUF árakat ez a gomb nem számolja újra.
+
+- Egy HUF forrásnál a párosítás automatikus; több forrásnál célárlistánként
+  választható HUF forrás. Minden célárlista pontosan egyszer kerül a tervbe.
+- A rendszer az összes párosítást még az első módosítás előtt ellenőrzi.
+  Hiányos, érvénytelen vagy időközben inaktívvá vált választással nem indul el.
+- A művelet megerősítést kér. A már kiszámított sorok egyedi/tömeges
+  jóváhagyási folyamata nem változik.
+- A manuális és jóváhagyott végleges árak megmaradnak; megváltozott
+  bemenetnél a meglévő szabályok szerint felülvizsgálandó jelölést kapnak.
+- A feldolgozott árlisták és létrehozott/frissített/kihagyott/felülvizsgálandó
+  sorok összesítve jelennek meg. A célárlisták közös futásazonosítót kapnak.
+  Soronként hibás bemenetnél a sor kimarad és naplózódik; váratlan hiba vagy
+  futást akadályozó feltétel esetén a teljes művelet adatbázis-módosítása visszaáll.
+- Az új gomb a meglévő újraszámítási jogosultságokat használja; archív
+  projektben és csak olvasási jogosultsággal nem érhető el.
+
+Ehhez a bővítéshez **nem kell migráció, Composer install, npm build, kézi
+fájlfeltöltés, új jogosultság vagy konfigurációmódosítás**. Telepítés után a
+szokásos cache-törlés és újraépítés szükséges. Git/NAS parancsok a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/PricingForeignRetailCalculations.php app/Filament/Support/Actions/CalculateForeignRetailAction.php app/Services/Pricing/ForeignRetailCalculationService.php app/Services/Pricing/ForeignRetailPriceListResolver.php tests/Feature/ForeignRetailCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Recalculate all foreign retail price lists with unambiguous pairing"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel élesítés csak külön engedéllyel, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+Ellenőrzés (2026-10-15): a devizás kalkuláció 33 tesztje / 208 assertion
+sikeres. A teljes futtatás a négy utolsó peremhelyzet-teszt hozzáadása előtti
+203 tesztből 200-at teljesített: a két ismert admin-erőforrás-darabszám
+eltérés mellett az Excel-import `date formula` esete hibázott. Az érintett
+dátumteszt öt esete külön futtatva sikeres (15 assertion); a teljes futásban
+jelentkező eltérés oka további vizsgálatot igényel. Az importkódot és az
+admin-darabszámteszteket ez a bővítés nem módosítja. Pint és diff-ellenőrzés sikeres.
+
+### Kalkulációs bemenetek és védelem
 
 - A HUF forrás manuális/megtartott végleges ára az alap, nem feltétlenül a
   kalkulált HUF ár. A forrássornak aktuálisnak és felülvizsgálattól mentesnek kell lennie.

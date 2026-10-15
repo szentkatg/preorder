@@ -58,7 +58,7 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
 
     protected function getHeaderActions(): array
     {
-        return [CalculateForeignRetailAction::make(), $this->pricingDecimalPlacesAction()];
+        return [CalculateForeignRetailAction::make(), CalculateForeignRetailAction::make(all: true), $this->pricingDecimalPlacesAction()];
     }
 
     protected function pricingDecimalColumns(): array

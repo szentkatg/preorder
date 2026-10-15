@@ -16,10 +16,14 @@ use App\Models\Product;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Pricing\ForeignRetailCalculationService;
+use App\Services\Pricing\ForeignRetailCalculator;
+use App\Services\Pricing\ForeignRetailPriceListResolver;
 use App\Services\Pricing\HufRetailCalculationService;
+use App\Services\Pricing\RetailCalculationDependencyService;
 use App\Services\Pricing\RetailPriceReviewService;
 use DomainException;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -258,6 +262,259 @@ class ForeignRetailCalculationTest extends TestCase
         $this->assertArrayNotHasKey('html', $page->effects);
         $payload = json_encode(['snapshot' => $page->snapshot, 'effects' => $page->effects], JSON_THROW_ON_ERROR);
         $this->assertLessThan(20000, strlen($payload));
+    }
+
+    public function test_unique_single_currency_pair_is_selected_without_visible_dropdowns(): void
+    {
+        Livewire::test(PricingForeignRetailCalculations::class)->mountAction('calculateForeignRetail')
+            ->assertFormFieldHidden('source_price_list_id')->assertFormFieldHidden('price_list_id')
+            ->callMountedAction()->assertHasNoErrors();
+        $this->assertSame($this->source->id, $this->retail()->source_retail_row_id);
+    }
+
+    public function test_single_currency_only_asks_for_the_ambiguous_source(): void
+    {
+        $other = $this->makeHufSource('OTHER-HUF');
+        Livewire::test(PricingForeignRetailCalculations::class)->mountAction('calculateForeignRetail')
+            ->assertFormFieldVisible('source_price_list_id')->assertFormFieldHidden('price_list_id');
+        Livewire::test(PricingForeignRetailCalculations::class)->callAction('calculateForeignRetail', ['source_price_list_id' => $other->id])
+            ->assertHasNoErrors();
+        $this->assertSame($other->id, $this->retail()->sourceRetailRow->price_list_id);
+    }
+
+    public function test_single_currency_only_asks_for_the_ambiguous_target(): void
+    {
+        $other = $this->makeSameCurrencyTarget('RETAIL-SK');
+        Livewire::test(PricingForeignRetailCalculations::class)->mountAction('calculateForeignRetail')
+            ->assertFormFieldHidden('source_price_list_id')->assertFormFieldVisible('price_list_id');
+        Livewire::test(PricingForeignRetailCalculations::class)->callAction('calculateForeignRetail', ['price_list_id' => $other->id])
+            ->assertHasNoErrors();
+        $this->assertSame(1, PricingCalculationRow::where('price_list_id', $other->id)->count());
+        $this->assertSame(0, PricingCalculationRow::where('price_list_id', $this->list->id)->count());
+    }
+
+    public function test_all_action_calculates_every_currency_regardless_of_current_tab_and_table_search(): void
+    {
+        $czk = $this->makeList('CZK', 16);
+        $ron = $this->makeList('RON', 80);
+        $pln = $this->makeList('PLN', 100);
+        Livewire::test(PricingForeignRetailCalculations::class)->call('selectRetailCurrency', 'CZK')
+            ->searchTable('no-matching-model')->callAction('calculateAllForeignRetail')->assertHasNoErrors();
+        foreach ([$this->list, $czk, $ron, $pln] as $list) {
+            $this->assertSame(1, PricingCalculationRow::where('price_list_id', $list->id)->count());
+        }
+        $this->assertCount(1, PricingCalculationRow::whereIn('price_list_id', [$this->list->id, $czk->id, $ron->id, $pln->id])
+            ->get()->pluck('calculation_snapshot.run_id')->unique());
+        $this->assertDatabaseCount('price_list_items', 0);
+    }
+
+    public function test_all_action_processes_multiple_country_price_lists_in_the_same_currency(): void
+    {
+        $sk = $this->makeSameCurrencyTarget('RETAIL-SK');
+        Livewire::test(PricingForeignRetailCalculations::class)->mountAction('calculateAllForeignRetail')
+            ->assertFormFieldHidden('sources.'.$this->list->id)->assertFormFieldHidden('sources.'.$sk->id)
+            ->callMountedAction()->assertHasNoErrors();
+        $this->assertSame('4.9500', $this->retail()->final_price);
+        $this->assertSame('4.9500', $this->retail($sk)->final_price);
+    }
+
+    public function test_all_pairs_are_validated_before_any_price_is_created_when_sources_are_ambiguous(): void
+    {
+        $this->makeHufSource('OTHER-HUF');
+        $this->makeList('CZK', 16);
+        try {
+            app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+            $this->fail('Ambiguous source lists must not be guessed.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('Több lehetséges', $exception->getMessage());
+        }
+        $this->assertSame(0, PricingCalculationRow::whereHas('currency', fn ($query) => $query->where('code', '!=', 'HUF'))->count());
+        $this->assertDatabaseCount('pricing_calculation_errors', 0);
+    }
+
+    public function test_all_action_allows_a_different_explicit_huf_source_for_each_target(): void
+    {
+        $other = $this->makeHufSource('OTHER-HUF');
+        $czk = $this->makeList('CZK', 16);
+        Livewire::test(PricingForeignRetailCalculations::class)->mountAction('calculateAllForeignRetail')
+            ->assertFormFieldVisible('sources.'.$this->list->id)->assertFormFieldVisible('sources.'.$czk->id);
+        Livewire::test(PricingForeignRetailCalculations::class)->callAction('calculateAllForeignRetail', ['sources' => [
+            $this->list->id => $this->hufList->id, $czk->id => $other->id,
+        ]])->assertHasNoErrors();
+        $this->assertSame($this->hufList->id, $this->retail()->sourceRetailRow->price_list_id);
+        $this->assertSame($other->id, $this->retail($czk)->sourceRetailRow->price_list_id);
+    }
+
+    public function test_partial_source_choices_cannot_cause_a_partial_batch(): void
+    {
+        $this->makeHufSource('OTHER-HUF');
+        $this->makeList('CZK', 16);
+        try {
+            app(ForeignRetailCalculationService::class)->recalculateAll($this->project, [$this->list->id => $this->hufList->id]);
+            $this->fail('Every ambiguous pair must be selected before processing.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('Több lehetséges', $exception->getMessage());
+        }
+        $this->assertSame(0, PricingCalculationRow::where('price_list_id', $this->list->id)->count());
+    }
+
+    public function test_inactive_and_non_retail_price_lists_do_not_make_pairs_ambiguous(): void
+    {
+        $inactive = $this->makeSameCurrencyTarget('INACTIVE');
+        $inactive->update(['active' => false]);
+        $nonRetail = $this->makeSameCurrencyTarget('WHOLESALE');
+        $nonRetail->update(['type' => 'wholesale']);
+        $pair = app(ForeignRetailPriceListResolver::class)->resolvePair('EUR');
+        $this->assertSame($this->hufList->id, $pair['source']->id);
+        $this->assertSame($this->list->id, $pair['target']->id);
+        $result = app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+        $this->assertSame(1, $result['price_lists']);
+    }
+
+    public function test_all_recalculation_rejects_stale_target_selections_without_writes(): void
+    {
+        $target = $this->makeSameCurrencyTarget('RETAIL-SK');
+        $target->update(['active' => false]);
+        try {
+            app(ForeignRetailCalculationService::class)->recalculateAll($this->project, [$target->id => $this->hufList->id]);
+            $this->fail('An inactive target cannot remain in the submitted plan.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('időközben megváltoztak', $exception->getMessage());
+        }
+        $this->assertSame(0, PricingCalculationRow::where('price_list_id', $this->list->id)->count());
+    }
+
+    public function test_all_recalculation_rejects_invalid_huf_sources_before_any_writes(): void
+    {
+        $czk = $this->makeList('CZK', 16);
+        try {
+            app(ForeignRetailCalculationService::class)->recalculateAll($this->project, [
+                $this->list->id => $this->hufList->id, $czk->id => $this->list->id,
+            ]);
+            $this->fail('A foreign target cannot be used as a HUF source.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('már nem választható', $exception->getMessage());
+        }
+        $this->assertSame(0, PricingCalculationRow::where('price_list_id', $this->list->id)->count());
+    }
+
+    public function test_all_recalculation_rechecks_project_status_from_the_database(): void
+    {
+        PricingProject::whereKey($this->project->id)->update(['status' => 'closed']);
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('Lezárt árprojekt');
+        app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+    }
+
+    public function test_all_recalculation_reports_missing_source_or_target_lists(): void
+    {
+        $this->hufList->update(['active' => false]);
+        try {
+            app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+            $this->fail('A missing HUF source must be reported.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('Nincs aktív', $exception->getMessage());
+        }
+        $this->hufList->update(['active' => true]);
+        $this->list->update(['active' => false]);
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('Nincs aktív EUR, CZK, RON vagy PLN');
+        app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+    }
+
+    public function test_all_action_is_hidden_for_archive_and_read_only_roles_and_service_rechecks_permissions(): void
+    {
+        $this->project->update(['status' => 'closed']);
+        Livewire::test(PricingForeignRetailCalculations::class)->call('setPricingArchive', true)
+            ->assertActionHidden('calculateAllForeignRetail');
+        $this->project->update(['status' => 'active']);
+        $reader = User::factory()->create();
+        foreach (['ViewAny:PricingCalculationRow', 'View:PricingForeignRetailCalculations'] as $name) {
+            $reader->givePermissionTo(Permission::findOrCreate($name, 'web'));
+        }
+        $this->actingAs($reader);
+        Livewire::test(PricingForeignRetailCalculations::class)->assertActionHidden('calculateAllForeignRetail');
+        $this->expectException(AuthorizationException::class);
+        app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+    }
+
+    public function test_all_recalculation_preserves_manual_approved_prices_and_reports_totals(): void
+    {
+        $this->calculate();
+        $review = app(RetailPriceReviewService::class);
+        $review->setManualPrice($this->retail(), 3.95);
+        $review->approveCurrentPrice($this->retail());
+        $czk = $this->makeList('CZK', 16);
+        ExchangeRate::where('currency_id', $this->list->currency_id)->update(['rate_to_huf' => 300]);
+        $result = app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+        $this->assertSame(2, $result['price_lists']);
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, $result['updated']);
+        $this->assertSame(1, $result['requires_review']);
+        $this->assertSame('3.9500', $this->retail()->final_price);
+        $this->assertTrue($this->retail()->requires_review);
+        $this->assertNotNull($this->retail($czk));
+    }
+
+    public function test_failed_row_inputs_are_reported_under_the_same_batch_run_id(): void
+    {
+        $czk = $this->makeList('CZK', 16);
+        ExchangeRate::where('currency_id', $czk->currency_id)->delete();
+        $result = app(ForeignRetailCalculationService::class)->recalculateAll($this->project);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame(1, $result['created']);
+        $this->assertDatabaseHas('pricing_calculation_errors', ['run_id' => $result['run_id']]);
+    }
+
+    public function test_unexpected_batch_failure_rolls_back_prices_from_previously_processed_lists(): void
+    {
+        $this->makeList('CZK', 16);
+        $service = new class(app(ForeignRetailCalculator::class), app(RetailCalculationDependencyService::class)) extends ForeignRetailCalculationService
+        {
+            private int $calls = 0;
+
+            public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null): array
+            {
+                if (++$this->calls === 2) {
+                    throw new \RuntimeException('Unexpected failure');
+                }
+
+                return parent::recalculate($project, $sourceList, $targetList, $runId);
+            }
+        };
+        try {
+            $service->recalculateAll($this->project);
+            $this->fail('Unexpected batch errors must propagate.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unexpected failure', $exception->getMessage());
+        }
+        $this->assertSame(0, PricingCalculationRow::whereHas('currency', fn ($query) => $query->where('code', '!=', 'HUF'))->count());
+    }
+
+    private function makeHufSource(string $code): PriceList
+    {
+        $list = $this->hufList->replicate();
+        $list->code = $code;
+        $list->save();
+        app(HufRetailCalculationService::class)->recalculate($this->project, $list);
+
+        return $list;
+    }
+
+    private function makeSameCurrencyTarget(string $code): PriceList
+    {
+        $list = $this->list->replicate();
+        $list->code = $code;
+        $list->save();
+        foreach ([PricingParameter::class, PricingRoundingRule::class] as $class) {
+            foreach ($class::where('price_list_id', $this->list->id)->get() as $setting) {
+                $copy = $setting->replicate();
+                $copy->price_list_id = $list->id;
+                $copy->save();
+            }
+        }
+
+        return $list;
     }
 
     private function calculate(?PriceList $list = null): array

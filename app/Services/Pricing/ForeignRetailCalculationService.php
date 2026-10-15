@@ -18,7 +18,35 @@ class ForeignRetailCalculationService
         private readonly RetailCalculationDependencyService $dependencies,
     ) {}
 
-    public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList): array
+    public function recalculateAll(PricingProject $project, array $sourceSelections = []): array
+    {
+        Gate::authorize('update', $project);
+        Gate::authorize('create', PricingCalculationRow::class);
+        Gate::authorize('update', new PricingCalculationRow);
+
+        return DB::transaction(function () use ($project, $sourceSelections): array {
+            $project = PricingProject::query()->lockForUpdate()->findOrFail($project->id);
+            if (! $project->isOpenForPricing()) {
+                throw new DomainException('Lezárt árprojekt nem számítható újra.');
+            }
+            // Resolve and validate every pair before the first price is changed.
+            $pairs = app(ForeignRetailPriceListResolver::class)->resolveAll($sourceSelections);
+            $result = ['run_id' => (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0,
+                'requires_review' => 0, 'price_lists' => count($pairs), 'pairs' => [], 'errors' => []];
+            foreach ($pairs as $pair) {
+                $run = $this->recalculate($project, $pair['source'], $pair['target'], $result['run_id']);
+                foreach (['created', 'updated', 'skipped', 'requires_review'] as $key) {
+                    $result[$key] += $run[$key];
+                }
+                $result['pairs'][] = $pair['source']->code.' → '.$pair['target']->code;
+                $result['errors'] = [...$result['errors'], ...$run['errors']];
+            }
+
+            return $result;
+        });
+    }
+
+    public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null): array
     {
         Gate::authorize('update', $project);
         Gate::authorize('create', PricingCalculationRow::class);
@@ -30,7 +58,7 @@ class ForeignRetailCalculationService
             || ! in_array($targetList->currency?->code, ForeignRetailCalculator::CURRENCIES, true)) {
             throw new DomainException('Nem lezárt árprojekt, aktív HUF forrás- és devizás célárlista szükséges.');
         }
-        $result = ['run_id' => (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0, 'requires_review' => 0, 'errors' => []];
+        $result = ['run_id' => $runId ?? (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0, 'requires_review' => 0, 'errors' => []];
 
         return DB::transaction(function () use ($project, $sourceList, $targetList, $result): array {
             $project = PricingProject::query()->lockForUpdate()->findOrFail($project->id);
