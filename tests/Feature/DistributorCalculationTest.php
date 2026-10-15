@@ -3,15 +3,21 @@
 namespace Tests\Feature;
 
 use App\Exports\AdminTableExport;
+use App\Exports\PartnerOrderMatrixExport;
+use App\Exports\PartnerOrderSummaryMatrixExport;
 use App\Filament\Pages\PriceListImport;
 use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Resources\PriceLists\Pages\CreatePriceList;
+use App\Filament\Resources\PriceLists\Pages\EditPriceList;
 use App\Filament\Resources\PricingCalculationRows\Pages\EditPricingCalculationRow;
+use App\Livewire\Partner\CatalogGroupOrder;
 use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
+use App\Models\Order;
 use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Models\PricingProject;
@@ -28,6 +34,7 @@ use App\Services\Pricing\WholesaleCalculationService;
 use App\Services\Pricing\WholesalePriceReviewService;
 use DomainException;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -297,9 +304,10 @@ class DistributorCalculationTest extends TestCase
     public function test_price_list_form_creates_valid_eur_distributor_sources_and_rejects_huf(): void
     {
         $data = ['code' => 'DIST_FORM', 'name_hu' => 'Disztribútor', 'type' => 'distributor', 'currency_id' => $this->whole->currency_id,
-            'source_wholesale_price_list_id' => $this->whole->id, 'active' => true];
+            'source_wholesale_price_list_id' => $this->whole->id, 'retail_price_list_id' => $this->retail->id, 'active' => true];
         Livewire::test(CreatePriceList::class)->fillForm($data)->call('create')->assertHasNoFormErrors();
-        $this->assertDatabaseHas('price_lists', ['code' => 'DIST_FORM', 'source_wholesale_price_list_id' => $this->whole->id]);
+        $this->assertDatabaseHas('price_lists', ['code' => 'DIST_FORM', 'source_wholesale_price_list_id' => $this->whole->id,
+            'retail_price_list_id' => $this->retail->id]);
         $data['code'] = 'DIST_BAD';
         $data['currency_id'] = Currency::where('code', 'HUF')->firstOrFail()->id;
         Livewire::test(CreatePriceList::class)->fillForm($data)->call('create')->assertHasFormErrors(['currency_id']);
@@ -318,16 +326,105 @@ class DistributorCalculationTest extends TestCase
             }
         };
         $page->headers([
-            ['code' => 'DIST_FORWARD', 'name_hu' => 'Disztribútor', 'type' => 'distributor', 'currency_code' => 'EUR', 'active' => 1, 'source_wholesale_price_list_code' => 'WHOLE_FORWARD'],
+            ['code' => 'DIST_FORWARD', 'name_hu' => 'Disztribútor', 'type' => 'distributor', 'currency_code' => 'EUR', 'active' => 1,
+                'source_wholesale_price_list_code' => 'WHOLE_FORWARD', 'retail_price_list_code' => 'RETAIL_FORWARD'],
             ['code' => 'WHOLE_FORWARD', 'name_hu' => 'Nagyker', 'type' => 'wholesale', 'currency_code' => 'EUR', 'active' => 1, 'retail_price_list_code' => 'RETAIL_EU'],
+            ['code' => 'RETAIL_FORWARD', 'name_hu' => 'Kisker', 'type' => 'retail', 'currency_code' => 'EUR', 'active' => 1],
         ]);
         $this->assertSame([], $page->rowValidationErrors);
         $source = PriceList::where('code', 'WHOLE_FORWARD')->firstOrFail();
         $this->assertSame($source->id, PriceList::where('code', 'DIST_FORWARD')->firstOrFail()->source_wholesale_price_list_id);
+        $this->assertSame(PriceList::where('code', 'RETAIL_FORWARD')->value('id'), PriceList::where('code', 'DIST_FORWARD')->value('retail_price_list_id'));
+        $this->target->update(['retail_price_list_id' => $this->retail->id]);
         $page->headers([['code' => 'DIST_EU', 'name_hu' => 'Frissített név', 'type' => 'distributor', 'currency_code' => 'EUR', 'active' => 1]]);
+        $this->assertSame($this->whole->id, $this->target->fresh()->source_wholesale_price_list_id);
+        $this->assertSame($this->retail->id, $this->target->fresh()->retail_price_list_id);
+        $page->headers([['code' => 'DIST_EU', 'name_hu' => 'Frissített név', 'type' => 'distributor', 'currency_code' => 'EUR', 'active' => 1,
+            'retail_price_list_code' => '']]);
+        $this->assertNull($this->target->fresh()->retail_price_list_id);
         $this->assertSame($this->whole->id, $this->target->fresh()->source_wholesale_price_list_id);
         $page->headers([['code' => 'DIST_INVALID', 'name_hu' => 'Hibás', 'type' => 'distributor', 'currency_code' => 'HUF', 'active' => 1]]);
         $this->assertDatabaseMissing('price_lists', ['code' => 'DIST_INVALID']);
+    }
+
+    public function test_editing_a_legacy_wholesale_list_to_distributor_preserves_both_links(): void
+    {
+        $legacy = PriceList::create(['code' => 'LEGACY_DIST', 'name_hu' => 'Régi disztribútor', 'type' => 'wholesale',
+            'currency_id' => $this->whole->currency_id, 'retail_price_list_id' => $this->retail->id, 'active' => true]);
+        $page = Livewire::test(EditPriceList::class, ['record' => $legacy->getRouteKey()]);
+        $page->set('data.type', 'distributor')
+            ->assertSet('data.retail_price_list_id', $this->retail->id)
+            ->assertFormFieldIsVisible('retail_price_list_id')
+            ->assertFormFieldIsVisible('source_wholesale_price_list_id')
+            ->fillForm(['source_wholesale_price_list_id' => $this->whole->id])
+            ->call('save')->assertHasNoFormErrors();
+        $this->assertSame('distributor', $legacy->fresh()->type);
+        $this->assertSame($this->retail->id, $legacy->fresh()->retail_price_list_id);
+        $this->assertSame($this->whole->id, $legacy->fresh()->source_wholesale_price_list_id);
+        // Ordinary model saves must also retain the portal's independent retail link.
+        $legacy->fresh()->update(['name_hu' => 'Új név']);
+        $this->assertSame($this->retail->id, $legacy->fresh()->retail_price_list_id);
+    }
+
+    public function test_distributor_discount_uses_wholesale_even_with_a_different_display_retail_list(): void
+    {
+        $display = PriceList::create(['code' => 'DISPLAY_RETAIL', 'name_hu' => 'Megjelenítési kisker', 'type' => 'retail',
+            'currency_id' => $this->whole->currency_id, 'active' => true]);
+        $this->target->update(['retail_price_list_id' => $display->id]);
+        // A wholesale multiplier exists only for the WHOLE_EU source, not the distributor target.
+        PricingParameter::where('parameter_type', 'wholesale_margin')->update(['price_list_id' => $this->whole->id]);
+        $this->assertSame(1, $this->calculate()['created']);
+        $this->assertSame('1.9800', $this->row()->base_price);
+        $this->assertSame('1.5800', $this->row()->final_price);
+        $this->assertSame($this->whole->id, $this->row()->sourceWholesaleRow->price_list_id);
+        $this->assertSame($display->id, $this->target->fresh()->retail_price_list_id);
+    }
+
+    public function test_type_conversion_preserves_partner_shared_page_and_excel_prices(): void
+    {
+        $this->target->update(['type' => 'wholesale', 'retail_price_list_id' => $this->retail->id]);
+        $product = $this->source()->product;
+        Color::create(['product_id' => $product->id, 'code' => 'BLACK', 'name_hu' => 'Fekete', 'active' => true]);
+        foreach ([[$this->target, 1.45], [$this->retail, 4.95]] as [$list, $price]) {
+            PriceListItem::create(['price_list_id' => $list->id, 'product_id' => $product->id,
+                'season_id' => $this->project->season_id, 'net_price' => $price]);
+        }
+        $published = DB::table('price_list_items')->orderBy('id')->get()->toArray();
+        $order = new Order(['season_id' => $this->project->season_id, 'price_list_id' => $this->target->id,
+            'reference_number' => 'TEST-DISTRIBUTOR']);
+        $portal = new class extends CatalogGroupOrder
+        {
+            public function displayedProduct(Product $product, int $priceListId): array
+            {
+                $this->setDisplayPriceList($priceListId);
+
+                return $this->formatProduct($product);
+            }
+        };
+        $portal->order = $order;
+        $beforePortal = $portal->displayedProduct($product, $this->target->id);
+        $beforeExport = (new PartnerOrderMatrixExport($order))->array();
+        $beforeSummary = (new PartnerOrderSummaryMatrixExport(new Collection([$order])))->array();
+
+        $this->target->update(['type' => 'distributor', 'source_wholesale_price_list_id' => $this->whole->id]);
+
+        $this->assertSame($beforePortal, $portal->displayedProduct($product, $this->target->id));
+        $this->assertSame(1.45, $beforePortal['price']);
+        $this->assertSame(4.95, $beforePortal['retail_price']);
+        $portal->sharedMode = true;
+        $this->assertSame($beforePortal, $portal->displayedProduct($product, $this->target->id));
+        $afterExport = (new PartnerOrderMatrixExport($order))->array();
+        $this->assertSame($beforeExport, $afterExport);
+        $this->assertSame($beforeSummary, (new PartnerOrderSummaryMatrixExport(new Collection([$order])))->array());
+        $exportRow = collect($afterExport)->first(fn ($row) => ($row[2] ?? null) === $product->model_code);
+        $this->assertNotNull($exportRow);
+        $this->assertSame(1.45, $exportRow[6]);
+        $this->assertSame(4.95, $exportRow[7]);
+        $this->assertEquals($published, DB::table('price_list_items')->orderBy('id')->get()->toArray());
+        $this->calculate();
+        $this->assertSame('1.5800', $this->row()->final_price);
+        $this->assertEquals($published, DB::table('price_list_items')->orderBy('id')->get()->toArray());
+        $this->assertSame($beforePortal, $portal->displayedProduct($product, $this->target->id));
     }
 
     public function test_migration_adds_nullable_source_and_discount_fields_without_rewriting_prices(): void

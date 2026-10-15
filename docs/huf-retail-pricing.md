@@ -1,5 +1,101 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Kalkulációs hibanapló szűrése és törlése (2026-10-15)
+
+Az **Árképzés → Árkalkulációs hibák** oldal alapból minden ártípust mutat,
+nincs automatikus Bekerülési érték szűrés. A kézi ártípusválasztóban a
+bekerülési, kisker-, nagyker- és disztribútori típus is elérhető, és külön
+Ártípus oszlop azonosítja a sorokat. A legfrissebb bejegyzések maradnak elöl.
+
+A soronkénti **Törlés**, illetve kijelölés után a **Kijelölt hibák törlése**
+művelet megerősítést kér. Csak a kiválasztott hibanapló-bejegyzéseket törli,
+véglegesen; kalkulációt, árat, árprojektet nem módosít. Ez nem hibajavítás,
+a következő hibás kalkuláció újra létrehozhat naplóbejegyzést.
+
+A meglévő jogosultságok érvényesek: egyedi törléshez
+`Delete:PricingCalculationError`, tömegeshez `DeleteAny:PricingCalculationError`.
+A megtekintési jog önmagában egyik törlést sem engedi; az egyedi és tömeges
+jog egymástól független. Nem kell policy- vagy Shield-újragenerálás.
+
+Ellenőrzés: **19 célzott teszt, 181 assertion sikeres** (hibalista és árképzési
+jogosultságok). Lefedett: minden ártípus alapból látható és kézzel szűrhető,
+egyedi/tömeges megerősítés, csak a kijelölt napló törlése, kalkulált/manuális
+árak megőrzése, csak olvasó felhasználó elutasítása közvetlen akcióhívásnál is.
+
+**Nincs új migráció, Composer install, npm build, kézi feltöltés vagy .env
+módosítás.** Szükség esetén a nem super_admin szerepkörnek a fenti törlési
+jogokat kell megadni. A fejlesztés önmagában nem töröl meglévő NAS-adatokat.
+
+Git/NAS, csak külön telepítési kéréskor (az előző, külön megőrzött
+disztribútori javítás fájljait ez a szűk staginglista nem tartalmazza):
+
+```powershell
+git add -- app/Filament/Resources/PricingCalculationErrors/Tables/PricingCalculationErrorsTable.php tests/Feature/PricingCalculationErrorsTest.php docs/huf-retail-pricing.md
+git commit -m "Show all pricing errors and allow authorized individual and bulk deletion"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+A NAS-telepítő tiszta, commitolt munkafát vár: az előző disztribútori
+javítást is rendezni kell a telepítés előtt, kihagyásával nem indul a deploy.
+A két fejlesztés közös dokumentációs fájlban szerepel.
+WePanel csak külön jóváhagyás és az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+## Disztribútori kisker kapcsolat megőrzése (2026-10-15)
+
+Javítás: disztribútori típus mentésekor a modell többé nem törli a
+`retail_price_list_id` mezőt. A **Kapcsolt kisker árlista** a nagyker és
+disztribútori típusnál egyaránt látható/szerkeszthető; e két típus közötti
+váltáskor a meglévő érték megmarad. Ez a partnerportál, megosztott rendelőlap,
+összesítők és Excel-exportok kisker árának önálló megjelenítési kapcsolata.
+A `source_wholesale_price_list_id` ettől független, csak a disztribútori
+kalkuláció nettó nagyker forrása. Nem vezetjük le és nem cseréljük ki
+automatikusan a megjelenítési kisker kapcsolatot a nagyker forrásból.
+
+Ellenőrzés: **57 célzott teszt, 354 assertion sikeres** (disztribútor, nagyker,
+árlistatörzs/szezon). A típusváltás előtti és utáni partneroldali termékadatok,
+megosztott mód, rendelőlap- és összesítő Excel-adattömbök megegyeznek;
+a publikált árlistatételek kalkuláció után is változatlanok. Külön teszt
+ellenőrzi, hogy eltérő megjelenítési kisker lista mellett is a kapcsolt nagyker
+nettó ára a disztribútori alap, saját nagyker szorzó nélkül.
+
+Az árlistafej-import mindkét kapcsolatot kezeli, előrehivatkozással is.
+A hiányzó `retail_price_list_code` oszlop nem törli a meglévő kapcsolatot;
+a jelen lévő, kifejezetten üres cella viszont továbbra is törlési szándék.
+A meglévő `price_list_items` árak változatlanok maradnak, a kalkuláció nem publikál.
+
+**Ehhez a javításhoz nincs új migráció, Composer install, npm build, kézi
+fájlfeltöltés vagy .env módosítás.** A korábbi disztribútori migráció továbbra is
+előfeltétel, a NAS-on már lefutott. A javítás önmagában nem állít át árlistát
+és nem futtat kalkulációt. Telepítés után külön, ellenőrzött adatbeállítás kell:
+`Distributor_EUR` típusa distributor, a meglévő `Retail_SK` megjelenítési
+kapcsolat megtartásával és `Wholesale_EU` kalkulációs forrással. Ha valaki már
+korábban átállított egy árlistát, a törölt kisker kapcsolatot a javítás nem
+találja ki automatikusan; azt ellenőrzött előzményből kell visszaállítani.
+
+Csak külön jóváhagyott NAS-telepítéskor a pricing worktree-ben:
+
+```powershell
+git add -- app/Models/PriceList.php app/Filament/Resources/PriceLists/Schemas/PriceListForm.php app/Filament/Pages/PriceListImport.php tests/Feature/DistributorCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Preserve distributor retail display links independently of pricing sources"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedéllyel, éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## EUR disztribútori árak a nagyker munkalapon (2026-10-15)
 
 Az **Árképzés → Nagyker árak → EUR** fülön a nagyker sor mellett külön,

@@ -4,6 +4,9 @@ namespace App\Filament\Resources\PricingCalculationErrors\Tables;
 
 use App\Models\PricingCalculationError;
 use App\Models\PricingCalculationRow;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -26,6 +29,9 @@ class PricingCalculationErrorsTable
                     ->tooltip(fn (PricingCalculationError $record): string => $record->run_id),
                 TextColumn::make('pricingProject.name')
                     ->label('Árprojekt'),
+                TextColumn::make('price_type')
+                    ->label('Ártípus')
+                    ->formatStateUsing(fn (string $state): string => self::priceTypes()[$state] ?? $state),
                 TextColumn::make('severity')
                     ->label('Szint')
                     ->badge()
@@ -50,10 +56,7 @@ class PricingCalculationErrorsTable
                     ->preload(),
                 SelectFilter::make('price_type')
                     ->label('Ártípus')
-                    ->options([
-                        PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
-                    ])
-                    ->default(PricingCalculationRow::TYPE_COST),
+                    ->options(self::priceTypes()),
                 SelectFilter::make('severity')
                     ->label('Szint')
                     ->options([
@@ -64,6 +67,26 @@ class PricingCalculationErrorsTable
             ->defaultSort('created_at', 'desc')
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
-            ->recordActions([ViewAction::make()]);
+            ->recordActions([
+                ViewAction::make(),
+                DeleteAction::make()->label('Törlés')
+                    ->modalDescription('Csak a hibanapló bejegyzése törlődik, a kalkuláció és az árak nem változnak. A törlés nem vonható vissza.'),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()->label('Kijelölt hibák törlése')
+                        ->modalDescription('A kijelölt hibanapló-bejegyzések végleg törlődnek. A kalkulációk és az árak nem változnak.'),
+                ]),
+            ]);
+    }
+
+    private static function priceTypes(): array
+    {
+        return [
+            PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
+            PricingCalculationRow::TYPE_RETAIL => 'Kisker',
+            PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
+            PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
+        ];
     }
 }

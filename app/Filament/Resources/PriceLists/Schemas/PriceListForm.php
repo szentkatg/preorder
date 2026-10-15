@@ -43,7 +43,7 @@ class PriceListForm
                     ->required()
                     ->live()
                     ->afterStateUpdated(function ($state, $set) {
-                        if ($state !== 'wholesale') {
+                        if (! in_array($state, ['wholesale', 'distributor'], true)) {
                             $set('retail_price_list_id', null);
                         }
                         if ($state !== 'distributor') {
@@ -75,8 +75,9 @@ class PriceListForm
                     ->searchable()
                     ->preload()
                     ->nullable()
-                    ->visible(fn ($get) => $get('type') === 'wholesale')
-                    ->dehydrated(fn ($get) => $get('type') === 'wholesale'),
+                    ->visible(fn ($get) => in_array($get('type'), ['wholesale', 'distributor'], true))
+                    ->dehydrated(fn ($get) => in_array($get('type'), ['wholesale', 'distributor'], true))
+                    ->helperText('A partnerportálon és az exportban megjelenő kisker árak forrása. Disztribútornál nem ez, hanem a külön megadott nagyker árlista a kalkuláció alapja.'),
 
                 Select::make('source_wholesale_price_list_id')->label('Forrás EUR nagyker árlista')
                     ->options(fn () => PriceList::query()->where('type', 'wholesale')->where('active', true)

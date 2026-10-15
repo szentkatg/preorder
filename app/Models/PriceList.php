@@ -23,8 +23,6 @@ class PriceList extends Model
         static::saving(function (PriceList $list): void {
             if ($list->type !== 'distributor') {
                 $list->source_wholesale_price_list_id = null;
-            } else {
-                $list->retail_price_list_id = null;
             }
         });
         static::updated(function (PriceList $list): void {

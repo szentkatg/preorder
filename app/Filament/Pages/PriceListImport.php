@@ -404,7 +404,9 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
                 'name_en' => $this->nullIfEmpty($row['name_en'] ?? null),
                 'type' => $this->nullIfEmpty($row['type'] ?? null) ?: 'wholesale',
                 'currency_id' => $currencyCode ? $currencies->get($currencyCode)?->id : null,
-                'retail_price_list_id' => $retailPriceListCode ? $priceLists->get($retailPriceListCode)?->id : null,
+                'retail_price_list_id' => array_key_exists('retail_price_list_code', $row)
+                    ? ($retailPriceListCode ? $priceLists->get($retailPriceListCode)?->id : null)
+                    : $priceList->retail_price_list_id,
                 'active' => $this->boolValue($row['active'] ?? true),
             ]);
 
@@ -421,7 +423,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             if (! $code || $this->isInvalidPriceList($code)) {
                 continue;
             }
-            if (($row['type'] ?? null) === 'wholesale' && array_key_exists('retail_price_list_code', $row)) {
+            if (in_array($row['type'] ?? null, ['wholesale', 'distributor'], true) && array_key_exists('retail_price_list_code', $row)) {
                 $retailCode = $this->nullIfEmpty($row['retail_price_list_code']);
                 $priceLists->get($code)?->update(['retail_price_list_id' => $retailCode ? $priceLists->get($retailCode)?->id : null]);
             }
