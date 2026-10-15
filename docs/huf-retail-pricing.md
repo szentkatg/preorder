@@ -1,5 +1,62 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Külön nagyker és disztribútori menü, tördelhető fejlécek (2026-10-15)
+
+Ez a lépés felváltja a lentebb dokumentált, korábbi összevont EUR munkalapot:
+
+- **Árképzés → Nagyker árak**: HUF/EUR, csak nagyker szerkesztés,
+  újraszámítás, jóváhagyás és nagyker oszlopok. Nem szűkíti disztribútori
+  választás a nagyker sorokat; disztribútori művelet vagy oszlop nincs itt.
+- **Árképzés → Disztribútori árak** (`/admin/pricing-distributor-calculations`):
+  külön EUR munkalap, saját árlistaválasztóval, oszlopokkal, egyedi/tömeges
+  jóváhagyással és újraszámítással. A forrás nettó nagyker ár csak olvasható;
+  a nagyker szerkesztés/jóváhagyás a háttérben hívható akciók között sem szerepel.
+  Még ki nem számolt disztribútori tételeknél is látszhat a nagyker forrássor.
+  Több célárlistánál választásig nem listázunk összekevert tételeket.
+
+A számítási képletek, tárolt kalkulációk, jóváhagyások és a partnerportál
+publikált árai nem változnak. A disztribútori tizedesek és szélességek az első
+megnyitáskor átvehetők a régi közös beállításból, utána a két oldal beállításai
+külön tárolódnak. A személyes EUR ÁFA-összehasonlítás közös marad; változtatása
+nem írja át a másik oldal pénznem-/árlistaválasztását.
+
+A bekerülési, HUF kisker, devizás kisker, nagyker és disztribútori oldalak
+közös átméretezhető táblázatában a fejléc normál szóközöknél több sorra törik,
+szükség esetén egy hosszú szó is törhető. A rendezhető címke és a rendezési
+ikon is az oszlop szélességén belül marad. A fejléc magassága automatikus,
+a tördelés nem növeli vissza a mentett oszlopszélességet. A soradatok továbbra
+is kompaktak, egysorosak; az átméretezés és a vízszintes görgetés megmarad.
+
+Ellenőrzés: **96 kapcsolódó teszt, 813 assertion sikeres** (nagyker,
+disztribútor, önálló oldaljogok, tizedesek, projektkontextus, jogosultságok és
+payload-regresszió). Mind az öt valódi Filament-nézetből készült helyi
+böngészős ellenőrzés: 110 px-es oszlopoknál a hosszabb fejlécek több sorra
+törtek; a nagyker és disztribútori képernyőképet külön is ellenőriztük.
+
+**Nincs új adatbázis-migráció, Composer install, npm build, kézi feltöltés
+vagy .env módosítás.** Új oldaljog: **View:PricingDistributorCalculations**.
+A super_admin automatikusan eléri; más szerepkörnek ezt külön kell megadni
+az Oldalak fülön. A nagyker oldaljog önmagában már nem ad disztribútori
+hozzáférést. A kalkulációs sorok/projekt szokásos ViewAny/View/Update/Create
+jogai továbbra is szükségesek. Shield- és policy-újragenerálás nem kell.
+
+Git/NAS a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/PricingWholesaleCalculations.php app/Filament/Pages/PricingDistributorCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/WholesaleCalculationsTable.php app/Filament/Resources/PricingCalculationRows/Tables/DistributorCalculationsTable.php app/Filament/Support/Concerns/HasPricingVatComparison.php resources/views/filament/pages/pricing-cost-calculations.blade.php tests/Feature/DistributorCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Separate distributor pricing workspace and wrap resizable pricing headers"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+WePanel csak külön engedéllyel, az éles ágba integrálás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Kalkulációs hibanapló szűrése és törlése (2026-10-15)
 
 Az **Árképzés → Árkalkulációs hibák** oldal alapból minden ártípust mutat,

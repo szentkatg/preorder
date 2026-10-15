@@ -71,6 +71,7 @@
                             aria-label="EUR kisker ár ÁFA százalék" style="width:9rem;border:1px solid currentColor;border-radius:.375rem;padding:.25rem .5rem;background:transparent">
                     </label>
                     @error('eurVatPercent') <span role="alert">{{ $message }}</span> @enderror
+                    @if (method_exists($this, 'selectDistributorPriceList'))
                     <label data-distributor-price-list-panel>
                         <span>Disztribútori árlista</span>
                         <select wire:change="selectDistributorPriceList($event.target.value)" wire:loading.attr="disabled">
@@ -86,6 +87,9 @@
                         <span>Forrás: {{ $this->selectedDistributorPriceList->sourceWholesalePriceList?->code }} — csak ennek a nagyker árlistának a sorai. ÁFA csak az összehasonlításhoz.</span>
                     @else
                         <span>Válassz disztribútori árlistát, vagy hozz létre újat az Árlisták törzsben. ÁFA csak az összehasonlításhoz; felhasználónként megjegyezzük.</span>
+                    @endif
+                    @else
+                        <span>Az ÁFA csak az összehasonlításhoz szolgál; felhasználónként megjegyezzük.</span>
                     @endif
                 @else
                     <span>HUF kisker ár nettósítása: 27% ÁFA — csak a nettó/nettó szorzóhoz.</span>
@@ -226,6 +230,31 @@
             position: relative;
             padding-block: 0.25rem;
             line-height: 1.25rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            text-overflow: clip;
+            vertical-align: bottom;
+        }
+
+        /* Sortable headings contain a text node and icons. Inline flow lets the
+           label wrap inside a fixed-width column without enlarging the column. */
+        [data-pricing-resizable-columns] .fi-ta-header-cell-sort-btn {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            text-align: inherit;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-header-cell-tooltip {
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        [data-pricing-resizable-columns] .fi-ta-header-cell-sort-btn > svg {
+            display: inline-block;
+            vertical-align: middle;
         }
 
         [data-pricing-resizable-columns] th[data-pricing-average-multiplier]::before {

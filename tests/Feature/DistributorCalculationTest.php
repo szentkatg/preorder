@@ -6,11 +6,16 @@ use App\Exports\AdminTableExport;
 use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\PartnerOrderSummaryMatrixExport;
 use App\Filament\Pages\PriceListImport;
+use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Pages\PricingDistributorCalculations;
+use App\Filament\Pages\PricingForeignRetailCalculations;
+use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Resources\PriceLists\Pages\CreatePriceList;
 use App\Filament\Resources\PriceLists\Pages\EditPriceList;
 use App\Filament\Resources\PricingCalculationRows\Pages\EditPricingCalculationRow;
 use App\Livewire\Partner\CatalogGroupOrder;
+use App\Models\AdminUiPreference;
 use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
@@ -32,6 +37,7 @@ use App\Services\Pricing\ForeignRetailCalculationService;
 use App\Services\Pricing\HufRetailCalculationService;
 use App\Services\Pricing\WholesaleCalculationService;
 use App\Services\Pricing\WholesalePriceReviewService;
+use BezhanSalleh\FilamentShield\Facades\FilamentShield;
 use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -202,11 +208,17 @@ class DistributorCalculationTest extends TestCase
         $this->assertSame('1.5800', $this->row()->final_price);
     }
 
-    public function test_eur_grid_shows_child_columns_while_huf_has_none(): void
+    public function test_distributor_workspace_is_separate_from_both_wholesale_currencies(): void
     {
-        $page = Livewire::test(PricingWholesaleCalculations::class);
-        $this->assertNull($page->instance()->getTable()->getColumn('distributor_final_price'));
-        $page->assertActionHidden('calculateDistributor')->call('selectWholesaleCurrency', 'EUR');
+        $wholesale = Livewire::test(PricingWholesaleCalculations::class);
+        $this->assertNull($wholesale->instance()->getTable()->getColumn('distributor_final_price'));
+        $wholesale->assertActionDoesNotExist('calculateDistributor')->call('selectWholesaleCurrency', 'EUR');
+        $this->assertNull($wholesale->instance()->getTable()->getColumn('distributor_final_price'));
+        $wholesale->assertDontSee('data-distributor-price-list-panel', false);
+        $page = Livewire::test(PricingDistributorCalculations::class)->assertSuccessful();
+        $page->assertActionDoesNotExist('calculateWholesale')->assertActionDoesNotExist('calculateAllWholesale')
+            ->assertTableActionDoesNotExist('approveRetail')->assertTableBulkActionDoesNotExist('approveRetailBulk');
+        $this->assertNull($page->instance()->getTable()->getColumn('manual_price'));
         $this->assertSame($this->target->id, $page->instance()->distributorPriceListId);
         $page->assertActionVisible('calculateDistributor')->callAction('calculateDistributor')->assertHasNoErrors();
         $this->assertSame('1.5800', $this->row()->final_price);
@@ -220,7 +232,10 @@ class DistributorCalculationTest extends TestCase
         $this->calculate();
         app(WholesalePriceReviewService::class)->approveCurrentPrice($this->source());
         $before = $this->source()->getAttributes();
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
+        $page->call('updateTableColumnState', 'manual_price', (string) $this->source()->id, '99');
+        $page->call('updateTableColumnState', 'final_price', (string) $this->source()->id, '99');
+        $this->assertSame($before, $this->source()->getAttributes());
         $page->call('updateTableColumnState', 'distributor_manual_price', (string) $this->source()->id, '1.4')->assertHasNoErrors();
         $this->assertSame('1.4000', $this->row()->final_price);
         $this->assertSame($before, $this->source()->getAttributes());
@@ -240,20 +255,20 @@ class DistributorCalculationTest extends TestCase
         $rule->price_list_id = $other->id;
         $rule->save();
         app(DistributorCalculationService::class)->recalculate($this->project);
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
         $this->assertNull($page->instance()->distributorPriceListId);
         $page->assertActionHidden('calculateDistributor')->call('selectDistributorPriceList', $this->target->id);
         $this->assertSame(1, $page->instance()->getTableRecords()->count());
         $page->call('selectDistributorPriceList', $other->id);
         $this->assertSame(1, $page->instance()->getTableRecords()->count());
-        $this->assertSame($other->id, Livewire::test(PricingWholesaleCalculations::class)->instance()->distributorPriceListId);
+        $this->assertSame($other->id, Livewire::test(PricingDistributorCalculations::class)->instance()->distributorPriceListId);
         $this->assertSame(2, PricingCalculationRow::where('price_type', 'distributor')->count());
     }
 
     public function test_child_values_can_be_filtered_sorted_and_exported_as_numbers_without_row_queries(): void
     {
         $this->calculate();
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR')->call('setEurVatPercent', 20);
+        $page = Livewire::test(PricingDistributorCalculations::class)->call('setEurVatPercent', 20);
         $page->sortTable('distributor_final_price')->searchTableColumns(['distributor_final_price' => '1,58'])
             ->assertHasNoErrors()->assertCanSeeTableRecords([$this->source()]);
         $table = $page->instance()->getTable();
@@ -279,7 +294,7 @@ class DistributorCalculationTest extends TestCase
         $this->calculate();
         app(DistributorPriceReviewService::class)->approveCurrentPrice($this->row());
         $before = $this->row()->getAttributes();
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
         $this->assertNull($page->instance()->averageDistributorNetNetMultiplier);
         $page->call('setEurVatPercent', 25);
         $this->assertEqualsWithDelta(4.95 / 1.25 / 1.58, $page->instance()->averageDistributorNetNetMultiplier, 0.0000001);
@@ -290,11 +305,11 @@ class DistributorCalculationTest extends TestCase
     {
         $this->calculate();
         $reader = User::factory()->create();
-        foreach (['View:PricingWholesaleCalculations', 'ViewAny:PricingCalculationRow', 'View:PricingCalculationRow'] as $name) {
+        foreach (['View:PricingDistributorCalculations', 'ViewAny:PricingCalculationRow', 'View:PricingCalculationRow'] as $name) {
             $reader->givePermissionTo(Permission::findOrCreate($name, 'web'));
         }
         $this->actingAs($reader);
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
         $page->assertActionHidden('calculateDistributor')->assertTableBulkActionHidden('approveDistributorBulk');
         $this->assertTrue($page->instance()->getTable()->getColumn('distributor_manual_price')->record($this->source())->isDisabled());
         $this->project->update(['status' => 'closed']);
@@ -452,7 +467,7 @@ class DistributorCalculationTest extends TestCase
     {
         $this->calculate();
         $before = $this->source()->getAttributes();
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
         $page->callTableBulkAction('approveDistributorBulk', [$this->source()], ['approval_status' => 'approved'])
             ->assertHasNoErrors()->assertNotified('Disztribútori tömeges jóváhagyás kész');
         $this->assertSame('approved', $this->row()->status);
@@ -506,8 +521,8 @@ class DistributorCalculationTest extends TestCase
         $other = $this->anotherTarget('DIST_SECOND');
         $other->update(['source_wholesale_price_list_id' => $otherWhole->id]);
         app(DistributorCalculationService::class)->recalculate($this->project);
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
-        $this->assertSame(2, $page->instance()->getTableRecords()->count());
+        $page = Livewire::test(PricingDistributorCalculations::class);
+        $this->assertSame(0, $page->instance()->getTableRecords()->count());
         $page->call('selectDistributorPriceList', $other->id);
         $records = $page->instance()->getTableRecords();
         $this->assertCount(1, $records);
@@ -534,7 +549,7 @@ class DistributorCalculationTest extends TestCase
             $copy->calculated_price = $index === 50 ? 2 : 1;
             $copy->save();
         }
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR')->call('setEurVatPercent', 20)->set('tableRecordsPerPage', 50);
+        $page = Livewire::test(PricingDistributorCalculations::class)->call('setEurVatPercent', 20)->set('tableRecordsPerPage', 50);
         $this->assertSame(50, $page->instance()->getTableRecords()->count());
         $this->assertEqualsWithDelta(201 / 51 / 1.2, $page->instance()->averageDistributorNetNetMultiplier, 0.0000001);
         $page->searchTableColumns(['color.name_hu' => 'Szín 50']);
@@ -546,7 +561,7 @@ class DistributorCalculationTest extends TestCase
         $this->calculate();
         $this->target->update(['active' => false]);
         $this->project->update(['status' => 'closed']);
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR')->call('setPricingArchive', true);
+        $page = Livewire::test(PricingDistributorCalculations::class)->call('setPricingArchive', true);
         $this->assertSame($this->target->id, $page->instance()->selectedDistributorPriceList->id);
         $page->assertCanSeeTableRecords([$this->source()])->assertActionHidden('calculateDistributor')
             ->assertTableActionDisabled('approveDistributor', $this->source());
@@ -584,10 +599,13 @@ class DistributorCalculationTest extends TestCase
         $other = $source->replicate();
         $other->pricing_project_id = $project->id;
         $other->save();
-        $page = Livewire::test(PricingWholesaleCalculations::class)->call('selectWholesaleCurrency', 'EUR');
+        $page = Livewire::test(PricingDistributorCalculations::class);
         $page->call('updateTableColumnState', 'distributor_manual_price', (string) $other->id, '10');
         $this->assertSame('1.5800', $this->row()->final_price);
-        $page->call('selectWholesaleCurrency', 'HUF')->call('updateTableColumnState', 'distributor_manual_price', (string) $source->id, '10');
+        $huf = $source->replicate();
+        $huf->currency_id = Currency::where('code', 'HUF')->value('id');
+        $huf->save();
+        $page->call('updateTableColumnState', 'distributor_manual_price', (string) $huf->id, '10');
         $this->assertSame('1.5800', $this->row()->final_price);
     }
 
@@ -599,6 +617,65 @@ class DistributorCalculationTest extends TestCase
                 ->fillForm(['manual_price' => 99, 'status' => 'approved'])->call('save')->assertHasNoFormErrors();
             $this->assertNull($row->fresh()->manual_price);
             $this->assertSame('calculated', $row->fresh()->status);
+        }
+    }
+
+    public function test_wholesale_and_distributor_page_permissions_are_independent(): void
+    {
+        foreach ([PricingWholesaleCalculations::class, PricingDistributorCalculations::class] as $allowed) {
+            $user = User::factory()->create();
+            $permission = 'View:'.class_basename($allowed);
+            $user->assignRole(Role::findOrCreate('reader_'.class_basename($allowed), 'web'));
+            foreach ([$permission, 'ViewAny:PricingCalculationRow', 'View:PricingCalculationRow'] as $name) {
+                $user->givePermissionTo(Permission::findOrCreate($name, 'web'));
+            }
+            $this->actingAs($user);
+            $this->assertSame($allowed === PricingWholesaleCalculations::class, PricingWholesaleCalculations::canAccess());
+            $this->assertSame($allowed === PricingDistributorCalculations::class, PricingDistributorCalculations::canAccess());
+            $this->get('/admin/pricing-wholesale-calculations')->assertStatus($allowed === PricingWholesaleCalculations::class ? 200 : 403);
+            $this->get('/admin/pricing-distributor-calculations')->assertStatus($allowed === PricingDistributorCalculations::class ? 200 : 403);
+        }
+        $pages = FilamentShield::getPages();
+        $this->assertArrayHasKey('View:PricingDistributorCalculations', $pages[PricingDistributorCalculations::class]['permissions']);
+    }
+
+    public function test_distributor_preferences_are_separate_and_preserve_legacy_widths_precision_and_personal_vat(): void
+    {
+        foreach (['column_widths' => ['distributor-final-price' => 115], 'decimal_places' => ['distributor_final_price' => 2]] as $suffix => $value) {
+            AdminUiPreference::create(['user_id' => auth()->id(), 'preference_key' => 'pricing_wholesale_calculation_'.$suffix, 'value' => $value]);
+        }
+        $wholesale = Livewire::test(PricingWholesaleCalculations::class)->call('setEurVatPercent', 19);
+        $distributor = Livewire::test(PricingDistributorCalculations::class);
+        $this->assertEquals(19, $distributor->instance()->eurVatPercent);
+        $this->assertSame(['distributor-final-price' => 115], $distributor->instance()->pricingColumnWidths);
+        $this->assertSame(2, $distributor->instance()->pricingDecimalPlacesFor('distributor_final_price'));
+        $this->assertNotSame($wholesale->instance()->pricingColumnStorageKey(), $distributor->instance()->pricingColumnStorageKey());
+        $distributor->call('savePricingColumnWidths', ['distributor-final-price' => 90]);
+        $this->assertSame(['distributor-final-price' => 115], Livewire::test(PricingWholesaleCalculations::class)->instance()->pricingColumnWidths);
+        $this->assertSame(['distributor-final-price' => 90], Livewire::test(PricingDistributorCalculations::class)->instance()->pricingColumnWidths);
+        $distributor->call('setEurVatPercent', 21);
+        $this->assertEquals(21, Livewire::test(PricingWholesaleCalculations::class)->instance()->eurVatPercent);
+        $wholesale->call('selectWholesaleCurrency', 'EUR');
+        $this->assertEquals(21, Livewire::test(PricingDistributorCalculations::class)->instance()->eurVatPercent);
+    }
+
+    public function test_distributor_review_filter_uses_child_status_not_wholesale_status(): void
+    {
+        $this->calculate();
+        $this->row()->update(['requires_review' => true]);
+        $page = Livewire::test(PricingDistributorCalculations::class);
+        $page->filterTable('distributor_requires_review', true)->assertCanSeeTableRecords([$this->source()]);
+        $page->filterTable('distributor_requires_review', false)->assertCanNotSeeTableRecords([$this->source()]);
+        $this->assertFalse($this->source()->requires_review);
+    }
+
+    public function test_all_resizable_pricing_workspaces_share_wrapping_headers(): void
+    {
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class, PricingForeignRetailCalculations::class,
+            PricingWholesaleCalculations::class, PricingDistributorCalculations::class] as $page) {
+            Livewire::test($page)->assertSuccessful()->assertSee('data-pricing-resizable-columns', false)
+                ->assertSee('overflow-wrap: anywhere;', false)
+                ->assertSee('.fi-ta-header-cell-sort-btn', false);
         }
     }
 }

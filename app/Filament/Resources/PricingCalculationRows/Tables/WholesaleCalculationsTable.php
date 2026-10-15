@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
-use App\Filament\Support\Actions\DistributorReviewActions;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\WholesalePriceReviewService;
 use Filament\Tables\Columns\TextColumn;
@@ -23,10 +22,6 @@ class WholesaleCalculationsTable
                         'record' => $record, 'vat' => $livewire->wholesaleVatPercent(),
                     ]));
             }
-        }
-        if ($currency === 'EUR') {
-            $table->recordActions([...$table->getRecordActions(), DistributorReviewActions::group()]);
-            $table->toolbarActions([...$table->getToolbarActions(), DistributorReviewActions::bulk()]);
         }
         foreach ($table->getToolbarActions() as $action) {
             if ($action->getName() === 'approveRetailBulk') {
@@ -59,7 +54,6 @@ class WholesaleCalculationsTable
             $shared['pricingRoundingRule.name'], $shared['calculated_price']->label('Kalkulált nettó nagyker '.$currency),
             $shared['manual_price']->label('Manuális nettó '.$currency),
             $shared['final_price']->label('Végleges nettó nagyker '.$currency), $shared['requires_review'], $shared['status'],
-            ...($currency === 'EUR' ? DistributorColumns::make() : []),
         ]);
     }
 
