@@ -41,4 +41,19 @@ class PricingProjectPolicy
     {
         return $authUser->can('DeleteAny:PricingProject');
     }
+
+    public function publish(AuthUser $authUser, PricingProject $project): bool
+    {
+        return $authUser->can('Publish:PricingProjectLifecycle');
+    }
+
+    public function reopen(AuthUser $authUser, PricingProject $project): bool
+    {
+        return $authUser->can('Reopen:PricingProjectLifecycle');
+    }
+
+    public function exportErp(AuthUser $authUser, PricingProject $project): bool
+    {
+        return $authUser->can('Export:PricingProjectLifecycle');
+    }
 }

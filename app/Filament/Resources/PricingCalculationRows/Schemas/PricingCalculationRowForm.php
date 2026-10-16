@@ -86,11 +86,12 @@ class PricingCalculationRowForm
                 Select::make('price_type')
                     ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Ártípus')
-                    ->options([
+                    ->options(fn (?PricingCalculationRow $record) => [
                         PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
                         PricingCalculationRow::TYPE_RETAIL => 'Kisker',
                         PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
                         PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
+                        ...($record?->price_type === 'outlet' ? ['outlet' => 'Outlet'] : []),
                     ])
                     ->required(),
 
@@ -111,6 +112,7 @@ class PricingCalculationRowForm
                 TextInput::make('multiplier')->label('Kalkulációs szorzó / kedvezmény-együttható')->numeric()->disabled(),
                 TextInput::make('source_wholesale_row_id')->label('Forrás nagyker kalkulációs sor')->numeric()->disabled(),
                 TextInput::make('distributor_discount_percent')->label('Disztribútori kedvezmény %')->numeric()->disabled(),
+                TextInput::make('outlet_discount_percent')->label('Outlet minimum kedvezmény %')->numeric()->disabled(),
                 TextInput::make('unrounded_price')->label('Kerekítés előtti ár')->numeric()->disabled(),
                 Select::make('pricing_rounding_rule_id')->label('Kalkuláció kerekítési szabálya')
                     ->relationship('pricingRoundingRule', 'name')->disabled(),
@@ -147,6 +149,7 @@ class PricingCalculationRowForm
             PricingCalculationRow::TYPE_RETAIL => in_array($record->currency?->code, ['HUF', 'EUR', 'CZK', 'RON', 'PLN'], true),
             PricingCalculationRow::TYPE_WHOLESALE => in_array($record->currency?->code, ['HUF', 'EUR'], true),
             PricingCalculationRow::TYPE_DISTRIBUTOR => $record->currency?->code === 'EUR',
+            PricingCalculationRow::TYPE_OUTLET => true,
             default => false,
         };
     }

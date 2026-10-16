@@ -128,7 +128,11 @@ trait HasPricingProjectContext
 
     protected function refreshPricingContextTable(): void
     {
+        unset($this->outletPriceLists);
         unset($this->pricingSelectedProject);
+        if (method_exists($this, 'loadPricingDecimalPlaces')) {
+            $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
+        }
         if (method_exists($this, 'averageRetailMultiplier')) {
             unset($this->averageRetailMultiplier);
         }

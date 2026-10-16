@@ -1,4 +1,9 @@
 <x-filament-panels::page>
+    <style>
+        .partner-price-list-product-filter .fi-fo-checkbox-list-option { gap: .375rem; padding-block: .125rem; }
+        .partner-price-list-product-filter .fi-fo-checkbox-list-option-text { min-width: 0; }
+        .partner-price-list-product-filter .fi-fo-checkbox-list-option-label { white-space: normal; overflow-wrap: anywhere; }
+    </style>
     <form wire:submit="loadProducts" class="space-y-4">
         {{ $this->form }}
         <x-filament::button type="submit" icon="heroicon-o-funnel" wire:loading.attr="disabled">Terméklista betöltése</x-filament::button>

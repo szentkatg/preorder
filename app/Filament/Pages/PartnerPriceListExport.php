@@ -20,6 +20,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\GridDirection;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -80,14 +81,14 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
                 ->required()->searchable()->live()->afterStateUpdated(function ($state, Set $set): void {
                     $list = PriceList::find($state);
                     $retail = $list?->retailPriceList;
-                    $set('retail_price_list_id', $retail?->active && $retail?->type === 'retail' && $retail?->currency_id == $list?->currency_id ? $retail->id : null);
+                    $set('retail_price_list_id', $retail?->active && in_array($retail?->type, ['retail', 'outlet'], true) ? $retail->id : null);
                     $this->clearPreview();
                 }),
-            Select::make('retail_price_list_id')->label('Bruttó kisker árlista (opcionális)')
-                ->options(fn (Get $get) => PriceList::where('active', true)->where('type', 'retail')
-                    ->where('currency_id', PriceList::find($get('price_list_id'))?->currency_id ?? 0)->orderBy('code')->pluck('code', 'id'))
+            Select::make('retail_price_list_id')->label('Bruttó kisker / outlet árlista (opcionális)')
+                ->options(fn () => PriceList::where('active', true)->whereIn('type', ['retail', 'outlet'])->with('currency')->orderBy('code')->get()
+                    ->mapWithKeys(fn ($list) => [$list->id => $list->code.' ('.$list->currency?->code.')']))
                 ->searchable()->live()->afterStateUpdated($invalidate)
-                ->helperText('Alapból a nettó árlistához kapcsolt kisker árlista. Csak azonos pénznem; árfolyam- vagy ÁFA-számítás nem történik.'),
+                ->helperText('Alapból a kapcsolt árlista. Bármely aktív kisker vagy outlet választható, eltérő pénznemben is. Átváltás nem történik.'),
             Select::make('language_id')->label('Fájl nyelve')->options(fn () => Language::where('active', true)
                 ->whereRaw('UPPER(code) IN (?, ?)', PartnerPriceListService::LANGUAGES)->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => strtoupper($row->code).' - '.($row->name_hu ?: $row->name)]))
                 ->required()->live()->afterStateUpdated($invalidate),
@@ -107,10 +108,11 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
 
     private function productFilter(string $name, string $label): CheckboxList
     {
-        return CheckboxList::make($name)->label($label)->searchable()->searchPrompt('Keresés...')->bulkToggleable()->columns(1)
+        return CheckboxList::make($name)->label($label)->searchable()->searchPrompt('Keresés...')->bulkToggleable()->columns(1)->gridDirection(GridDirection::Row)
             ->selectAllAction(fn (Action $action) => $action->label('Mindent kijelöl'))
             ->deselectAllAction(fn (Action $action) => $action->label('Kijelölés visszavonása'))
-            ->extraAttributes(['style' => 'max-height:14rem;overflow-y:auto;']);
+            ->extraAttributes(['class' => 'partner-price-list-product-filter',
+                'style' => 'max-height:12rem;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:minmax(0,1fr);gap:.125rem;align-content:start;']);
     }
 
     private function refreshCatalogSelection(Get $get, Set $set): void

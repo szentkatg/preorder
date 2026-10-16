@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasOutletPricing;
 use App\Filament\Support\Concerns\HasPricingGridInteractions;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
@@ -22,6 +23,7 @@ use Livewire\Attributes\Computed;
 
 class PricingHufRetailCalculations extends Page implements HasTable
 {
+    use HasOutletPricing;
     use HasPageShield {
         canAccess as protected canAccessUsingPagePermission;
     }
@@ -61,8 +63,12 @@ class PricingHufRetailCalculations extends Page implements HasTable
     {
         abort_unless(static::canAccess(), 403);
         $this->initialisePricingProjectContext();
+        unset($this->outletPriceLists);
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
         $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
+        if ($this->outletPriceLists->isNotEmpty()) {
+            $this->resetTable();
+        }
     }
 
     public function pricingWorkspaceDescription(): string
@@ -84,7 +90,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
-        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->pricingDecimalPlacesAction()];
+        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction()];
     }
 
     public function updateTableColumnState(string $column, string $record, mixed $input): mixed
@@ -108,6 +114,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
             'unrounded_price' => 'Kerekítés előtti HUF', 'calculated_price' => 'Kalkulált kisker HUF',
             'final_price' => 'Végleges kisker HUF', 'target_purchase_price' => 'Cél beszerzési ár',
             'previous_season_price' => 'Előző szezon kisker ár',
+            ...$this->outletDecimalColumns(),
         ];
     }
 
@@ -125,7 +132,8 @@ class PricingHufRetailCalculations extends Page implements HasTable
             $table->query(
                 PricingCalculationRow::query()->where('price_type', PricingCalculationRow::TYPE_RETAIL)
                     ->whereHas('currency', fn ($query) => $query->where('code', $this->retailCurrencyCode()))
-                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency', 'retailCostSource'])
+                    ->with(['pricingProject.season', 'product.itemMainGroup', 'color', 'priceList', 'currency', 'pricingRoundingRule', 'supplier', 'purchaseCurrency', 'retailCostSource',
+                        'outletRows' => fn ($query) => $query->whereIn('price_list_id', $this->outletPriceLists->pluck('id'))])
             ),
             PricingCalculationRow::class,
             withViewAction: false,

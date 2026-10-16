@@ -10,6 +10,7 @@ use App\Models\PricingCalculationRow;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\Pricing\DistributorComparison;
+use App\Services\Pricing\OutletComparison;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -97,6 +98,14 @@ class AdminResourceTable
         $column
             ->sortable()
             ->searchable(isIndividual: true);
+
+        if ($modelClass === PricingCalculationRow::class && ($column->getExtraAttributes()['data-pricing-outlet-column'] ?? false)) {
+            $expression = OutletComparison::sql($column->getName());
+            $column->alignEnd()->sortable(query: fn (Builder $query, string $direction) => $query->orderByRaw('('.$expression.') '.($direction === 'desc' ? 'desc' : 'asc')))
+                ->searchable(query: fn (Builder $query, string $search) => $query->whereRaw('CAST(('.$expression.') AS CHAR) LIKE ?', ['%'.str_replace(',', '.', $search).'%']), isIndividual: true);
+
+            return;
+        }
 
         if ($modelClass === PricingCalculationRow::class && ($column->getExtraAttributes()['data-pricing-distributor-column'] ?? false)) {
             $expression = fn ($livewire) => DistributorComparison::sql($column->getName(), $livewire->selectedDistributorPriceList?->id, $livewire->wholesaleVatPercent());

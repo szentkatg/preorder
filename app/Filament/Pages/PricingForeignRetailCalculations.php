@@ -27,10 +27,16 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
     public function mount(): void
     {
         parent::mount();
+        $initialCurrency = $this->retailCurrency;
         $saved = AdminUiPreference::query()->where('user_id', auth()->id())
             ->where('preference_key', 'pricing_foreign_retail_currency')->first()?->value;
         if (in_array($saved['code'] ?? null, ForeignRetailCalculator::CURRENCIES, true)) {
             $this->retailCurrency = $saved['code'];
+        }
+        unset($this->outletPriceLists);
+        if ($this->retailCurrency !== $initialCurrency) {
+            $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
+            $this->resetTable();
         }
     }
 
@@ -40,6 +46,7 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
         abort_unless(in_array($code, ForeignRetailCalculator::CURRENCIES, true), 422);
         $this->clearPricingContextInteractions();
         $this->retailCurrency = $code;
+        unset($this->outletPriceLists);
         AdminUiPreference::updateOrCreate(['user_id' => auth()->id(), 'preference_key' => 'pricing_foreign_retail_currency'], ['value' => ['code' => $code]]);
         $this->refreshPricingContextTable();
     }
@@ -69,7 +76,7 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
 
     protected function getHeaderActions(): array
     {
-        return [CalculateForeignRetailAction::make(), CalculateForeignRetailAction::make(all: true), $this->pricingDecimalPlacesAction()];
+        return [CalculateForeignRetailAction::make(), CalculateForeignRetailAction::make(all: true), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction()];
     }
 
     protected function pricingDecimalColumns(): array
@@ -79,6 +86,6 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
             'multiplier' => 'Effektív országszorzó', 'cost_based_multiplier' => 'Bekerülési szorzó',
             'calculation_multiplier' => 'Kalkulációs országszorzó',
             'unrounded_price' => 'Kerekítés előtti ár', 'calculated_price' => 'Kalkulált kisker',
-            'final_price' => 'Végleges kisker', 'previous_season_price' => 'Előző szezon kisker ár'];
+            'final_price' => 'Végleges kisker', 'previous_season_price' => 'Előző szezon kisker ár', ...$this->outletDecimalColumns()];
     }
 }

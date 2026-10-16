@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ProtectsClosedPricingProjectDeletion;
 use App\Services\Pricing\RetailCalculationDependencyService;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PricingCalculationRow extends Model
 {
+    use ProtectsClosedPricingProjectDeletion;
+
     // Keep the displayed multiplier sortable/searchable without changing the stored calculation input.
     public const EFFECTIVE_MULTIPLIER_SQL = 'CASE WHEN base_price > 0 THEN (1.0 * COALESCE(manual_price, retained_price, calculated_price) / NULLIF(base_price, 0)) ELSE NULL END';
 
@@ -64,6 +67,8 @@ class PricingCalculationRow extends Model
 
     public const TYPE_DISTRIBUTOR = 'distributor';
 
+    public const TYPE_OUTLET = 'outlet';
+
     public const STATUS_CALCULATED = 'calculated';
 
     public const STATUS_REVIEWED = 'reviewed';
@@ -81,6 +86,7 @@ class PricingCalculationRow extends Model
         'source_retail_row_id',
         'source_wholesale_row_id',
         'distributor_discount_percent',
+        'outlet_discount_percent',
         'source_retail_price',
         'retail_exchange_rate',
         'product_id',
@@ -117,6 +123,7 @@ class PricingCalculationRow extends Model
     {
         return [
             'distributor_discount_percent' => 'decimal:6',
+            'outlet_discount_percent' => 'decimal:6',
             'source_retail_price' => 'decimal:4',
             'retail_exchange_rate' => 'decimal:6',
             'calculated_price' => 'decimal:4',
@@ -157,7 +164,8 @@ class PricingCalculationRow extends Model
                 && $row->wasChanged(RetailCalculationDependencyService::COST_INPUT_FIELDS)) {
                 app(RetailCalculationDependencyService::class)->invalidateForCostChange($row);
             }
-            if ($row->price_type === self::TYPE_RETAIL && $row->wasChanged(['final_price', 'base_price', 'requires_review'])) {
+            if ($row->price_type === self::TYPE_RETAIL && $row->wasChanged(['final_price', 'base_price', 'requires_review',
+                'price_list_id', 'pricing_project_id', 'product_id', 'color_key', 'currency_id'])) {
                 app(RetailCalculationDependencyService::class)->invalidateForRetailChange($row);
             }
             if ($row->price_type === self::TYPE_WHOLESALE && $row->wasChanged([
@@ -195,6 +203,30 @@ class PricingCalculationRow extends Model
     public function distributorRows(): HasMany
     {
         return $this->hasMany(self::class, 'source_wholesale_row_id')->where('price_type', self::TYPE_DISTRIBUTOR);
+    }
+
+    public function outletRows(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_retail_row_id')->where('price_type', self::TYPE_OUTLET);
+    }
+
+    public function getActualOutletDiscountAttribute(): ?float
+    {
+        return $this->price_type === self::TYPE_OUTLET && (float) $this->base_price > 0 && $this->final_price !== null
+            ? (1 - (float) $this->final_price / (float) $this->base_price) * 100 : null;
+    }
+
+    public function outletDiscountIsSufficient(mixed $price = null): bool
+    {
+        $price ??= $this->final_price;
+        if ($this->price_type !== self::TYPE_OUTLET || $price === null || ! is_numeric($price) || ! is_finite((float) $price) || (float) $price <= 0 || (float) $this->base_price <= 0
+            || $this->outlet_discount_percent === null || (float) $this->outlet_discount_percent < 0 || (float) $this->outlet_discount_percent >= 100) {
+            return false;
+        }
+        $ceiling = BigDecimal::of($this->base_price)->multipliedBy(BigDecimal::one()
+            ->minus(BigDecimal::of($this->outlet_discount_percent)->dividedBy(100, 8, RoundingMode::HALF_UP)));
+
+        return BigDecimal::of((string) $price)->compareTo($ceiling) <= 0;
     }
 
     public function retailCostSource(): BelongsTo

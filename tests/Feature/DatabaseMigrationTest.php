@@ -37,6 +37,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', ['source_retail_row_id', 'source_retail_price', 'retail_exchange_rate']));
         $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', ['source_wholesale_row_id', 'distributor_discount_percent']));
         $this->assertTrue(Schema::hasColumn('price_lists', 'source_wholesale_price_list_id'));
+        $this->assertTrue(Schema::hasColumn('price_lists', 'source_retail_price_list_id'));
+        $this->assertTrue(Schema::hasColumn('pricing_calculation_rows', 'outlet_discount_percent'));
         $this->assertTrue(Schema::hasColumn('suppliers', 'country_code'));
         $this->assertTrue(Schema::hasColumn('skus', 'sku_name'));
         $this->assertTrue(Schema::hasColumn('price_list_items', 'product_id'));
@@ -52,6 +54,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('order_types'));
         $this->assertTrue(Schema::hasTable('order_share_links'));
         $this->assertTrue(Schema::hasTable('pricing_projects'));
+        $this->assertTrue(Schema::hasColumns('pricing_projects', ['closed_at', 'closed_by']));
+        $this->assertTrue(Schema::hasTable('pricing_project_publications'));
         $this->assertTrue(Schema::hasTable('pricing_parameters'));
         $this->assertTrue(Schema::hasTable('pricing_rounding_rules'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));

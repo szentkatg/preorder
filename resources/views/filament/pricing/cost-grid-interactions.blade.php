@@ -92,6 +92,7 @@
             input.disabled = true;
             try {
                 if (isCost) await wire.startInlineCostPercentParameterAdjustment(Number(cell.dataset.costRecordId), cell.dataset.costParameter, text);
+                else if (cell.dataset.pricingOutletListId) await wire.setOutletManualPrice(Number(cell.dataset.pricingRecordId), Number(cell.dataset.pricingOutletListId), text);
                 else await wire.setPricingManualPrice(Number(cell.dataset.pricingRecordId), text);
             } catch (_) {
                 showError(grid);

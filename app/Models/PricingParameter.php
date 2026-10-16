@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ProtectsClosedPricingProjectDeletion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PricingParameter extends Model
 {
+    use ProtectsClosedPricingProjectDeletion;
+
     public const TYPE_SHIPPING_COST_PERCENT = 'shipping_cost_percent';
 
     public const TYPE_CUSTOMS_PERCENT = 'customs_percent';
@@ -18,6 +21,8 @@ class PricingParameter extends Model
     public const TYPE_WHOLESALE_MARGIN = 'wholesale_margin';
 
     public const TYPE_DISTRIBUTOR_DISCOUNT = 'distributor_discount';
+
+    public const TYPE_OUTLET_DISCOUNT = 'outlet_discount';
 
     public const SCOPE_GLOBAL = 'global';
 
@@ -46,6 +51,19 @@ class PricingParameter extends Model
             'value' => 'decimal:6',
             'active' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        $invalidate = static function (self $parameter): void {
+            if ($parameter->parameter_type === self::TYPE_OUTLET_DISCOUNT || $parameter->getOriginal('parameter_type') === self::TYPE_OUTLET_DISCOUNT) {
+                PricingCalculationRow::where('price_type', 'outlet')->whereIn('pricing_project_id', array_filter([
+                    $parameter->pricing_project_id, $parameter->getOriginal('pricing_project_id'),
+                ]))->update(['requires_review' => true]);
+            }
+        };
+        static::saved($invalidate);
+        static::deleted($invalidate);
     }
 
     public function pricingProject(): BelongsTo

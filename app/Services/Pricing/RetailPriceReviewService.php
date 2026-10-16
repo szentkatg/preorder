@@ -151,6 +151,7 @@ class RetailPriceReviewService
             'retail_parameter' => $snapshot['retail_parameter'] ?? [],
             'wholesale_parameter' => $snapshot['wholesale_parameter'] ?? [],
             'distributor_parameter' => $snapshot['distributor_parameter'] ?? [],
+            'outlet_parameter' => $snapshot['outlet_parameter'] ?? [],
             'calculated_price' => (float) $row->calculated_price,
             'status' => $row->status,
         ]]);

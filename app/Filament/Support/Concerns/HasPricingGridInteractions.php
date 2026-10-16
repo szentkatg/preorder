@@ -48,7 +48,12 @@ trait HasPricingGridInteractions
         }
         $items = [];
         if ($this->canEditPricingGridRow($source)) {
-            $items[] = ['action' => 'pricingApprove', 'label' => 'Jóváhagyás'];
+            $withOutlet = method_exists($this, 'supportsOutletPricing') && $this->supportsOutletPricing() && $this->outletPriceLists->isNotEmpty();
+            $items[] = ['action' => 'pricingApprove', 'label' => $withOutlet ? 'Kisker ár jóváhagyása' : 'Jóváhagyás'];
+            if ($withOutlet) {
+                $items[] = ['action' => 'pricingOutletApprove', 'label' => 'Outlet ár jóváhagyása'];
+                $items[] = ['action' => 'pricingAllApprove', 'label' => 'Minden ár jóváhagyása'];
+            }
             $items[] = ['action' => 'pricingAccept', 'label' => 'Kalkulált ár visszaállítása'];
             if ($this->canPairPricingProduct() && Gate::allows('update', $row->product)) {
                 $items[] = ['action' => 'pairPreviousSeasonProduct', 'label' => 'Előző szezon termékének összekapcsolása'];
@@ -165,6 +170,7 @@ trait HasPricingGridInteractions
 
     protected function refreshPricingGrid(): void
     {
+        unset($this->outletPriceLists);
         unset($this->averageRetailMultiplier, $this->averageCostBasedMultiplier, $this->averageNetNetMultiplier, $this->averageDistributorNetNetMultiplier);
         $this->resetTable();
     }
@@ -178,7 +184,7 @@ trait HasPricingGridInteractions
         return view(match (true) {
             $this instanceof PricingDistributorCalculations => 'filament.pricing.distributor-calculation-details',
             $this instanceof PricingWholesaleCalculations => 'filament.pricing.wholesale-calculation-details',
-            default => 'filament.pricing.retail-calculation-details',
+            default => 'filament.pricing.retail-with-outlet-details',
         }, ['record' => $row, 'source' => $source, 'vat' => method_exists($this, 'wholesaleVatPercent') ? $this->wholesaleVatPercent() : null]);
     }
 

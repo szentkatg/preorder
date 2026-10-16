@@ -9,6 +9,7 @@ use App\Filament\Resources\PricingCalculationRows\Pages\ViewPricingCalculationRo
 use App\Filament\Resources\PricingCalculationRows\Schemas\PricingCalculationRowForm;
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\LocksClosedPricingProject;
 use App\Models\PricingCalculationRow;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -18,6 +19,8 @@ use Filament\Tables\Table;
 
 class PricingCalculationRowResource extends Resource
 {
+    use LocksClosedPricingProject;
+
     protected static ?string $model = PricingCalculationRow::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTableCells;

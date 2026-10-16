@@ -52,7 +52,11 @@ trait HasPricingTablePreferences
         $rules = array_fill_keys(array_keys($this->pricingDecimalColumns()), ['nullable', 'integer', 'min:0', 'max:6']);
         $validated = Validator::make($places, $rules)->validate();
         $this->pricingDecimalPlaces = $this->sanitizePricingDecimalPlaces($validated);
-        $this->saveAdminPreference($this->pricingPreferencePrefix().'_decimal_places', $this->pricingDecimalPlaces);
+        $key = $this->pricingPreferencePrefix().'_decimal_places';
+        $saved = $this->loadAdminPreference($key);
+        // Outlet columns depend on project/currency. Keep preferences for other contexts.
+        $otherColumns = is_array($saved) ? array_diff_key($saved, $rules) : [];
+        $this->saveAdminPreference($key, array_replace($otherColumns, $this->pricingDecimalPlaces));
     }
 
     public function pricingDecimalPlacesFor(string $column): ?int
@@ -90,7 +94,7 @@ trait HasPricingTablePreferences
         return $formats;
     }
 
-    private function loadPricingDecimalPlaces(): array
+    protected function loadPricingDecimalPlaces(): array
     {
         $saved = $this->loadAdminPreference($this->pricingPreferencePrefix().'_decimal_places');
 

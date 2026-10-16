@@ -5,11 +5,14 @@ Az admin felületen: **Árképzés → Partner árlista készítése**.
 ## Használat
 
 1. Szezon és aktív nettó nagyker/disztribútori árlista kiválasztása.
-2. Opcionálisan azonos pénznemű bruttó kisker árlista. Alapból a nettó
-   árlistához kapcsolt kisker árlista kerül ide, ha aktív és megfelelő típusú.
+2. Opcionálisan bármely aktív bruttó kisker vagy outlet árlista, eltérő
+   pénznemben is. Alapból a nettó árlistához kapcsolt lista kerül ide, ha aktív
+   és megfelelő típusú. Nincs átváltás: a nettó és bruttó oszlop fejlécében
+   külön feltüntetjük a saját pénznemüket, outletnél az outlet megnevezést is.
 3. Magyar vagy angol nyelv és Excel/PDF formátum kiválasztása.
 4. Márkák, főcsoportok és katalóguscsoportok szűrése. Mindhárom kereshető,
-   görgethető jelölőnégyzetes lista, **Mindent kijelöl / Kijelölés visszavonása**
+   kompakt, egymás alatti, függőlegesen görgethető jelölőnégyzetes lista,
+   **Mindent kijelöl / Kijelölés visszavonása**
    lehetőséggel. Több érték kipipálható; üresen az összeset jelenti.
    A különböző szűrők együtt érvényesülnek. A katalóguscsoport-választó a
    többi termékszűrőt is követi: bővítéskor megőrzi az érvényes jelöléseket,
@@ -37,6 +40,7 @@ exportot nem korlátozza. Egy fájl legfeljebb 10 000 terméket tartalmazhat.
   megfelelően a bruttó kisker árat tárolja. Nincs ÁFA- vagy árfolyamszámítás.
 - Hiányzó ár/adat: `-`, nem nulla. A valódi nulla numerikus nulla marad.
   A hiányos termékek láthatók az előnézetben, és igény szerint kihagyhatók.
+  A kiadott Excel/PDF végén nincs hiányzó árról szóló magyarázó sor.
 - Fejlécek: `lang/hu/price_list.php`, `lang/en/price_list.php`.
 - Márka, főcsoport, rendelőlaptípus és szezon neve: `translations`, a
   meglévő névmezőkre való visszaeséssel. Terméknév és katalóguscsoport:

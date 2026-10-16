@@ -9,6 +9,7 @@ use App\Filament\Resources\PricingRoundingRules\Pages\ViewPricingRoundingRule;
 use App\Filament\Resources\PricingRoundingRules\Schemas\PricingRoundingRuleForm;
 use App\Filament\Resources\PricingRoundingRules\Tables\PricingRoundingRulesTable;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\LocksClosedPricingProject;
 use App\Models\PricingRoundingRule;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -18,6 +19,8 @@ use Filament\Tables\Table;
 
 class PricingRoundingRuleResource extends Resource
 {
+    use LocksClosedPricingProject;
+
     protected static ?string $model = PricingRoundingRule::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowPathRoundedSquare;

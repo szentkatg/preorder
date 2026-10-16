@@ -30,7 +30,7 @@ class PricingParametersTable
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([EditAction::make()])
             ->toolbarActions([
-                BulkActionGroup::make([DeleteBulkAction::make()]),
+                BulkActionGroup::make([DeleteBulkAction::make()->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false)]),
             ]);
     }
 }

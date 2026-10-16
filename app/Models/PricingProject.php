@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Gate;
 
 class PricingProject extends Model
 {
@@ -21,12 +22,15 @@ class PricingProject extends Model
         'status',
         'active',
         'created_by',
+        'closed_at',
+        'closed_by',
     ];
 
     protected function casts(): array
     {
         return [
             'active' => 'boolean',
+            'closed_at' => 'datetime',
         ];
     }
 
@@ -43,6 +47,25 @@ class PricingProject extends Model
     public function season(): BelongsTo
     {
         return $this->belongsTo(Season::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $project): void {
+            if ($project->getOriginal('status') === self::STATUS_CLOSED && $project->isDirty('status') && $project->isOpenForPricing()) {
+                Gate::authorize('reopen', $project);
+            }
+        });
+    }
+
+    public function publications(): HasMany
+    {
+        return $this->hasMany(PricingProjectPublication::class);
+    }
+
+    public function closer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
     }
 
     public function creator(): BelongsTo

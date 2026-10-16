@@ -144,6 +144,7 @@ class PricingCalculationRowsTable
                         PricingCalculationRow::TYPE_RETAIL => 'Kisker',
                         PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
                         PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
+                        PricingCalculationRow::TYPE_OUTLET => 'Outlet',
                     ])
                     ->default(PricingCalculationRow::TYPE_COST),
 
@@ -179,9 +180,11 @@ class PricingCalculationRowsTable
                     ->modalCancelActionLabel('Bezárás')
                     ->modalContent(
                         fn (PricingCalculationRow $record) => view(
-                            $record->price_type === PricingCalculationRow::TYPE_RETAIL
-                                ? 'filament.pricing.retail-calculation-details'
-                                : 'filament.pricing.calculation-details',
+                            match ($record->price_type) {
+                                'retail' => 'filament.pricing.retail-with-outlet-details',
+                                'outlet' => 'filament.pricing.outlet-calculation-details',
+                                default => 'filament.pricing.calculation-details',
+                            },
                             ['record' => $record]
                         )
                     ),
@@ -214,6 +217,7 @@ class PricingCalculationRowsTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
+                        ->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false)
                         ->visible(fn ($livewire): bool => Gate::allows('deleteAny', PricingCalculationRow::class)
                             && (! method_exists($livewire, 'pricingWorkspaceIsEditable') || $livewire->pricingWorkspaceIsEditable()))
                         ->authorize(fn ($livewire): bool => Gate::allows('deleteAny', PricingCalculationRow::class)

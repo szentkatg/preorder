@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PricingProjects\Pages;
 
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
+use App\Filament\Support\Actions\PricingProjectLifecycleActions;
 use App\Filament\Support\Pages\ReadOnlyRecord;
 use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\CostCalculationService;
@@ -18,6 +19,9 @@ class ViewPricingProject extends ReadOnlyRecord
     protected function getHeaderActions(): array
     {
         return [
+            PricingProjectLifecycleActions::close()->record(fn () => $this->record),
+            PricingProjectLifecycleActions::reopen()->record(fn () => $this->record),
+            PricingProjectLifecycleActions::export()->record(fn () => $this->record),
             Action::make('recalculateCost')
                 ->visible(fn (): bool => CostCalculationAuthorization::canRecalculate($this->record))
                 ->authorize(fn (): bool => CostCalculationAuthorization::canRecalculate($this->record))

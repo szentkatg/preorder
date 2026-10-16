@@ -9,6 +9,7 @@ use App\Filament\Resources\PricingParameters\Pages\ViewPricingParameter;
 use App\Filament\Resources\PricingParameters\Schemas\PricingParameterForm;
 use App\Filament\Resources\PricingParameters\Tables\PricingParametersTable;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\LocksClosedPricingProject;
 use App\Models\PricingParameter;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -18,6 +19,8 @@ use Filament\Tables\Table;
 
 class PricingParameterResource extends Resource
 {
+    use LocksClosedPricingProject;
+
     protected static ?string $model = PricingParameter::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;

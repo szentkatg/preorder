@@ -16,9 +16,20 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class PricingProjectResource extends Resource
 {
+    public static function canEdit(Model $record): bool
+    {
+        return $record->isOpenForPricing() && parent::canEdit($record);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return $record->isOpenForPricing() && ! $record->publications()->exists() && parent::canDelete($record);
+    }
+
     protected static ?string $model = PricingProject::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;

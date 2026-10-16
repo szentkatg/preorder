@@ -41,7 +41,7 @@ class PartnerPriceListService
         $rules = [
             'season_id' => ['required', 'integer', Rule::exists('seasons', 'id')],
             'price_list_id' => ['required', 'integer', Rule::exists('price_lists', 'id')->where('active', true)->whereIn('type', ['wholesale', 'distributor'])],
-            'retail_price_list_id' => ['nullable', 'integer', Rule::exists('price_lists', 'id')->where('active', true)->where('type', 'retail')],
+            'retail_price_list_id' => ['nullable', 'integer', Rule::exists('price_lists', 'id')->where('active', true)->whereIn('type', ['retail', 'outlet'])],
             'language_id' => ['required', 'integer', Rule::exists('languages', 'id')->where('active', true)],
             'format' => ['required', Rule::in(['xlsx', 'pdf'])],
             'brand_ids' => ['present', 'array', 'max:1000'],
@@ -61,9 +61,6 @@ class PartnerPriceListService
         if (! empty($data['retail_price_list_id'])) {
             $retail = PriceList::findOrFail($data['retail_price_list_id']);
             Gate::authorize('view', $retail);
-            if ($retail->currency_id != $list->currency_id) {
-                throw ValidationException::withMessages(['data.retail_price_list_id' => 'A nettó és a kisker árlista pénzneme egyezzen meg. Nem végzünk automatikus átváltást.']);
-            }
         }
         foreach (['season_id', 'price_list_id', 'language_id'] as $key) {
             $data[$key] = (int) $data[$key];
@@ -134,6 +131,7 @@ class PartnerPriceListService
         $label = static fn ($model, string $entity) => trim((string) ($translations[$entity.'|'.$model?->code]
             ?? ($locale === 'en' ? ($model?->name_en ?: $model?->name_hu ?: $model?->name) : ($model?->name_hu ?: $model?->name ?: $model?->name_en)) ?? $model?->code));
         $list = PriceList::with('currency')->findOrFail($configuration['price_list_id']);
+        $retailList = $configuration['retail_price_list_id'] ? PriceList::with('currency')->findOrFail($configuration['retail_price_list_id']) : null;
         $season = Season::findOrFail($configuration['season_id']);
         $captions = Lang::get('price_list', [], $locale);
         $usdRate = ExchangeRate::query()->where('season_id', $season->id)->where('active', true)
@@ -174,7 +172,8 @@ class PartnerPriceListService
         return ['sections' => array_values($sections), 'locale' => $locale, 'captions' => $captions,
             'usd_huf_rate' => (float) $usdRate, 'footer_lines' => $footerLines,
             'season' => $label($season, 'season'), 'season_code' => $season->code, 'currency' => $list->currency?->code,
-            'price_list_code' => $list->code, 'retail_price_list_code' => $configuration['retail_price_list_id'] ? PriceList::findOrFail($configuration['retail_price_list_id'])->code : null,
+            'retail_currency' => $retailList?->currency?->code, 'retail_label' => $retailList?->type === 'outlet' ? $captions['outlet'] : $captions['retail'],
+            'price_list_code' => $list->code, 'retail_price_list_code' => $retailList?->code,
             'show_retail' => $configuration['retail_price_list_id'] !== null, 'net_label' => $list->type === 'distributor' ? $captions['net_distributor'] : $captions['net_wholesale'],
             'missing_prices' => $missing, 'product_count' => $products->count()];
     }

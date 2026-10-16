@@ -34,6 +34,7 @@ class PricingRoundingRuleForm
                         PricingCalculationRow::TYPE_RETAIL => 'Kisker',
                         PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
                         PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
+                        PricingCalculationRow::TYPE_OUTLET => 'Outlet',
                     ])
                     ->required(),
 

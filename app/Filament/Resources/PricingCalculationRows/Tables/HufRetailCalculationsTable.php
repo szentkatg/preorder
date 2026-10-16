@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Filament\Support\OutletColumns;
 use App\Filament\Support\PricingGrid;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\RetailPriceReviewService;
@@ -103,13 +104,14 @@ class HufRetailCalculationsTable
                 PricingCalculationRow::STATUS_APPROVED_ROUND_3 => '3. körös jóváhagyott',
                 default => $state,
             }),
+            ...OutletColumns::make($table->getLivewire()),
             PricingGrid::operationsColumn(),
         ])->filters([
             SelectFilter::make('pricing_project_id')->label('Árprojekt')->relationship('pricingProject', 'name')->searchable()->preload(),
             SelectFilter::make('price_list_id')->label('Árlista')->relationship('priceList', 'code')->searchable()->preload(),
             TernaryFilter::make('requires_review')->label('Felülvizsgálandó'),
         ])->toolbarActions([
-            BulkAction::make('approveRetailBulk')->label('Kijelölt árak jóváhagyása')->icon('heroicon-o-check')
+            BulkAction::make('approveRetailBulk')->label('Kijelölt kisker árak jóváhagyása')->icon('heroicon-o-check')
                 ->requiresConfirmation()->modalHeading('Kijelölt árak tömeges jóváhagyása')
                 ->modalDescription('A kijelölt sorok aktuális végleges árát hagyod jóvá. A manuális és megtartott árak nem változnak. Az elavult kalkulációjú vagy nem módosítható sorokat kihagyjuk, és jelezzük az eredményt.')
                 ->modalSubmitActionLabel('Jóváhagyás')->modalCancelActionLabel('Mégse')
@@ -129,6 +131,10 @@ class HufRetailCalculationsTable
                 ->after(fn ($livewire) => $livewire->resetTable()),
             $table->getLivewire()->pricingAcceptBulkAction(),
             $table->getLivewire()->pricingDetailsBulkAction(),
+            ...($table->getLivewire()->supportsOutletPricing() ? [
+                $table->getLivewire()->outletApprovalBulkAction('outlet'),
+                $table->getLivewire()->outletApprovalBulkAction('all'),
+            ] : []),
         ])->selectable(fn ($livewire) => self::canApproveBulk($livewire) || Gate::allows('view', new PricingCalculationRow))
             ->checkIfRecordIsSelectableUsing(fn (PricingCalculationRow $record) => self::canEdit($record) || Gate::allows('view', $record))
             ->deselectAllRecordsWhenFiltered()

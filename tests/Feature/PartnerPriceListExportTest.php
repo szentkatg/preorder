@@ -201,12 +201,24 @@ class PartnerPriceListExportTest extends TestCase
         app(PartnerPriceListService::class)->document($this->configuration, [$other->id]);
     }
 
-    public function test_cross_currency_retail_list_is_rejected(): void
+    public function test_cross_currency_retail_and_outlet_lists_keep_their_own_prices_and_currency(): void
     {
         $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
         $retail = PriceList::create(['code' => 'RETAIL_EUR', 'name_hu' => 'EUR kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
-        Livewire::test(PartnerPriceListExport::class)->fillForm($this->configuration)
-            ->set('data.retail_price_list_id', $retail->id)->call('loadProducts')->assertHasErrors('data.retail_price_list_id');
+        $outlet = PriceList::create(['code' => 'OUTLET_EUR', 'name_hu' => 'EUR outlet', 'type' => 'outlet', 'currency_id' => $eur->id, 'source_retail_price_list_id' => $retail->id, 'active' => true]);
+        foreach ([$retail, $outlet] as $list) {
+            PriceListItem::create(['price_list_id' => $list->id, 'season_id' => $this->season->id, 'product_id' => $this->product->id, 'net_price' => 29.95]);
+            Livewire::test(PartnerPriceListExport::class)->fillForm($this->configuration)
+                ->set('data.retail_price_list_id', $list->id)->call('loadProducts')->assertHasNoFormErrors();
+            $doc = app(PartnerPriceListService::class)->document(array_replace($this->configuration, ['retail_price_list_id' => $list->id]), [$this->product->id]);
+            $this->assertSame('HUF', $doc['currency']);
+            $this->assertSame('EUR', $doc['retail_currency']);
+            $this->assertEquals(29.95, $doc['sections'][0]['rows'][0]['retail_price']);
+            $rows = (new PriceListWorkbook($doc))->sheets()[0]->array();
+            $this->assertStringContainsString('EUR', $rows[4][3]);
+            $html = view('exports.partner-price-list', ['document' => $doc])->render();
+            $this->assertStringNotContainsString('price or information is not yet available', $html);
+        }
     }
 
     public function test_default_selection_includes_every_page_and_subset_export_respects_deselection(): void

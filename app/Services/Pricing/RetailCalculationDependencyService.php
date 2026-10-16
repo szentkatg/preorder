@@ -36,7 +36,7 @@ class RetailCalculationDependencyService
         $foreign = PricingCalculationRow::query()->whereIn('source_retail_row_id', $sourceIds)
             ->where('price_type', PricingCalculationRow::TYPE_RETAIL)->pluck('id')->all();
         PricingCalculationRow::query()->whereIn('source_retail_row_id', [...$sourceIds, ...$foreign])
-            ->whereIn('price_type', [PricingCalculationRow::TYPE_RETAIL, PricingCalculationRow::TYPE_WHOLESALE, PricingCalculationRow::TYPE_DISTRIBUTOR])
+            ->whereIn('price_type', [PricingCalculationRow::TYPE_RETAIL, PricingCalculationRow::TYPE_WHOLESALE, PricingCalculationRow::TYPE_DISTRIBUTOR, PricingCalculationRow::TYPE_OUTLET])
             ->update(['requires_review' => true]);
     }
 

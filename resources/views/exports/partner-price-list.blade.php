@@ -33,7 +33,7 @@
                 <th style="width:20%">{{ $document['captions']['code'] }}</th>
                 <th style="width:22%">{{ $document['captions']['name'] }}</th>
                 <th>{{ $document['net_label'] }} ({{ $document['currency'] }})</th>
-                @if ($document['show_retail'])<th>{{ $document['captions']['retail'] }} ({{ $document['currency'] }})</th>@endif
+                @if ($document['show_retail'])<th>{{ $document['retail_label'] }} ({{ $document['retail_currency'] }})</th>@endif
                 <th style="width:16%">@foreach (explode(' ', $document['captions']['delivery'], 2) as $part){{ $part }}@if (!$loop->last)<br>@endif @endforeach</th>
                 <th style="width:10%">@foreach (explode(' ', $document['captions']['page'], 2) as $part){{ $part }}@if (!$loop->last)<br>@endif @endforeach</th>
             </tr></thead>
@@ -54,7 +54,6 @@
             @endforeach
             </tbody>
         </table>
-        <p class="note">{{ $document['captions']['missing'] }}</p>
         <div class="contact-block">
             @foreach ($document['footer_lines'] as $line)<p>{{ $line }}</p>@endforeach
         </div>

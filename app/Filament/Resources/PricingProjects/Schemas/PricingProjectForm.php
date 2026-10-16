@@ -15,6 +15,7 @@ class PricingProjectForm
         return $schema
             ->components([
                 Select::make('season_id')
+                    ->disabled(fn (?PricingProject $record) => $record?->exists)
                     ->label('Szezon')
                     ->relationship('season', 'name')
                     ->searchable()
@@ -22,21 +23,23 @@ class PricingProjectForm
                     ->required(),
 
                 TextInput::make('name')
+                    ->disabled(fn (?PricingProject $record) => $record?->status === 'closed')
                     ->label('Név')
                     ->required()
                     ->maxLength(255),
 
                 Select::make('status')
                     ->label('Státusz')
-                    ->options([
+                    ->disabled(fn (?PricingProject $record) => $record?->status === 'closed')
+                    ->options(fn (?PricingProject $record) => $record?->status === 'closed' ? ['closed' => 'Lezárt'] : [
                         PricingProject::STATUS_DRAFT => 'Tervezet',
                         PricingProject::STATUS_ACTIVE => 'Aktív',
-                        PricingProject::STATUS_CLOSED => 'Lezárt',
                     ])
                     ->default(PricingProject::STATUS_DRAFT)
                     ->required(),
 
                 Toggle::make('active')
+                    ->disabled(fn (?PricingProject $record) => $record?->status === 'closed')
                     ->label('Aktív')
                     ->default(true),
             ])

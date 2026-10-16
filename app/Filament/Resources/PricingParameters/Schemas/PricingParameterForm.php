@@ -30,7 +30,9 @@ class PricingParameterForm
                         PricingParameter::TYPE_COUNTRY_MULTIPLIER => 'Ország / pénznem szorzó',
                         PricingParameter::TYPE_WHOLESALE_MARGIN => 'Nagyker szorzó',
                         PricingParameter::TYPE_DISTRIBUTOR_DISCOUNT => 'Disztribútor kedvezmény %',
+                        PricingParameter::TYPE_OUTLET_DISCOUNT => 'Outlet minimum kedvezmény %',
                     ])
+                    ->live()
                     ->required(),
 
                 Select::make('scope_type')
@@ -77,11 +79,13 @@ class PricingParameterForm
                     ->label('Pénznem')
                     ->relationship('currency', 'code')
                     ->searchable()
-                    ->preload(),
+                    ->preload()->required(fn ($get) => $get('parameter_type') === PricingParameter::TYPE_OUTLET_DISCOUNT),
 
                 TextInput::make('value')
                     ->label('Érték')
-                    ->helperText('Nagyker szorzó esetén például 2,5: bruttó kisker ár ÷ 2,5 = nettó nagyker ár. Nem százalék.')
+                    ->helperText('Outlet kedvezménynél például 25 = legalább 25% kedvezmény. Nagyker szorzónál például 2,5: bruttó kisker ár ÷ 2,5 = nettó nagyker ár.')
+                    ->minValue(fn ($get) => $get('parameter_type') === PricingParameter::TYPE_OUTLET_DISCOUNT ? 0 : null)
+                    ->maxValue(fn ($get) => $get('parameter_type') === PricingParameter::TYPE_OUTLET_DISCOUNT ? 99.999999 : null)
                     ->numeric()
                     ->required(),
 

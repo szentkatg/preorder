@@ -29,7 +29,7 @@ return [
             'pages' => true,
             'widgets' => true,
             'resources' => true,
-            'custom_permissions' => false,
+            'custom_permissions' => true,
         ],
     ],
 
@@ -254,7 +254,11 @@ return [
     |
     */
 
-    'custom_permissions' => [],
+    'custom_permissions' => [
+        'Publish:PricingProjectLifecycle' => 'Árprojekt életciklus – Lezárás és árak publikálása',
+        'Reopen:PricingProjectLifecycle' => 'Árprojekt életciklus – Visszanyitás',
+        'Export:PricingProjectLifecycle' => 'Árprojekt életciklus – ERP árexport',
+    ],
 
     /*
     |--------------------------------------------------------------------------

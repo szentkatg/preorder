@@ -25,8 +25,6 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
 
     private array $footerRows = [];
 
-    private int $noteRow = 5;
-
     private int $lastRow = 5;
 
     public function __construct(private readonly array $document, private readonly array $section, private readonly string $sheetTitle) {}
@@ -53,7 +51,7 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
         $captions = $this->document['captions'];
         $headings = [$captions['code'], $captions['name'], $this->document['net_label'].' ('.$this->document['currency'].')'];
         if ($this->document['show_retail']) {
-            $headings[] = $captions['retail'].' ('.$this->document['currency'].')';
+            $headings[] = $this->document['retail_label'].' ('.$this->document['retail_currency'].')';
         }
         $headings[] = $captions['delivery'];
         $headings[] = $captions['page'];
@@ -77,9 +75,6 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
             $this->productRows[] = count($rows);
         }
         $rows[] = [null];
-        $rows[] = [$captions['missing']];
-        $this->noteRow = count($rows);
-        $rows[] = [null];
         foreach ($this->document['footer_lines'] as $line) {
             $rows[] = [$line];
             $this->footerRows[] = count($rows);
@@ -99,7 +94,7 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
             $sheet->getStyle('A1:'.$lastColumn.$this->lastRow)->applyFromArray([
                 'font' => ['name' => 'Arial', 'size' => 10], 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
-            foreach ([2, 3, $this->noteRow, ...$this->footerRows] as $row) {
+            foreach ([2, 3, ...$this->footerRows] as $row) {
                 $sheet->mergeCells('A'.$row.':'.$lastColumn.$row);
             }
             $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(14);
@@ -128,7 +123,6 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
                 $sheet->getStyle($dateColumn.$row)->getNumberFormat()->setFormatCode($this->document['captions']['excel_date_format']);
                 $sheet->getRowDimension($row)->setRowHeight(-1);
             }
-            $sheet->getStyle('A'.$this->noteRow)->getFont()->setItalic(true)->setSize(9);
             foreach ($this->footerRows as $row) {
                 $sheet->getStyle('A'.$row)->getFont()->setSize(9);
                 $sheet->getStyle('A'.$row)->getAlignment()->setWrapText(true);
