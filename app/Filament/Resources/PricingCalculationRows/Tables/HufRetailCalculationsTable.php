@@ -68,7 +68,7 @@ class HufRetailCalculationsTable
                 ->numeric()->placeholder('-')
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'cost_based_multiplier', 6, true, ''))
                 ->extraHeaderAttributes(fn ($livewire) => self::multiplierAverageAttributes($livewire->averageCostBasedMultiplier,
-                    'A szűrt sorok bekerülési szorzóinak számtani átlaga'))
+                    'Értékkel súlyozott bekerülési szorzó: osztandók összege / osztók összege a teljes szűrt találati halmazon'))
                 ->tooltip('Végleges devizás kisker ár × a kalkuláció mentett árfolyama ÷ a hozzá tartozó HUF kisker sor bekerülési alapja. Hiányzó vagy nem pozitív bekerülési értéknél/árfolyamnál nincs szorzó.'),
             TextColumn::make('calculation_multiplier')->label('Kalkulációs szorzó')
                 ->getStateUsing(fn (PricingCalculationRow $record) => $record->multiplier === null ? null : (float) $record->multiplier)
@@ -136,7 +136,7 @@ class HufRetailCalculationsTable
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
     }
 
-    private static function multiplierAverageAttributes(?float $average, string $description = 'A szűrt sorok szorzóinak számtani átlaga'): array
+    private static function multiplierAverageAttributes(?float $average, string $description = 'Értékkel súlyozott szorzó: osztandók összege / osztók összege a teljes szűrt találati halmazon'): array
     {
         $formatted = $average === null ? '-' : number_format($average, 2, ',', ' ');
 

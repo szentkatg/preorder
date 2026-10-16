@@ -537,11 +537,13 @@ class ForeignRetailCalculationTest extends TestCase
         $second->product_id = $product->id;
         $second->source_retail_row_id = $source->id;
         $second->calculated_price = 10;
+        $second->base_price = 20;
         $second->save();
         $page = Livewire::test(PricingForeignRetailCalculations::class);
-        $expected = (2 * 400 / 460 + 4) / 2;
+        $expected = (2 * 400 + 10 * 400) / (460 + 1000);
         $this->assertEqualsWithDelta($expected, $page->instance()->averageCostBasedMultiplier, 0.0000001);
-        $page->assertSee('data-pricing-average-multiplier="Átlag: 2,87"', false);
+        $this->assertEqualsWithDelta(12 / ((float) $first->base_price + 20), $page->instance()->averageRetailMultiplier, 0.0000001);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,29"', false);
         $page->sortTable('cost_based_multiplier', 'asc')->assertCanSeeTableRecords([$first, $second], inOrder: true);
         $page->sortTable('cost_based_multiplier', 'desc')->assertCanSeeTableRecords([$second, $first], inOrder: true);
         $page->searchTableColumns(['cost_based_multiplier' => '4'])
@@ -581,7 +583,7 @@ class ForeignRetailCalculationTest extends TestCase
         }
         $page = Livewire::test(PricingForeignRetailCalculations::class)->set('tableRecordsPerPage', 50);
         $this->assertSame(50, $page->instance()->getTableRecords()->count());
-        $this->assertEqualsWithDelta(202 / 51, $page->instance()->averageCostBasedMultiplier, 0.0000001);
+        $this->assertEqualsWithDelta((2 * 400 + 50 * 3 * 400) / (400 + 50 * 300), $page->instance()->averageCostBasedMultiplier, 0.0000001);
         $records = $page->instance()->getTableRecords();
         DB::enableQueryLog();
         DB::flushQueryLog();

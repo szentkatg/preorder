@@ -6,7 +6,7 @@ use App\Filament\Support\Actions\CalculateForeignRetailAction;
 use App\Models\AdminUiPreference;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\ForeignRetailCalculator;
-use Illuminate\Support\Facades\DB;
+use App\Services\Pricing\PricingMultiplierAverage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -51,16 +51,15 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Devizás kisker árak: végleges HUF kisker ár ÷ szezonárfolyam × országszorzó, majd kerekítés. A bekerülési szorzó = végleges devizás ár × mentett árfolyam ÷ a HUF forrássor bekerülési alapja. Mindkét szorzó átlaga a szűrt sorok számtani átlaga; a kerekítés és a manuális ár hatását is mutatja.';
+        return 'Devizás kisker árak: végleges HUF kisker ár ÷ szezonárfolyam × országszorzó, majd kerekítés. A bekerülési szorzó = végleges devizás ár × mentett árfolyam ÷ a HUF forrássor bekerülési alapja. Mindkét súlyozott átlag a teljes szűrt találati halmaz osztandóinak összege / osztóinak összege; a kerekítés és a manuális ár hatását is mutatja.';
     }
 
     #[Computed]
     public function averageCostBasedMultiplier(): ?float
     {
-        $query = clone $this->getFilteredTableQuery();
-        $average = $query->toBase()->avg(DB::raw(PricingCalculationRow::costBasedMultiplierSql()));
-
-        return $average === null ? null : (float) $average;
+        return PricingMultiplierAverage::calculate($this->getFilteredTableQuery(),
+            'CASE WHEN retail_exchange_rate > 0 THEN COALESCE(manual_price, retained_price, calculated_price) * retail_exchange_rate ELSE NULL END',
+            PricingCalculationRow::costBasedMultiplierBaseSql());
     }
 
     protected function pricingPreferencePrefix(): string

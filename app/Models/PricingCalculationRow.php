@@ -25,17 +25,21 @@ class PricingCalculationRow extends Model
 
     public static function costBasedMultiplierSql(): string
     {
+        return 'CASE WHEN retail_exchange_rate > 0 THEN'
+            .' 1.0 * COALESCE(manual_price, retained_price, calculated_price) * retail_exchange_rate'
+            .' / NULLIF('.self::costBasedMultiplierBaseSql().', 0) ELSE NULL END';
+    }
+
+    public static function costBasedMultiplierBaseSql(): string
+    {
         // The foreign row's base_price is converted HUF retail, not its HUF cost.
-        $cost = '(SELECT huf_source.base_price FROM pricing_calculation_rows AS huf_source'
+        return '(SELECT huf_source.base_price FROM pricing_calculation_rows AS huf_source'
             .' WHERE huf_source.id = pricing_calculation_rows.source_retail_row_id'
             .' AND huf_source.pricing_project_id = pricing_calculation_rows.pricing_project_id'
             .' AND huf_source.product_id = pricing_calculation_rows.product_id'
             .' AND huf_source.color_key = pricing_calculation_rows.color_key'
             ." AND huf_source.price_type = 'retail' AND huf_source.base_price > 0)";
 
-        return 'CASE WHEN retail_exchange_rate > 0 THEN'
-            .' 1.0 * COALESCE(manual_price, retained_price, calculated_price) * retail_exchange_rate'
-            .' / NULLIF('.$cost.', 0) ELSE NULL END';
     }
 
     public static function targetPurchasePriceSql(): string

@@ -345,7 +345,7 @@ class WholesaleCalculationTest extends TestCase
         $this->assertSame('1.9800', $this->row($this->eur)->final_price);
     }
 
-    public function test_average_includes_all_pages_follows_filters_and_is_not_weighted(): void
+    public function test_value_weighted_average_includes_all_pages_and_follows_filters(): void
     {
         $this->calculate();
         $first = $this->row();
@@ -360,8 +360,8 @@ class WholesaleCalculationTest extends TestCase
         }
         $page = Livewire::test(PricingWholesaleCalculations::class)->set('tableRecordsPerPage', 50);
         $this->assertSame(50, $page->instance()->getTableRecords()->count());
-        $this->assertEqualsWithDelta(202 / 51, $page->instance()->averageRetailMultiplier, 0.0000001);
-        $this->assertEqualsWithDelta(202 / 51 / 1.27, $page->instance()->averageNetNetMultiplier, 0.0000001);
+        $this->assertEqualsWithDelta((200 + 50 * 1200) / (100 + 50 * 300), $page->instance()->averageRetailMultiplier, 0.0000001);
+        $this->assertEqualsWithDelta((200 + 50 * 1200) / (100 + 50 * 300) / 1.27, $page->instance()->averageNetNetMultiplier, 0.0000001);
         $page->searchTableColumns(['color.name_hu' => 'Szín 50']);
         $this->assertEquals(4, $page->instance()->averageRetailMultiplier);
         $page->searchTableColumns(['color.name_hu' => 'NINCS']);

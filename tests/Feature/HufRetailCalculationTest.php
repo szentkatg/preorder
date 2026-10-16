@@ -775,7 +775,7 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame(['SUP-PRICE', 'Test Supplier Name', 6.1054], $export->map($lower));
     }
 
-    public function test_average_multiplier_is_arithmetic_and_follows_filters_and_search(): void
+    public function test_average_multiplier_is_value_weighted_and_follows_filters_and_search(): void
     {
         $this->calculate();
         $first = $this->retail();
@@ -796,11 +796,11 @@ class HufRetailCalculationTest extends TestCase
         $third->save();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $page = Livewire::test(PricingHufRetailCalculations::class);
-        $this->assertEqualsWithDelta(16 / 3, $page->instance()->averageRetailMultiplier, 0.0000001);
+        $this->assertEqualsWithDelta(2400 / 500, $page->instance()->averageRetailMultiplier, 0.0000001);
         $page->filterTable('price_list_id', $this->list->id);
-        $this->assertSame(3.0, $page->instance()->averageRetailMultiplier);
-        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,00"', false);
-        $this->assertNotSame(3.5, $page->instance()->averageRetailMultiplier); // Sum(price) / sum(cost) would be weighted.
+        $this->assertSame(3.5, $page->instance()->averageRetailMultiplier);
+        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,50"', false);
+        $this->assertNotSame(3.0, $page->instance()->averageRetailMultiplier); // Not the arithmetic mean of 2 and 4.
         $page->searchTableColumns(['product.model_code' => 'SECOND-MODEL']);
         $this->assertSame(4.0, $page->instance()->averageRetailMultiplier);
         $page->searchTableColumns(['product.model_code' => 'NO-SUCH-PRODUCT']);

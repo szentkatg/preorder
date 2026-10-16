@@ -1,5 +1,65 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Értékkel súlyozott szorzóátlagok (2026-10-16)
+
+Az összes árképzési fejlécátlag a korábbi számtani átlag helyett az
+**osztandók összege / osztók összege** képletet használja. Példa:
+200/100 és 1200/300 esetén (200 + 1200) / (100 + 300) = **3,50**, nem 3,00.
+A korábbi, számtani átlagról szóló fejlesztési feljegyzéseket ez felülírja.
+
+| Fejlécátlag | Osztandó soronként | Osztó soronként |
+| --- | --- | --- |
+| HUF kisker szorzó | Végleges HUF kisker ár | HUF bekerülési alap |
+| Devizás országszorzó | Végleges devizás kisker ár | Mentett, devizára átváltott HUF kisker alap |
+| Devizás bekerülési szorzó | Végleges devizás kisker ár × mentett HUF/deviza árfolyam | Kapcsolt HUF kisker sor bekerülési alapja |
+| Nagyker szorzó | Bruttó kisker alap | Végleges nettó nagyker ár |
+| Nagyker nettó/nettó szorzó | ÁFA alapján nettósított kisker alap | Végleges nettó nagyker ár |
+| Disztribútori nettó/nettó szorzó | ÁFA alapján nettósított kisker alap | Kiválasztott árlista végleges nettó disztribútori ára |
+
+A végleges ár sorrendje változatlan: manuális → megtartott → kalkulált.
+A nettósítás HUF esetén 27%, EUR esetén a felhasználó mentett ÁFA-beállítása.
+A teljes szűrt találati halmaz számít, a lapozástól és a megjelenített sorok
+számától függetlenül. Keresés, projekt/pénznem/árlista, archív és oszlopszűrők
+egyaránt érvényesek. Hiányzó osztandó vagy nem pozitív/hiányzó osztó esetén
+a sort **mindkét** összegből kihagyjuk; hibás árfolyam és hiányzó termék-/ársor
+kapcsolat szintén nem növelheti csak az egyik összeget. Üres érvényes halmaznál
+nincs átlag, a fejlécben „-” szerepel. A nulla osztandó önmagában érvényes,
+ha az adott sor szorzóképlete is megengedi; nulla osztóval soha nem számolunk.
+
+A közös `PricingMultiplierAverage` SQL-ben összesít egyetlen lekérdezéssel,
+nem tölti be PHP-ba a teljes táblázatot, és nem módosítja a lista lekérdezését.
+A nagyker nettó/nettó súlyozott átlag a közös ÁFA miatt a már kiszámolt
+nagyker súlyozott átlag nettósítása, újabb összesítő lekérdezés nélkül.
+A soronkénti szorzók, árak, jóváhagyások és Excel-export tartalma változatlan.
+A keretes, félkövér, két tizedesjegyes átlagkijelzés megmarad; a magyarázatok
+már súlyozott átlagot írnak.
+
+Ellenőrzés: **184 sikeres teszt, 1507 ellenőrzés**. Eltérő súlyok, szűrés,
+oldalhatáron túli sorok, hiányzó/nulla osztók, hiányzó osztandók, üres találat,
+manuális/megtartott árak, deviza és ÁFA is lefedett. A közös összesítés egy SQL
+lekérdezés, a kiinduló listalekérdezés és a mentett adatok változatlanok.
+
+Üzemeltetés: nincs migráció, Composer install, npm build, kézi fájlfeltöltés,
+új jogosultság vagy .env módosítás. A fejlesztés önmagában nem telepít a NAS-ra
+vagy élesre, és nem ír át árakat.
+
+Git a pricing worktree-ben, csak külön kért kihelyezéshez:
+
+```powershell
+git add -- app/Filament/Pages/PricingHufRetailCalculations.php app/Filament/Pages/PricingForeignRetailCalculations.php app/Filament/Pages/PricingWholesaleCalculations.php app/Filament/Pages/PricingDistributorCalculations.php app/Filament/Resources/PricingCalculationRows/Tables/HufRetailCalculationsTable.php app/Filament/Resources/PricingCalculationRows/Tables/WholesaleCalculationsTable.php app/Filament/Resources/PricingCalculationRows/Tables/DistributorColumns.php app/Models/PricingCalculationRow.php app/Services/Pricing/PricingMultiplierAverage.php tests/Feature/PricingMultiplierAverageTest.php tests/Feature/HufRetailCalculationTest.php tests/Feature/ForeignRetailCalculationTest.php tests/Feature/WholesaleCalculationTest.php tests/Feature/DistributorCalculationTest.php docs/huf-retail-pricing.md
+git commit -m "Weight all pricing multiplier averages by their denominator values"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles WePanel csak külön kért, éles ágba integrált telepítésnél:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
 ## Egységes, könnyű árképzési táblák és műveleti menük (2026-10-15)
 
 - A bekerülési érték szállítás%/vám% cellái és az összes árképzési munkalap

@@ -50,6 +50,7 @@ class WholesaleCalculationsTable
 
     private static function averageAttributes(?float $value): array
     {
-        return ['data-pricing-average-multiplier' => 'Átlag: '.($value === null ? '-' : number_format($value, 2, ',', ' '))];
+        return ['data-pricing-average-multiplier' => 'Átlag: '.($value === null ? '-' : number_format($value, 2, ',', ' ')),
+            'aria-description' => 'Értékkel súlyozott szorzó: osztandók összege / osztók összege a teljes szűrt találati halmazon'];
     }
 }

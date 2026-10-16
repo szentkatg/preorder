@@ -559,7 +559,7 @@ class DistributorCalculationTest extends TestCase
         }
         $page = Livewire::test(PricingDistributorCalculations::class)->call('setEurVatPercent', 20)->set('tableRecordsPerPage', 50);
         $this->assertSame(50, $page->instance()->getTableRecords()->count());
-        $this->assertEqualsWithDelta(201 / 51 / 1.2, $page->instance()->averageDistributorNetNetMultiplier, 0.0000001);
+        $this->assertEqualsWithDelta((2 + 49 * 4 + 6) / (1 + 49 + 2) / 1.2, $page->instance()->averageDistributorNetNetMultiplier, 0.0000001);
         $page->searchTableColumns(['color.name_hu' => 'Szín 50']);
         $this->assertEqualsWithDelta(3 / 1.2, $page->instance()->averageDistributorNetNetMultiplier, 0.0000001);
     }

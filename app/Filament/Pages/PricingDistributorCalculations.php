@@ -10,9 +10,9 @@ use App\Models\AdminUiPreference;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\DistributorComparison;
+use App\Services\Pricing\PricingMultiplierAverage;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -116,10 +116,14 @@ class PricingDistributorCalculations extends PricingHufRetailCalculations
     #[Computed]
     public function averageDistributorNetNetMultiplier(): ?float
     {
-        $average = (clone $this->getFilteredTableQuery())->toBase()->avg(DB::raw(DistributorComparison::sql(
-            'distributor_net_net_multiplier', $this->selectedDistributorPriceList?->id, $this->wholesaleVatPercent())));
+        $vat = $this->wholesaleVatPercent();
+        if ($vat === null) {
+            return null;
+        }
 
-        return $average === null ? null : (float) $average;
+        return PricingMultiplierAverage::calculate($this->getFilteredTableQuery(),
+            'CASE WHEN base_price > 0 THEN base_price / '.json_encode(1 + $vat / 100, JSON_PRESERVE_ZERO_FRACTION).' ELSE NULL END',
+            DistributorComparison::sql('distributor_final_price', $this->selectedDistributorPriceList?->id));
     }
 
     public function retailCurrencyCode(): string
@@ -129,7 +133,7 @@ class PricingDistributorCalculations extends PricingHufRetailCalculations
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Nettó disztribútori ár = végleges nettó nagyker ár × (1 − kedvezmény% / 100), majd saját kerekítés. A nagyker alap csak olvasható; itt kizárólag a disztribútori árakat szerkeszted és hagyod jóvá. Az ÁFA csak a nettó/nettó összehasonlítást befolyásolja. Az átlag a szűrt sorok számtani átlaga.';
+        return 'Nettó disztribútori ár = végleges nettó nagyker ár × (1 − kedvezmény% / 100), majd saját kerekítés. A nagyker alap csak olvasható; itt kizárólag a disztribútori árakat szerkeszted és hagyod jóvá. Az ÁFA csak a nettó/nettó összehasonlítást befolyásolja. A súlyozott átlag a teljes szűrt találati halmaz nettósított kisker árainak összege / végleges nettó disztribútori árainak összege.';
     }
 
     protected function pricingPreferencePrefix(): string

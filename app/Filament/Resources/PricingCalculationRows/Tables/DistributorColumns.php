@@ -34,7 +34,8 @@ class DistributorColumns
                         ? (float) $record->base_price / (1 + $vat / 100) / (float) $price : null;
                 })
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'distributor_net_net_multiplier', 6, true, ''))
-                ->extraHeaderAttributes(fn ($livewire) => ['data-pricing-average-multiplier' => 'Átlag: '.($livewire->averageDistributorNetNetMultiplier === null
+                ->extraHeaderAttributes(fn ($livewire) => ['aria-description' => 'Értékkel súlyozott szorzó: nettósított kisker árak összege / végleges nettó disztribútori árak összege a teljes szűrt találati halmazon',
+                    'data-pricing-average-multiplier' => 'Átlag: '.($livewire->averageDistributorNetNetMultiplier === null
                     ? '-' : number_format($livewire->averageDistributorNetNetMultiplier, 2, ',', ' '))]),
             IconColumn::make('distributor_requires_review')->label('Disztr. felülvizsgálandó')->boolean()->trueColor('danger')->falseColor('success')->placeholder('-')
                 ->getStateUsing(fn (PricingCalculationRow $record, $livewire) => self::row($record, $livewire)?->requires_review),

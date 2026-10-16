@@ -8,9 +8,9 @@ use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingVatComparison;
 use App\Models\AdminUiPreference;
 use App\Models\PricingCalculationRow;
+use App\Services\Pricing\PricingMultiplierAverage;
 use App\Services\Pricing\WholesaleCalculator;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -67,23 +67,23 @@ class PricingWholesaleCalculations extends PricingHufRetailCalculations
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Nettó nagyker ár = végleges bruttó kisker ár ÷ nagyker szorzó, majd kerekítés. A nettó/nettó szorzó a kisker árat az összehasonlítás kedvéért nettósítja: HUF 27%, EUR a megadott ÁFA alapján. Az ÁFA nem változtatja a nagyker árat vagy a jóváhagyást. Az átlagok a szűrt sorok számtani átlagai.';
+        return 'Nettó nagyker ár = végleges bruttó kisker ár ÷ nagyker szorzó, majd kerekítés. A nettó/nettó szorzó a kisker árat az összehasonlítás kedvéért nettósítja: HUF 27%, EUR a megadott ÁFA alapján. Az ÁFA nem változtatja a nagyker árat vagy a jóváhagyást. A súlyozott átlagok a teljes szűrt találati halmaz osztandóinak összege / osztóinak összege.';
     }
 
     #[Computed]
     public function averageRetailMultiplier(): ?float
     {
-        $average = (clone $this->getFilteredTableQuery())->toBase()->avg(DB::raw(PricingCalculationRow::WHOLESALE_MULTIPLIER_SQL));
-
-        return $average === null ? null : (float) $average;
+        return PricingMultiplierAverage::calculate($this->getFilteredTableQuery(),
+            'CASE WHEN base_price > 0 THEN base_price ELSE NULL END', 'COALESCE(manual_price, retained_price, calculated_price)');
     }
 
     #[Computed]
     public function averageNetNetMultiplier(): ?float
     {
-        $average = (clone $this->getFilteredTableQuery())->toBase()->avg(DB::raw(PricingCalculationRow::netNetMultiplierSql($this->wholesaleVatPercent())));
+        $vat = $this->wholesaleVatPercent();
+        $average = $this->averageRetailMultiplier;
 
-        return $average === null ? null : (float) $average;
+        return $vat === null || $average === null ? null : $average / (1 + $vat / 100);
     }
 
     protected function pricingPreferencePrefix(): string

@@ -10,13 +10,13 @@ use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
+use App\Services\Pricing\PricingMultiplierAverage;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 
@@ -67,16 +67,14 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'HUF bruttó kisker árak: a Kisker szorzó minden sornál a végleges, kerekítés utáni ár / bekerülési érték. Az átlag a szűrt sorok szorzóinak számtani átlaga. A piros cél-beszerzési ár jelzi, ha a kalkulációs szorzó eléréséhez alkudni kell.';
+        return 'HUF bruttó kisker árak: a Kisker szorzó minden sornál a végleges, kerekítés utáni ár / bekerülési érték. A súlyozott átlag a teljes szűrt találati halmaz végleges árainak összege / bekerülési értékeinek összege. A piros cél-beszerzési ár jelzi, ha a kalkulációs szorzó eléréséhez alkudni kell.';
     }
 
     #[Computed]
     public function averageRetailMultiplier(): ?float
     {
-        $query = clone $this->getFilteredTableQuery();
-        $average = $query->toBase()->avg(DB::raw(PricingCalculationRow::EFFECTIVE_MULTIPLIER_SQL));
-
-        return $average === null ? null : (float) $average;
+        return PricingMultiplierAverage::calculate($this->getFilteredTableQuery(),
+            'COALESCE(manual_price, retained_price, calculated_price)', 'base_price');
     }
 
     protected function pricingPreferencePrefix(): string
