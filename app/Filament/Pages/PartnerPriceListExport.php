@@ -11,6 +11,8 @@ use App\Models\Season;
 use App\Services\PartnerPriceListPdf;
 use App\Services\PartnerPriceListService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -72,10 +74,7 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
 
         return $schema->components([
             Select::make('season_id')->label('Szezon')->options(fn () => Season::orderByDesc('code')->get()->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->name]))
-                ->required()->searchable()->live()->afterStateUpdated(function (Set $set): void {
-                    $set('catalog_groups', []);
-                    $this->clearPreview();
-                }),
+                ->required()->searchable()->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set)),
             Select::make('price_list_id')->label('Nettó árlista')->options(fn () => PriceList::where('active', true)->whereIn('type', ['wholesale', 'distributor'])
                 ->with('currency')->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->name_hu.' ('.$row->currency?->code.')']))
                 ->required()->searchable()->live()->afterStateUpdated(function ($state, Set $set): void {
@@ -93,21 +92,33 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
                 ->whereRaw('UPPER(code) IN (?, ?)', PartnerPriceListService::LANGUAGES)->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => strtoupper($row->code).' - '.($row->name_hu ?: $row->name)]))
                 ->required()->live()->afterStateUpdated($invalidate),
             Select::make('format')->label('Formátum')->options(['xlsx' => 'Excel (.xlsx)', 'pdf' => 'PDF (.pdf)'])->required()->live()->afterStateUpdated($invalidate),
-            Select::make('brand_ids')->label('Márkák')->multiple()->searchable()->options(fn () => Brand::where('active', true)->orderBy('name')->pluck('name', 'id'))
-                ->live()->afterStateUpdated(function (Set $set): void {
-                    $set('catalog_groups', []);
-                    $this->clearPreview();
-                })->helperText('Üresen: minden márka.'),
-            Select::make('item_main_group_ids')->label('Főcsoportok')->multiple()->searchable()->options(fn () => ItemMainGroup::where('active', true)->orderBy('code')->get()
+            $this->productFilter('brand_ids', 'Márkák')->options(fn () => Brand::where('active', true)->orderBy('name')->pluck('name', 'id'))
+                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set))
+                ->helperText('Több márka is kipipálható. Üresen: minden márka.'),
+            $this->productFilter('item_main_group_ids', 'Főcsoportok')->options(fn () => ItemMainGroup::where('active', true)->orderBy('code')->get()
                 ->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.($row->name_hu ?: $row->name)]))
-                ->live()->afterStateUpdated(function (Set $set): void {
-                    $set('catalog_groups', []);
-                    $this->clearPreview();
-                })->helperText('Üresen: minden főcsoport.'),
-            Select::make('catalog_groups')->label('Katalóguscsoportok')->multiple()->searchable()
+                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set))
+                ->helperText('Több főcsoport is kipipálható. Üresen: minden főcsoport.'),
+            $this->productFilter('catalog_groups', 'Katalóguscsoportok')
                 ->options(fn (Get $get) => app(PartnerPriceListService::class)->catalogGroups($get('season_id') ? (int) $get('season_id') : null, $get('brand_ids') ?? [], $get('item_main_group_ids') ?? []))
-                ->live()->afterStateUpdated($invalidate)->helperText('Üresen: minden katalóguscsoport. A szűrések együtt érvényesülnek.'),
+                ->live()->afterStateUpdated($invalidate)->helperText('Több csoport is kipipálható. Üresen: minden katalóguscsoport. A három szűrő együtt érvényesül.'),
         ])->columns(['default' => 1, 'md' => 2, 'xl' => 3])->statePath('data');
+    }
+
+    private function productFilter(string $name, string $label): CheckboxList
+    {
+        return CheckboxList::make($name)->label($label)->searchable()->searchPrompt('Keresés...')->bulkToggleable()->columns(1)
+            ->selectAllAction(fn (Action $action) => $action->label('Mindent kijelöl'))
+            ->deselectAllAction(fn (Action $action) => $action->label('Kijelölés visszavonása'))
+            ->extraAttributes(['style' => 'max-height:14rem;overflow-y:auto;']);
+    }
+
+    private function refreshCatalogSelection(Get $get, Set $set): void
+    {
+        $available = app(PartnerPriceListService::class)->catalogGroups($get('season_id') ? (int) $get('season_id') : null,
+            $get('brand_ids') ?? [], $get('item_main_group_ids') ?? []);
+        $set('catalog_groups', array_values(array_intersect($get('catalog_groups') ?? [], array_keys($available))));
+        $this->clearPreview();
     }
 
     public function clearPreview(): void

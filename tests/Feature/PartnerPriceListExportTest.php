@@ -18,6 +18,8 @@ use App\Models\Translation;
 use App\Models\User;
 use App\Services\PartnerPriceListService;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -133,20 +135,23 @@ class PartnerPriceListExportTest extends TestCase
             Cell::setValueBinder(new DefaultValueBinder);
             $book = IOFactory::load($path);
             $sheet = $book->getSheet(0);
-            $this->assertSame(7200.5, $sheet->getCell('C8')->getValue());
-            $this->assertEquals(15990, $sheet->getCell('D8')->getValue());
-            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('D8')->getDataType());
-            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('E8')->getDataType());
-            $this->assertSame('2027.04.01', $sheet->getCell('E8')->getFormattedValue());
-            $this->assertSame('Expected arrival', $sheet->getCell('E6')->getValue());
-            $this->assertSame('Catalogue page', $sheet->getCell('F6')->getValue());
-            $this->assertSame(7, $sheet->getCell('F8')->getValue());
-            $this->assertSame('Daypack', $sheet->getCell('A7')->getValue());
+            $this->assertSame(7200.5, $sheet->getCell('C7')->getValue());
+            $this->assertEquals(15990, $sheet->getCell('D7')->getValue());
+            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('D7')->getDataType());
+            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('E7')->getDataType());
+            $this->assertSame('2027.04.01', $sheet->getCell('E7')->getFormattedValue());
+            $this->assertSame('Expected arrival', $sheet->getCell('E5')->getValue());
+            $this->assertSame('Catalogue page', $sheet->getCell('F5')->getValue());
+            $this->assertSame(7, $sheet->getCell('F7')->getValue());
+            $this->assertSame('Daypack', $sheet->getCell('A6')->getValue());
             $this->assertSame('F', $sheet->getHighestDataColumn());
             $this->assertSame('portrait', $sheet->getPageSetup()->getOrientation());
             $lastRow = $sheet->getHighestDataRow();
             $this->assertSame($doc['footer_lines'], array_map(fn ($row) => $sheet->getCell('A'.$row)->getValue(), range($lastRow - 2, $lastRow)));
-            $this->assertSame('C7', $sheet->getFreezePane());
+            $this->assertSame('C6', $sheet->getFreezePane());
+            $this->assertNull($sheet->getCell('A4')->getValue());
+            $this->assertStringContainsString('&7&K8A919BWHOLE_HU / RETAIL_HU', $sheet->getHeaderFooter()->getOddFooter());
+            $this->assertSame($sheet->getHeaderFooter()->getOddFooter(), $sheet->getHeaderFooter()->getEvenFooter());
         } finally {
             Cell::setValueBinder($binder);
             @unlink($path);
@@ -174,7 +179,7 @@ class PartnerPriceListExportTest extends TestCase
         $doc = app(PartnerPriceListService::class)->document($this->configuration, [$this->product->id]);
         $this->assertSame(1, $doc['missing_prices']);
         $this->assertNull($doc['sections'][0]['rows'][0]['net_price']);
-        $this->assertSame('-', (new PriceListWorkbook($doc))->sheets()[0]->array()[7][2]);
+        $this->assertSame('-', (new PriceListWorkbook($doc))->sheets()[0]->array()[6][2]);
     }
 
     public function test_unauthorised_page_and_forged_direct_export_are_denied(): void
@@ -295,8 +300,8 @@ class PartnerPriceListExportTest extends TestCase
         PriceListItem::where('price_list_id', $this->net->id)->update(['net_price' => 0]);
         $doc = app(PartnerPriceListService::class)->document(array_replace($this->configuration, ['retail_price_list_id' => null]), [$this->product->id]);
         $sheetExport = (new PriceListWorkbook($doc))->sheets()[0];
-        $this->assertSame(0.0, $sheetExport->array()[7][2]);
-        $this->assertCount(5, $sheetExport->array()[5]);
+        $this->assertSame(0.0, $sheetExport->array()[6][2]);
+        $this->assertCount(5, $sheetExport->array()[4]);
         $this->assertSame(0, $doc['missing_prices']);
         $sheet = new Spreadsheet;
         $sheetExport->bindValue($sheet->getActiveSheet()->getCell('A1'), '=1+1');
@@ -356,12 +361,72 @@ class PartnerPriceListExportTest extends TestCase
         $doc = app(PartnerPriceListService::class)->document($this->configuration, $ids);
         $this->assertSame([$ids[0], $ids[2], $ids[1]], array_column($doc['sections'][0]['rows'], 'id'));
         $rows = (new PriceListWorkbook($doc))->sheets()[0]->array();
-        $this->assertCount(6, $rows[5]);
+        $this->assertCount(6, $rows[4]);
         $this->assertSame(1, count(array_filter($rows, fn ($row) => $row === ['Hátizsák'])));
         $this->assertSame(1, count(array_filter($rows, fn ($row) => $row === ['Másik csoport'])));
         $html = view('exports.partner-price-list', ['document' => $doc])->render();
         $this->assertStringNotContainsString('<th style="width:18%">', $html);
         $this->assertStringContainsString('colspan="6">Hátizsák', $html);
         $this->assertStringContainsString('380 HUF/USD', $html);
+    }
+
+    public function test_english_pdf_uses_comma_prices_without_exposing_price_codes_in_the_body(): void
+    {
+        $doc = app(PartnerPriceListService::class)->document(array_replace($this->configuration, ['language_id' => $this->en->id]), [$this->product->id]);
+        $html = view('exports.partner-price-list', ['document' => $doc])->render();
+        $this->assertStringContainsString('7 200,50', $html);
+        $this->assertStringContainsString('15 990,00', $html);
+        $this->assertStringNotContainsString('7 200.50', $html);
+        $this->assertStringNotContainsString('WHOLE_HU', $html);
+        $this->assertStringNotContainsString('RETAIL_HU', $html);
+    }
+
+    public function test_multiple_brands_main_groups_and_catalogue_groups_match_with_or_inside_each_filter(): void
+    {
+        $brand = Brand::create(['code' => 'SECOND', 'name' => 'Másik márka', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'SECOND', 'name_hu' => 'Másik főcsoport', 'active' => true]);
+        $other = $this->product->replicate();
+        $other->model_code = 'SECOND';
+        $other->brand_id = $brand->id;
+        $other->item_main_group_id = $group->id;
+        $other->catalog_group_name_hu = 'Másik katalóguscsoport';
+        $other->save();
+        $config = array_replace($this->configuration, ['brand_ids' => [$this->product->brand_id, $brand->id],
+            'item_main_group_ids' => [$this->product->item_main_group_id, $group->id], 'catalog_groups' => ['Hátizsák', 'Másik katalóguscsoport']]);
+        $page = Livewire::test(PartnerPriceListExport::class)->fillForm($config)->call('loadProducts')
+            ->assertHasNoFormErrors()->assertCanSeeTableRecords([$this->product, $other]);
+        $this->assertCount(2, $page->instance()->selectedTableRecords);
+        $this->assertSame($config['brand_ids'], $page->instance()->appliedFilters['brand_ids']);
+        $this->assertSame($config['item_main_group_ids'], $page->instance()->appliedFilters['item_main_group_ids']);
+        $this->assertSame($config['catalog_groups'], $page->instance()->appliedFilters['catalog_groups']);
+    }
+
+    public function test_product_filters_are_searchable_checkbox_lists_without_changing_single_value_export_settings(): void
+    {
+        $page = Livewire::test(PartnerPriceListExport::class)->assertSuccessful();
+        foreach (['brand_ids', 'item_main_group_ids', 'catalog_groups'] as $name) {
+            $page->assertFormFieldExists($name, fn ($field) => $field instanceof CheckboxList
+                && $field->isSearchable() && $field->isBulkToggleable());
+        }
+        foreach (['season_id', 'price_list_id', 'retail_price_list_id', 'language_id', 'format'] as $name) {
+            $page->assertFormFieldExists($name, fn ($field) => $field instanceof Select && ! $field->isMultiple());
+        }
+    }
+
+    public function test_adding_filter_values_keeps_valid_catalogue_selections_and_removes_only_invalid_ones(): void
+    {
+        $brand = Brand::create(['code' => 'SECOND', 'name' => 'Másik márka', 'active' => true]);
+        $other = $this->product->replicate();
+        $other->model_code = 'SECOND';
+        $other->brand_id = $brand->id;
+        $other->catalog_group_name_hu = 'Másik katalóguscsoport';
+        $other->save();
+        $page = Livewire::test(PartnerPriceListExport::class)
+            ->fillForm(array_replace($this->configuration, ['brand_ids' => [$this->product->brand_id], 'catalog_groups' => ['Hátizsák']]))
+            ->call('loadProducts')->set('data.brand_ids', [$this->product->brand_id, $brand->id])
+            ->assertSet('data.catalog_groups', ['Hátizsák'])->assertSet('appliedFilters', null);
+        $page->set('data.catalog_groups', ['Hátizsák', 'Másik katalóguscsoport'])
+            ->set('data.brand_ids', [$brand->id])->assertSet('data.catalog_groups', ['Másik katalóguscsoport']);
+        $page->call('loadProducts')->assertCanSeeTableRecords([$other])->assertCanNotSeeTableRecords([$this->product]);
     }
 }

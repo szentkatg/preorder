@@ -8,9 +8,14 @@ Az admin felületen: **Árképzés → Partner árlista készítése**.
 2. Opcionálisan azonos pénznemű bruttó kisker árlista. Alapból a nettó
    árlistához kapcsolt kisker árlista kerül ide, ha aktív és megfelelő típusú.
 3. Magyar vagy angol nyelv és Excel/PDF formátum kiválasztása.
-4. Márkák, főcsoportok és katalóguscsoportok szűrése. Egy mezőn belül több
-   érték választható; üresen az összeset jelenti. A különböző szűrők együtt
-   érvényesülnek. A katalóguscsoport-választó a többi termékszűrőt is követi.
+4. Márkák, főcsoportok és katalóguscsoportok szűrése. Mindhárom kereshető,
+   görgethető jelölőnégyzetes lista, **Mindent kijelöl / Kijelölés visszavonása**
+   lehetőséggel. Több érték kipipálható; üresen az összeset jelenti.
+   A különböző szűrők együtt érvényesülnek. A katalóguscsoport-választó a
+   többi termékszűrőt is követi: bővítéskor megőrzi az érvényes jelöléseket,
+   szűkítéskor csak a már nem elérhető csoportok kijelölését törli.
+   Szezonból, nettó/kisker árlistából, nyelvből és formátumból továbbra is egy
+   választható; nem készül tömeges ZIP-export.
 5. **Terméklista betöltése**: minden találat alapból kijelölt, az összes
    oldalon, nem csak a megjelenített 100 sor. A soronkénti jelölők,
    **Mindent kijelöl** és **Kijelölés visszavonása** módosítják a kijelölést.
@@ -43,13 +48,21 @@ exportot nem korlátozza. Egy fájl legfeljebb 10 000 terméket tartalmazhat.
 
 Excelben márkánként/rendelőlaptípusonként külön munkalap, katalóguscsoportos
 elválasztók, ismétlődő nyomtatási fejléc, fagyasztott azonosítóoszlopok,
-A4 álló nyomtatás. A katalóguscsoport a csoport tetején szerepel, külön
+A4 álló nyomtatás. Az árlistakódok már nem a cím alatt, hanem a nyomtatási
+láblécben jelennek meg minden oldalon, 7 pontos halványszürke betűkkel.
+A katalóguscsoport a csoport tetején szerepel, külön
 oszlopban és terméksoronként nem ismétlődik. Az árak számok, rendszer szerinti
 tizedeselválasztóval; a dátumok valódi Excel-dátumok, `2027.04.01` kijelzéssel.
 Szövegmezőből nem keletkezhet Excel-képlet.
 
 PDF-ben márkánként/rendelőlaptípusonként új szakasz, ismétlődő táblázatfejléc,
-A4 álló formátum és oldalszámozás. Unicode betűkészlet; magyar ékezetekkel.
+A4 álló formátum és oldalszámozás. Az árlistakódok minden oldal alsó
+láblécében, 7 pontos halványszürke betűvel látszanak, a címből kikerültek.
+Az árak tizedeselválasztója a PDF-ben minden nyelven vessző (pl. `29,95`).
+Az Excel-árak valódi számok maradnak; az Excel/Windows tizedeselválasztó-
+beállítása érvényes rájuk. Magyar beállítással ezek is vesszősek. A fájl
+nem változtatja meg az Excel globális beállítását, és nem alakítja szöveggé
+az árakat. Unicode betűkészlet; magyar ékezetekkel.
 Mindkét formátum PHP-val készül, szerveroldali Node.js nélkül.
 
 Minden munkalap/szakasz végén megjelenik a kapcsolat és az árgarancia:
@@ -119,6 +132,18 @@ git pull --ff-only
 /opt/alt/php83/usr/bin/php /a/composer/tenyleges/eleresi/utja install --no-dev --optimize-autoloader
 /opt/alt/php83/usr/bin/php artisan optimize:clear
 /opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Árlistakódok láblécbe helyezése, vesszős PDF-árak és többes termékszűrés
+
+A módosítás kihelyezése külön kérésre történik. Nincs új migráció,
+Composer-függőség, npm build vagy kézi feltöltés.
+
+```powershell
+git add -- app/Filament/Pages/PartnerPriceListExport.php app/Exports/PartnerPriceListSheet.php app/Services/PartnerPriceListPdf.php resources/views/exports/partner-price-list.blade.php tests/Feature/PartnerPriceListExportTest.php docs/partner-price-list-export.md
+git commit -m "Clarify multiple product filters and simplify price list headers"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-nas.ps1
 ```
 
 A Composer tényleges útját a tárhelyen kell ellenőrizni (`command -v composer`);
