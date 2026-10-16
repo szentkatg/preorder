@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <style>
         @page { margin: 26pt 24pt 30pt; }
-        body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #202735; }
+        body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; line-height: 1.15; color: #202735; }
         h1 { font-size: 15pt; margin: 0 0 5pt; }
         h2 { font-size: 11pt; margin: 0 0 4pt; }
         p { margin: 3pt 0 10pt; }
@@ -13,11 +13,14 @@
         table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
-        th { background: #27364b; color: white; padding: 6pt 4pt; text-align: center; font-size: 8pt; }
-        td { border-bottom: .4pt solid #d8dde5; padding: 4pt; vertical-align: middle; overflow-wrap: break-word; }
+        th { background: #27364b; color: white; padding: 4pt 3pt; text-align: center; font-size: 8pt; }
+        td { border-bottom: .4pt solid #d8dde5; padding: 2.5pt 3pt; vertical-align: middle; overflow-wrap: break-word; }
         .group td { background: #e8edf3; font-weight: bold; }
+        .group { page-break-after: avoid; }
         .number { text-align: right; white-space: nowrap; }
         .note { font-size: 8pt; font-style: italic; }
+        .contact-block { page-break-inside: avoid; margin-top: 10pt; font-size: 8pt; }
+        .contact-block p { margin: 2pt 0; }
     </style>
 </head>
 <body>
@@ -28,23 +31,22 @@
         <p>{{ $document['price_list_code'] }}@if ($document['retail_price_list_code']) / {{ $document['retail_price_list_code'] }}@endif</p>
         <table>
             <thead><tr>
-                <th style="width:15%">{{ $document['captions']['code'] }}</th>
-                <th style="width:17%">{{ $document['captions']['name'] }}</th>
-                <th style="width:18%">{{ $document['captions']['category'] }}</th>
+                <th style="width:20%">{{ $document['captions']['code'] }}</th>
+                <th style="width:22%">{{ $document['captions']['name'] }}</th>
                 <th>{{ $document['net_label'] }} ({{ $document['currency'] }})</th>
                 @if ($document['show_retail'])<th>{{ $document['captions']['retail'] }} ({{ $document['currency'] }})</th>@endif
-                <th style="width:13%">@foreach (explode(' ', $document['captions']['delivery'], 2) as $part){{ $part }}@if (!$loop->last)<br>@endif @endforeach</th>
+                <th style="width:16%">@foreach (explode(' ', $document['captions']['delivery'], 2) as $part){{ $part }}@if (!$loop->last)<br>@endif @endforeach</th>
                 <th style="width:10%">@foreach (explode(' ', $document['captions']['page'], 2) as $part){{ $part }}@if (!$loop->last)<br>@endif @endforeach</th>
             </tr></thead>
             <tbody>
             @php($lastGroup = null)
             @foreach ($section['rows'] as $product)
-                @if ($lastGroup !== $product['main_group'] && $product['main_group'] !== '')
-                    <tr class="group"><td colspan="{{ $document['show_retail'] ? 7 : 6 }}">{{ $product['main_group'] }}</td></tr>
+                @if ($lastGroup !== $product['catalog_group'] && $product['catalog_group'] !== '')
+                    <tr class="group"><td colspan="{{ $document['show_retail'] ? 6 : 5 }}">{{ $product['catalog_group'] }}</td></tr>
                 @endif
-                @php($lastGroup = $product['main_group'])
+                @php($lastGroup = $product['catalog_group'])
                 <tr>
-                    <td>{{ $product['code'] }}</td><td>{{ $product['name'] }}</td><td>{{ $product['catalog_group'] }}</td>
+                    <td>{{ $product['code'] }}</td><td>{{ $product['name'] }}</td>
                     <td class="number">{{ $product['net_price'] === null ? '-' : number_format($product['net_price'], 2, $document['locale'] === 'hu' ? ',' : '.', ' ') }}</td>
                     @if ($document['show_retail'])<td class="number">{{ $product['retail_price'] === null ? '-' : number_format($product['retail_price'], 2, $document['locale'] === 'hu' ? ',' : '.', ' ') }}</td>@endif
                     <td class="number">{{ $product['delivery_date']?->format($document['captions']['date_format']) ?? '-' }}</td>
@@ -54,6 +56,9 @@
             </tbody>
         </table>
         <p class="note">{{ $document['captions']['missing'] }}</p>
+        <div class="contact-block">
+            @foreach ($document['footer_lines'] as $line)<p>{{ $line }}</p>@endforeach
+        </div>
     </div>
 @endforeach
 </body>

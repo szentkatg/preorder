@@ -6,6 +6,7 @@ use App\Exports\PartnerPriceListExport as PriceListWorkbook;
 use App\Filament\Pages\PartnerPriceListExport;
 use App\Models\Brand;
 use App\Models\Currency;
+use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
 use App\Models\Language;
 use App\Models\OrderSheetType;
@@ -61,6 +62,8 @@ class PartnerPriceListExportTest extends TestCase
         $this->en = Language::create(['code' => 'EN', 'name_hu' => 'Angol', 'active' => true]);
         $this->season = Season::create(['code' => 'S27', 'name' => '2027 Nyár', 'active' => true]);
         $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $usd = Currency::create(['code' => 'USD', 'name_hu' => 'Dollár', 'active' => true]);
+        ExchangeRate::create(['season_id' => $this->season->id, 'currency_id' => $usd->id, 'rate_to_huf' => 380, 'active' => true]);
         $brand = Brand::create(['code' => 'HT', 'name' => 'Heavy Tools', 'active' => true]);
         $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'name_en' => 'Bag', 'active' => true]);
         $type = OrderSheetType::create(['code' => 'BAGS', 'name_hu' => 'Táskák', 'name_en' => 'Bags', 'active' => true]);
@@ -130,13 +133,19 @@ class PartnerPriceListExportTest extends TestCase
             Cell::setValueBinder(new DefaultValueBinder);
             $book = IOFactory::load($path);
             $sheet = $book->getSheet(0);
-            $this->assertSame(7200.5, $sheet->getCell('D8')->getValue());
-            $this->assertEquals(15990, $sheet->getCell('E8')->getValue());
+            $this->assertSame(7200.5, $sheet->getCell('C8')->getValue());
+            $this->assertEquals(15990, $sheet->getCell('D8')->getValue());
+            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('D8')->getDataType());
             $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('E8')->getDataType());
-            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('F8')->getDataType());
-            $this->assertSame('Expected arrival', $sheet->getCell('F6')->getValue());
-            $this->assertSame('Catalogue page', $sheet->getCell('G6')->getValue());
-            $this->assertSame(7, $sheet->getCell('G8')->getValue());
+            $this->assertSame('2027.04.01', $sheet->getCell('E8')->getFormattedValue());
+            $this->assertSame('Expected arrival', $sheet->getCell('E6')->getValue());
+            $this->assertSame('Catalogue page', $sheet->getCell('F6')->getValue());
+            $this->assertSame(7, $sheet->getCell('F8')->getValue());
+            $this->assertSame('Daypack', $sheet->getCell('A7')->getValue());
+            $this->assertSame('F', $sheet->getHighestDataColumn());
+            $this->assertSame('portrait', $sheet->getPageSetup()->getOrientation());
+            $lastRow = $sheet->getHighestDataRow();
+            $this->assertSame($doc['footer_lines'], array_map(fn ($row) => $sheet->getCell('A'.$row)->getValue(), range($lastRow - 2, $lastRow)));
             $this->assertSame('C7', $sheet->getFreezePane());
         } finally {
             Cell::setValueBinder($binder);
@@ -150,7 +159,11 @@ class PartnerPriceListExportTest extends TestCase
     {
         $page = Livewire::test(PartnerPriceListExport::class)->fillForm(array_replace($this->configuration, ['format' => 'pdf']))->call('loadProducts')
             ->call('exportPriceList')->assertFileDownloaded('partner-arlista-S27-HU.pdf');
-        $this->assertStringStartsWith('%PDF-', base64_decode($page->effects['download']['content']));
+        $pdf = base64_decode($page->effects['download']['content']);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        preg_match('/\/MediaBox\s*\[([\d.\s]+)\]/', $pdf, $matches);
+        $size = preg_split('/\s+/', trim($matches[1]));
+        $this->assertLessThan((float) $size[3], (float) $size[2]);
     }
 
     public function test_missing_prices_are_not_zero_and_other_season_prices_are_not_used(): void
@@ -161,7 +174,7 @@ class PartnerPriceListExportTest extends TestCase
         $doc = app(PartnerPriceListService::class)->document($this->configuration, [$this->product->id]);
         $this->assertSame(1, $doc['missing_prices']);
         $this->assertNull($doc['sections'][0]['rows'][0]['net_price']);
-        $this->assertSame('-', (new PriceListWorkbook($doc))->sheets()[0]->array()[7][3]);
+        $this->assertSame('-', (new PriceListWorkbook($doc))->sheets()[0]->array()[7][2]);
     }
 
     public function test_unauthorised_page_and_forged_direct_export_are_denied(): void
@@ -282,8 +295,8 @@ class PartnerPriceListExportTest extends TestCase
         PriceListItem::where('price_list_id', $this->net->id)->update(['net_price' => 0]);
         $doc = app(PartnerPriceListService::class)->document(array_replace($this->configuration, ['retail_price_list_id' => null]), [$this->product->id]);
         $sheetExport = (new PriceListWorkbook($doc))->sheets()[0];
-        $this->assertSame(0.0, $sheetExport->array()[7][3]);
-        $this->assertCount(6, $sheetExport->array()[5]);
+        $this->assertSame(0.0, $sheetExport->array()[7][2]);
+        $this->assertCount(5, $sheetExport->array()[5]);
         $this->assertSame(0, $doc['missing_prices']);
         $sheet = new Spreadsheet;
         $sheetExport->bindValue($sheet->getActiveSheet()->getCell('A1'), '=1+1');
@@ -302,5 +315,53 @@ class PartnerPriceListExportTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         app(PartnerPriceListService::class)->document($this->configuration, [['invalid']]);
+    }
+
+    public function test_footer_uses_exact_selected_season_usd_rate_and_translates_without_rounding_to_integer(): void
+    {
+        ExchangeRate::query()->update(['rate_to_huf' => 381.275]);
+        $otherSeason = Season::create(['code' => 'S26', 'name' => 'Korábbi', 'active' => true]);
+        ExchangeRate::create(['season_id' => $otherSeason->id, 'currency_id' => Currency::where('code', 'USD')->value('id'), 'rate_to_huf' => 370, 'active' => true]);
+        $service = app(PartnerPriceListService::class);
+        $hu = $service->document($this->configuration, [$this->product->id]);
+        $this->assertSame(381.275, $hu['usd_huf_rate']);
+        $this->assertSame(['www.heavytools.com, info@heavytools.com', 'Az árváltozás jogát fenntartjuk.', 'A megrendelési árakat 381,275 HUF/USD árfolyamszintig garantáljuk.'], $hu['footer_lines']);
+        $en = $service->document(array_replace($this->configuration, ['language_id' => $this->en->id]), [$this->product->id]);
+        $this->assertStringContainsString('381.275 HUF/USD', $en['footer_lines'][2]);
+        $this->assertStringContainsString('We reserve the right', $en['footer_lines'][1]);
+    }
+
+    public function test_missing_inactive_and_zero_usd_rate_do_not_emit_an_unfounded_price_guarantee(): void
+    {
+        $page = Livewire::test(PartnerPriceListExport::class)->fillForm($this->configuration)->call('loadProducts');
+        foreach ([['active' => false, 'rate_to_huf' => 380], ['active' => true, 'rate_to_huf' => 0]] as $invalid) {
+            ExchangeRate::query()->update($invalid);
+            $page->call('exportPriceList')->assertHasErrors('data.season_id')->assertNoFileDownloaded();
+        }
+        ExchangeRate::query()->delete();
+        $page->call('exportPriceList')->assertHasErrors('data.season_id')->assertNoFileDownloaded();
+    }
+
+    public function test_catalogue_group_is_a_single_heading_not_a_repeated_product_column(): void
+    {
+        $ids = [$this->product->id];
+        foreach (['Másik csoport', 'Hátizsák'] as $index => $group) {
+            $copy = $this->product->replicate();
+            $copy->model_code = 'MODEL'.$index;
+            $copy->catalog_group_name_hu = $group;
+            $copy->catalog_sort = $index + 1;
+            $copy->save();
+            $ids[] = $copy->id;
+        }
+        $doc = app(PartnerPriceListService::class)->document($this->configuration, $ids);
+        $this->assertSame([$ids[0], $ids[2], $ids[1]], array_column($doc['sections'][0]['rows'], 'id'));
+        $rows = (new PriceListWorkbook($doc))->sheets()[0]->array();
+        $this->assertCount(6, $rows[5]);
+        $this->assertSame(1, count(array_filter($rows, fn ($row) => $row === ['Hátizsák'])));
+        $this->assertSame(1, count(array_filter($rows, fn ($row) => $row === ['Másik csoport'])));
+        $html = view('exports.partner-price-list', ['document' => $doc])->render();
+        $this->assertStringNotContainsString('<th style="width:18%">', $html);
+        $this->assertStringContainsString('colspan="6">Hátizsák', $html);
+        $this->assertStringContainsString('380 HUF/USD', $html);
     }
 }

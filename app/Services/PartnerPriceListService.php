@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExchangeRate;
 use App\Models\Language;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
@@ -135,6 +136,15 @@ class PartnerPriceListService
         $list = PriceList::with('currency')->findOrFail($configuration['price_list_id']);
         $season = Season::findOrFail($configuration['season_id']);
         $captions = Lang::get('price_list', [], $locale);
+        $usdRate = ExchangeRate::query()->where('season_id', $season->id)->where('active', true)
+            ->whereHas('currency', fn ($query) => $query->whereRaw('UPPER(code) = ?', ['USD'])->where('active', true))
+            ->value('rate_to_huf');
+        if ($usdRate === null || ! is_numeric($usdRate) || ! is_finite((float) $usdRate) || (float) $usdRate <= 0) {
+            throw ValidationException::withMessages(['data.season_id' => 'A kiválasztott szezonhoz hiányzik az aktív, pozitív USD/HUF árfolyam. Állítsd be az Árfolyamok törzsben az árgarancia feltüntetéséhez.']);
+        }
+        $decimalSeparator = $locale === 'hu' ? ',' : '.';
+        $formattedRate = rtrim(rtrim(number_format((float) $usdRate, 4, $decimalSeparator, ' '), '0'), $decimalSeparator);
+        $footerLines = [$captions['contact'], $captions['price_change'], str_replace(':rate', $formattedRate, $captions['exchange_guarantee'])];
         $sections = [];
         $missing = 0;
         foreach ($products as $product) {
@@ -151,11 +161,18 @@ class PartnerPriceListService
             $sections[$sectionKey]['rows'][] = ['id' => $product->id, 'code' => $product->model_code,
                 'name' => $locale === 'en' ? ($product->name_en ?: $product->name_hu) : ($product->name_hu ?: $product->name_en),
                 'main_group' => $label($product->itemMainGroup, 'item_main_group'),
-                'catalog_group' => $locale === 'en' ? ($product->catalog_group_name_en ?: $product->catalog_group_name_hu) : ($product->catalog_group_name_hu ?: $product->catalog_group_name_en),
+                'catalog_group' => trim((string) ($locale === 'en' ? ($product->catalog_group_name_en ?: $product->catalog_group_name_hu) : ($product->catalog_group_name_hu ?: $product->catalog_group_name_en))),
                 'net_price' => $net, 'retail_price' => $retail, 'delivery_date' => $delivery, 'catalog_page' => $product->catalog_page];
         }
 
+        // Keep each catalogue group contiguous, retaining its first catalogue position.
+        foreach ($sections as &$section) {
+            $section['rows'] = collect($section['rows'])->groupBy('catalog_group')->flatMap(fn ($rows) => $rows)->values()->all();
+        }
+        unset($section);
+
         return ['sections' => array_values($sections), 'locale' => $locale, 'captions' => $captions,
+            'usd_huf_rate' => (float) $usdRate, 'footer_lines' => $footerLines,
             'season' => $label($season, 'season'), 'season_code' => $season->code, 'currency' => $list->currency?->code,
             'price_list_code' => $list->code, 'retail_price_list_code' => $configuration['retail_price_list_id'] ? PriceList::findOrFail($configuration['retail_price_list_id'])->code : null,
             'show_retail' => $configuration['retail_price_list_id'] !== null, 'net_label' => $list->type === 'distributor' ? $captions['net_distributor'] : $captions['net_wholesale'],

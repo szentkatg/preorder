@@ -19,9 +19,10 @@ class PartnerPriceListPdf
         $options->setFontCache(storage_path('framework/cache'));
         $pdf = new Dompdf($options);
         $pdf->loadHtml(view('exports.partner-price-list', ['document' => $document])->render(), 'UTF-8');
-        $pdf->setPaper('A4', 'landscape');
+        $pdf->setPaper('A4', 'portrait');
         $pdf->render();
-        $pdf->getCanvas()->page_text(740, 575, '{PAGE_NUM} / {PAGE_COUNT}', null, 8, [0.3, 0.3, 0.3]);
+        $canvas = $pdf->getCanvas();
+        $canvas->page_text($canvas->get_width() - 65, $canvas->get_height() - 20, '{PAGE_NUM} / {PAGE_COUNT}', null, 8, [0.3, 0.3, 0.3]);
 
         return $pdf->output();
     }

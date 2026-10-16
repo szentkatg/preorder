@@ -23,6 +23,10 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
 
     private array $productRows = [];
 
+    private array $footerRows = [];
+
+    private int $noteRow = 6;
+
     private int $lastRow = 6;
 
     public function __construct(private readonly array $document, private readonly array $section, private readonly string $sheetTitle) {}
@@ -45,9 +49,9 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
 
     public function array(): array
     {
-        $this->groupRows = $this->productRows = [];
+        $this->groupRows = $this->productRows = $this->footerRows = [];
         $captions = $this->document['captions'];
-        $headings = [$captions['code'], $captions['name'], $captions['category'], $this->document['net_label'].' ('.$this->document['currency'].')'];
+        $headings = [$captions['code'], $captions['name'], $this->document['net_label'].' ('.$this->document['currency'].')'];
         if ($this->document['show_retail']) {
             $headings[] = $captions['retail'].' ('.$this->document['currency'].')';
         }
@@ -57,14 +61,14 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
             [$this->document['price_list_code'].($this->document['retail_price_list_code'] ? ' / '.$this->document['retail_price_list_code'] : '')], [null], $headings];
         $group = null;
         foreach ($this->section['rows'] as $product) {
-            if ($group !== $product['main_group']) {
-                $group = $product['main_group'];
+            if ($group !== $product['catalog_group']) {
+                $group = $product['catalog_group'];
                 if ($group !== '') {
                     $this->groupRows[] = count($rows) + 1;
                     $rows[] = [$group];
                 }
             }
-            $line = [$product['code'], $product['name'], $product['catalog_group'], $product['net_price'] ?? '-'];
+            $line = [$product['code'], $product['name'], $product['net_price'] ?? '-'];
             if ($this->document['show_retail']) {
                 $line[] = $product['retail_price'] ?? '-';
             }
@@ -75,6 +79,12 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
         }
         $rows[] = [null];
         $rows[] = [$captions['missing']];
+        $this->noteRow = count($rows);
+        $rows[] = [null];
+        foreach ($this->document['footer_lines'] as $line) {
+            $rows[] = [$line];
+            $this->footerRows[] = count($rows);
+        }
         $this->lastRow = count($rows);
 
         return $rows;
@@ -84,13 +94,13 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
     {
         return [AfterSheet::class => function (AfterSheet $event): void {
             $sheet = $event->sheet->getDelegate();
-            $lastColumn = $this->document['show_retail'] ? 'G' : 'F';
-            $dateColumn = $this->document['show_retail'] ? 'F' : 'E';
+            $lastColumn = $this->document['show_retail'] ? 'F' : 'E';
+            $dateColumn = $this->document['show_retail'] ? 'E' : 'D';
             $sheet->setShowGridlines(false);
             $sheet->getStyle('A1:'.$lastColumn.$this->lastRow)->applyFromArray([
                 'font' => ['name' => 'Arial', 'size' => 10], 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
-            foreach ([2, 3, 4, $this->lastRow] as $row) {
+            foreach ([2, 3, 4, $this->noteRow, ...$this->footerRows] as $row) {
                 $sheet->mergeCells('A'.$row.':'.$lastColumn.$row);
             }
             $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(14);
@@ -101,7 +111,7 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
                 'alignment' => ['wrapText' => true, 'horizontal' => Alignment::HORIZONTAL_CENTER],
             ]);
             $sheet->getRowDimension(6)->setRowHeight(34);
-            $widths = $this->document['show_retail'] ? [20, 24, 27, 18, 20, 20, 14] : [20, 24, 27, 18, 20, 14];
+            $widths = $this->document['show_retail'] ? [18, 22, 15, 16, 17, 12] : [18, 26, 17, 21, 18];
             foreach ($widths as $index => $width) {
                 $sheet->getColumnDimensionByColumn($index + 1)->setWidth($width);
             }
@@ -109,19 +119,25 @@ class PartnerPriceListSheet extends DefaultValueBinder implements FromArray, Wit
                 $sheet->mergeCells('A'.$row.':'.$lastColumn.$row);
                 $sheet->getStyle('A'.$row.':'.$lastColumn.$row)->applyFromArray(['font' => ['bold' => true],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E8EDF3']]]);
-                $sheet->getRowDimension($row)->setRowHeight(21);
+                $sheet->getRowDimension($row)->setRowHeight(18);
             }
             foreach ($this->productRows as $row) {
                 $sheet->getStyle('A'.$row.':'.$lastColumn.$row)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_HAIR)->getColor()->setRGB('D8DDE5');
-                $sheet->getStyle('A'.$row.':C'.$row)->getAlignment()->setWrapText(true);
-                $sheet->getStyle('D'.$row.':'.($this->document['show_retail'] ? 'E' : 'D').$row)->getNumberFormat()->setFormatCode('#,##0.00');
-                $sheet->getStyle('D'.$row.':'.$lastColumn.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('A'.$row.':B'.$row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle('C'.$row.':'.($this->document['show_retail'] ? 'D' : 'C').$row)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle('C'.$row.':'.$lastColumn.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getStyle($dateColumn.$row)->getNumberFormat()->setFormatCode($this->document['captions']['excel_date_format']);
                 $sheet->getRowDimension($row)->setRowHeight(-1);
             }
-            $sheet->getStyle('A'.$this->lastRow)->getFont()->setItalic(true)->setSize(9);
+            $sheet->getStyle('A'.$this->noteRow)->getFont()->setItalic(true)->setSize(9);
+            foreach ($this->footerRows as $row) {
+                $sheet->getStyle('A'.$row)->getFont()->setSize(9);
+                $sheet->getStyle('A'.$row)->getAlignment()->setWrapText(true);
+                $sheet->getRowDimension($row)->setRowHeight(17);
+            }
             $sheet->freezePane('C7');
-            $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_A4)
+            $sheet->getPageMargins()->setLeft(0.25)->setRight(0.25)->setTop(0.35)->setBottom(0.35);
+            $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT)->setPaperSize(PageSetup::PAPERSIZE_A4)
                 ->setFitToWidth(1)->setFitToHeight(0)->setRowsToRepeatAtTopByStartAndEnd(2, 6)->setPrintArea('A2:'.$lastColumn.$this->lastRow);
             $sheet->getHeaderFooter()->setOddFooter('&L'.$this->document['season_code'].'&R'.$this->document['captions']['page_number'].' &P / &N');
         }];

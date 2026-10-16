@@ -41,14 +41,32 @@ exportot nem korlátozza. Egy fájl legfeljebb 10 000 terméket tartalmazhat.
 
 ## Fájlok
 
-Excelben márkánként/rendelőlaptípusonként külön munkalap, főcsoportos
+Excelben márkánként/rendelőlaptípusonként külön munkalap, katalóguscsoportos
 elválasztók, ismétlődő nyomtatási fejléc, fagyasztott azonosítóoszlopok,
-A4 fekvő nyomtatás. Az árak számok, rendszer szerinti tizedeselválasztóval;
-a dátumok valódi Excel-dátumok. Szövegmezőből nem keletkezhet Excel-képlet.
+A4 álló nyomtatás. A katalóguscsoport a csoport tetején szerepel, külön
+oszlopban és terméksoronként nem ismétlődik. Az árak számok, rendszer szerinti
+tizedeselválasztóval; a dátumok valódi Excel-dátumok, `2027.04.01` kijelzéssel.
+Szövegmezőből nem keletkezhet Excel-képlet.
 
 PDF-ben márkánként/rendelőlaptípusonként új szakasz, ismétlődő táblázatfejléc,
-A4 fekvő formátum és oldalszámozás. Unicode betűkészlet; magyar ékezetekkel.
+A4 álló formátum és oldalszámozás. Unicode betűkészlet; magyar ékezetekkel.
 Mindkét formátum PHP-val készül, szerveroldali Node.js nélkül.
+
+Minden munkalap/szakasz végén megjelenik a kapcsolat és az árgarancia:
+
+```text
+www.heavytools.com, info@heavytools.com
+Az árváltozás jogát fenntartjuk.
+A megrendelési árakat <szezonális USD árfolyam> HUF/USD árfolyamszintig garantáljuk.
+```
+
+Angol exportban a két utolsó sor angolul jelenik meg. Az árfolyam az
+`exchange_rates.rate_to_huf` mezőből jön: pontosan a választott szezon és az
+aktív USD pénznem aktív árfolyama. A négy tizedesig tárolt érték érdemi
+tizedesei megmaradnak; a példában lévő 370 nincs beégetve. Hiányzó, inaktív
+vagy nem pozitív árfolyamnál az export hibát jelez a szezon mezőnél; az
+**Árfolyamok** törzsben kell beállítani. Nem használunk másik szezont vagy
+aktuális piaci árfolyamot, és az árgaranciához nem számolunk újra árakat.
 
 ## Jogosultságok
 
@@ -107,3 +125,24 @@ A Composer tényleges útját a tárhelyen kell ellenőrizni (`command -v compos
 a fenti helykitöltőt nem szabad változatlanul futtatni. Migráció ehhez a
 fejlesztéshez nincs. Nem super_admin kollégáknál a fenti oldal- és olvasási
 jogokat a szerepkörben engedélyezni kell.
+
+### A kompakt elrendezés külön kihelyezése
+
+Ez a már telepített export megjelenítési módosítása: **nincs új migráció,
+Composer install, npm build, kézi feltöltés vagy .env változtatás**. Az árgaranciához
+a kiválasztott szezon aktív USD/HUF árfolyamának megléte szükséges.
+
+```powershell
+git add -- app/Exports/PartnerPriceListSheet.php app/Services/PartnerPriceListService.php app/Services/PartnerPriceListPdf.php lang/hu/price_list.php lang/en/price_list.php resources/views/exports/partner-price-list.blade.php tests/Feature/PartnerPriceListExportTest.php docs/partner-price-list-export.md
+git commit -m "Compact portrait partner price lists with seasonal exchange guarantee"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-nas.ps1
+```
+
+Éles/WePanel kihelyezés csak külön jóváhagyott éles kiadás részeként:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
