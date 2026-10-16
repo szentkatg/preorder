@@ -89,6 +89,20 @@ class OutletCalculationTest extends TestCase
         return app(OutletCalculationService::class)->recalculate($this->project, 'HUF');
     }
 
+    public function test_row_warning_includes_outlet_approval_and_clears_after_combined_approval(): void
+    {
+        $this->calculate();
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->source(), 'approved');
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $record = $page->instance()->getTableRecords()->first();
+        $this->assertTrue($page->instance()->getTable()->getRecordClasses($record)['pricing-needs-attention']);
+
+        app(RetailOutletReviewService::class)->approve($this->source(), [$this->outlet->id], 'all', 'approved');
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $record = $page->instance()->getTableRecords()->first();
+        $this->assertFalse($page->instance()->getTable()->getRecordClasses($record)['pricing-needs-attention']);
+    }
+
     public function test_outlet_uses_gross_same_currency_retail_and_never_publishes(): void
     {
         $this->assertSame(1, $this->calculate()['created']);

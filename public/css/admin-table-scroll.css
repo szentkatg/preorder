@@ -63,3 +63,20 @@
         display: none !important;
     }
 }
+
+/* Keep editable cells blue; their tint sits over the row's review warning. */
+.fi-ta-table > tbody > tr.pricing-needs-attention {
+    background-color: rgba(239, 68, 68, .08);
+}
+
+.fi-ta-table > tbody > tr.pricing-needs-attention:hover {
+    background-color: rgba(239, 68, 68, .12);
+}
+
+.dark .fi-ta-table > tbody > tr.pricing-needs-attention {
+    background-color: rgba(248, 113, 113, .12);
+}
+
+.dark .fi-ta-table > tbody > tr.pricing-needs-attention:hover {
+    background-color: rgba(248, 113, 113, .17);
+}

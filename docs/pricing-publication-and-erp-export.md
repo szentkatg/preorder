@@ -111,6 +111,48 @@ kalkulációt. Első publikálás előtt nem készül ERP-export.
 
 ## Telepítés
 
+### Jóváhagyásra / felülvizsgálatra váró sorok jelölése
+
+A HUF és devizás kisker-, nagyker-, disztribútori, bekerülési és általános
+kalkulációs listák halványpiros háttérrel jelzik a figyelmet igénylő sorokat,
+világos és sötét témában is. Piros a sor, ha felülvizsgálandó, nincs pozitív
+végleges ára, vagy még nem jóváhagyott (az „Átnézett” még nem jóváhagyás).
+A bekerülési értéknek nincs külön jóváhagyási lépése, ezért ott önmagában a
+„Kalkulált” státusz nem figyelmeztetés. A kisker listákon a konfigurált,
+hozzátartozó outlet sorok állapota és minimumkedvezménye is számít.
+A disztribútori listán a kiválasztott disztribútori sor státuszát nézzük,
+nem a táblázat alapjául szolgáló nagyker sorét. A szerkeszthető cellák kék
+jelölése megmarad. A színezés nem módosít adatot, nem végez újraszámítást
+és nem váltja ki a lezárás teljes érvényesség-ellenőrzését.
+
+Ehhez a megjelenítési változáshoz nincs új migráció, Composer install,
+npm build, kézi feltöltés, új jogosultság vagy egyéb üzemeltetői teendő.
+A közvetlenül kiszolgált CSS Gitből frissül; URL-jét fájlidőbélyeg verziózza.
+
+Git a pricing worktree-ben:
+
+```bash
+git add -- app/Models/PricingCalculationRow.php app/Filament/Support/PricingGrid.php app/Filament/Resources/PricingCalculationRows/Tables/PricingCalculationRowsTable.php public/css/admin-table-scroll.css tests/Unit/PricingAttentionTest.php tests/Feature/PricingGridInteractionsTest.php tests/Feature/OutletCalculationTest.php tests/Feature/PricingCostDoubleClickTest.php docs/pricing-publication-and-erp-export.md
+git commit -m "Highlight pricing rows pending approval or review"
+git push origin feature/pricing-module
+```
+
+NAS (csak kért telepítéskor):
+
+```powershell
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles WePanel/cPanel, külön jóváhagyott és az éles ágba integrált release után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### A publikálás és ERP-export eredeti telepítése
+
 Migráció szükséges: `2026_10_16_160000_add_pricing_publications.php`.
 Az előző outlet fejlesztés migrációja is szükséges, ha még nincs telepítve.
 Composer/npm build/kézi assetfeltöltés nem kell. A migráció üres naplót és

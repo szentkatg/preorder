@@ -71,6 +71,20 @@ class PricingGridInteractionsTest extends TestCase
         $this->assertStringContainsString('Bekerülési', $page->instance()->getMountedAction()->getModalContent()->render());
     }
 
+    public function test_row_warning_tracks_approval_and_review_without_changing_prices(): void
+    {
+        $originalPrice = $this->retail->final_price;
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $this->assertTrue($page->instance()->getTable()->getRecordClasses($this->retail)['pricing-needs-attention']);
+
+        $page->callAction('pricingApprove', ['approval_status' => 'approved'], ['record_id' => $this->retail->id])->assertHasNoErrors();
+        $this->assertFalse($page->instance()->getTable()->getRecordClasses($this->retail->fresh())['pricing-needs-attention']);
+
+        $this->retail->update(['requires_review' => true]);
+        $this->assertTrue($page->instance()->getTable()->getRecordClasses($this->retail->fresh())['pricing-needs-attention']);
+        $this->assertSame($originalPrice, $this->retail->fresh()->final_price);
+    }
+
     public function test_manual_comma_price_approval_and_explicit_calculated_reset_work(): void
     {
         $page = Livewire::test(PricingHufRetailCalculations::class)

@@ -70,6 +70,20 @@ class PricingCostDoubleClickTest extends TestCase
         $this->assertNotEmpty($legacy->getRecordActions());
     }
 
+    public function test_row_warning_on_cost_and_generic_tables_preserves_double_click_classes(): void
+    {
+        $page = Livewire::test(PricingCostCalculations::class);
+        $classes = $page->instance()->getTable()->getRecordClasses($this->cost);
+        $this->assertContains('pricing-cost-row', $classes);
+        $this->assertContains('pricing-cost-details-enabled', $classes);
+        $this->assertFalse($classes['pricing-needs-attention']);
+
+        $this->cost->update(['requires_review' => true]);
+        $this->assertTrue($page->instance()->getTable()->getRecordClasses($this->cost)['pricing-needs-attention']);
+        $generic = PricingCalculationRowsTable::configure(Table::make($page->instance()));
+        $this->assertTrue($generic->getRecordClasses($this->cost)['pricing-needs-attention']);
+    }
+
     public function test_details_are_loaded_only_when_requested_and_use_the_existing_breakdown_view(): void
     {
         $before = $this->cost->fresh()->getAttributes();

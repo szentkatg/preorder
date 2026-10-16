@@ -43,7 +43,30 @@ class PricingGrid
             ->recordClasses(fn (PricingCalculationRow $record, $livewire) => [
                 'pricing-price-row', 'pricing-price-row-id-'.$record->id,
                 ($row = $livewire->pricingEditableRow($record)) && Gate::allows('view', $row) ? 'pricing-price-details-enabled' : '',
+                'pricing-needs-attention' => self::needsAttention($record, $livewire),
             ]);
+    }
+
+    public static function needsAttention(PricingCalculationRow $record, $livewire): bool
+    {
+        // On the distributor page the table record is the wholesale source;
+        // approval belongs to the selected distributor row, not that source.
+        $row = $livewire->pricingEditableRow($record);
+        if ($row?->needsPricingAttention()) {
+            return true;
+        }
+
+        if (! $livewire->supportsOutletPricing()) {
+            return false;
+        }
+
+        foreach ($livewire->outletPriceLists as $list) {
+            if (OutletColumns::row($record, $list->id)?->needsPricingAttention()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function inputValue(mixed $value): string

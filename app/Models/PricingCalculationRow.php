@@ -81,6 +81,22 @@ class PricingCalculationRow extends Model
 
     public const STATUS_APPROVED_ROUND_3 = 'approved_round_3';
 
+    public function needsPricingAttention(): bool
+    {
+        if ($this->requires_review || (float) $this->final_price <= 0) {
+            return true;
+        }
+
+        // Cost calculations have no approval workflow of their own.
+        if ($this->price_type === self::TYPE_COST) {
+            return false;
+        }
+
+        return ! in_array($this->status, [self::STATUS_APPROVED, self::STATUS_MODIFIED_APPROVED,
+            self::STATUS_APPROVED_ROUND_2, self::STATUS_APPROVED_ROUND_3], true)
+            || ($this->price_type === self::TYPE_OUTLET && ! $this->outletDiscountIsSufficient());
+    }
+
     protected $fillable = [
         'pricing_project_id',
         'source_retail_row_id',

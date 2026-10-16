@@ -164,10 +164,13 @@ class PricingCalculationRowsTable
             ->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
-            ->recordClasses($lightweightCost ? fn (PricingCalculationRow $record): array => [
-                'pricing-cost-row', 'pricing-cost-row-id-'.$record->getKey(),
-                Gate::allows('view', $record) ? 'pricing-cost-details-enabled' : '',
-            ] : null)
+            ->recordClasses(fn (PricingCalculationRow $record): array => [
+                ...($lightweightCost ? [
+                    'pricing-cost-row', 'pricing-cost-row-id-'.$record->getKey(),
+                    Gate::allows('view', $record) ? 'pricing-cost-details-enabled' : '',
+                ] : []),
+                'pricing-needs-attention' => $record->needsPricingAttention(),
+            ])
             ->recordActions($lightweightCost ? [] : [
                 Action::make('calculationDetails')
                     ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
