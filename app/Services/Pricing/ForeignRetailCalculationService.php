@@ -46,7 +46,7 @@ class ForeignRetailCalculationService
         });
     }
 
-    public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null): array
+    public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null, ?int $productId = null): array
     {
         Gate::authorize('update', $project);
         Gate::authorize('create', PricingCalculationRow::class);
@@ -60,12 +60,13 @@ class ForeignRetailCalculationService
         }
         $result = ['run_id' => $runId ?? (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0, 'requires_review' => 0, 'errors' => []];
 
-        return DB::transaction(function () use ($project, $sourceList, $targetList, $result): array {
+        return DB::transaction(function () use ($project, $sourceList, $targetList, $result, $productId): array {
             $project = PricingProject::query()->lockForUpdate()->findOrFail($project->id);
             if (! $project->isOpenForPricing()) {
                 throw new DomainException('Az árprojekt időközben lezárt lett.');
             }
             $sources = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
+                ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
                 ->where('price_type', 'retail')->where('price_list_id', $sourceList->id)->where('currency_id', $sourceList->currency_id)
                 ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
                 ->with(['currency', 'product.itemMainGroup', 'supplier', 'priceList'])->lockForUpdate()->get();

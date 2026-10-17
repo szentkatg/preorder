@@ -80,3 +80,84 @@
 .dark .fi-ta-table > tbody > tr.pricing-needs-attention:hover {
     background-color: rgba(248, 113, 113, .17);
 }
+
+/* Shared by every Filament list, including relation managers and modal tables. */
+.fi-ta-table .fi-ta-selection-cell,
+.fi-ta-table .fi-ta-group-selection-cell {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background-color: #fff;
+    box-shadow: 1px 0 0 #e5e7eb;
+}
+
+.fi-ta-table > tbody > tr.fi-selected > .fi-ta-selection-cell {
+    position: sticky;
+}
+
+.fi-ta-table thead .fi-ta-selection-cell,
+[data-pricing-resizable-columns] .fi-ta-table th.fi-ta-selection-cell {
+    position: sticky;
+    left: 0;
+    z-index: 21;
+    background-color: #f9fafb;
+}
+
+.dark .fi-ta-table .fi-ta-selection-cell,
+.dark .fi-ta-table .fi-ta-group-selection-cell {
+    background-color: #18181b;
+    box-shadow: 1px 0 0 #3f3f46;
+}
+
+.dark .fi-ta-table thead .fi-ta-selection-cell {
+    background-color: #181f2a;
+}
+
+.fi-ta-table tr.pricing-needs-attention .fi-ta-selection-cell {
+    background-color: #fef0f0;
+}
+
+.dark .fi-ta-table tr.pricing-needs-attention .fi-ta-selection-cell {
+    background-color: #332326;
+}
+
+.fi-ta-table > tbody > tr > .fi-ta-cell {
+    padding-block: .125rem;
+}
+
+.fi-ta-table .fi-ta-cell :is(.fi-ta-text, .fi-ta-text-input, .fi-ta-icon, .fi-ta-text-item, .fi-badge, .fi-btn, .fi-link) {
+    padding-block: 0;
+    line-height: 1.25;
+}
+
+.fi-ta-table .fi-ta-cell :is(.fi-input, .fi-btn) {
+    min-height: 1.5rem;
+    padding-block: 0;
+}
+
+@media print {
+    .fi-ta-table :is(.fi-ta-selection-cell, .fi-ta-group-selection-cell) {
+        position: static;
+    }
+}
+
+.product-pricing-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: .5rem 1rem;
+    margin-block: .5rem 1rem;
+}
+.product-pricing-fields label { display: grid; gap: .25rem; }
+.product-pricing-editor :is(input, select) {
+    border: 1px solid #9ca3af;
+    border-radius: .375rem;
+    padding: .25rem .5rem;
+    background: transparent;
+    color: inherit;
+    min-width: 0;
+}
+.product-pricing-editor h3 { font-weight: 700; margin-block: 1rem .25rem; }
+.product-pricing-preview { border-collapse: collapse; width: 100%; }
+.product-pricing-preview :is(th, td) { border: 1px solid #64748b; padding: .25rem .5rem; text-align: right; }
+.product-pricing-preview :is(th, td):first-child { text-align: left; }
+.product-pricing-preview input { width: 9rem; text-align: right; }

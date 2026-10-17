@@ -40,7 +40,7 @@ class OutletCalculator extends WholesaleCalculator
         }
         $factor = BigDecimal::one()->minus(BigDecimal::of($parameter->value)->dividedBy(100, 8, RoundingMode::HALF_UP));
         $unrounded = BigDecimal::of($source->final_price)->multipliedBy($factor)->toFloat();
-        $price = $this->rounding->apply($unrounded, $rule);
+        $price = $this->rounding->applyOutlet($unrounded, $rule);
         if (! is_finite($price) || $price <= 0 || $price > 99999999999.9999 || $unrounded > 99999999999.9999) {
             throw new DomainException('Az outlet kalkuláció nem pozitív vagy túl nagy árat eredményezett.');
         }
@@ -57,7 +57,8 @@ class OutletCalculator extends WholesaleCalculator
                 'inputs' => ['base_price' => (float) $source->final_price, 'multiplier' => $factor->toFloat(),
                     'outlet_discount_percent' => (float) $parameter->value, 'unrounded_price' => $unrounded],
                 'outlet_parameter' => $parameter->only(['id', 'scope_type', 'value', 'currency_id', 'price_list_id', 'product_id', 'item_main_group_id']),
-                'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment']), 'calculated_price' => $price,
+                'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment'])
+                    + ['discount_safe' => true], 'calculated_price' => $price,
             ]];
     }
 

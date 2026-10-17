@@ -57,9 +57,21 @@ class PricingParameter extends Model
     {
         $invalidate = static function (self $parameter): void {
             if ($parameter->parameter_type === self::TYPE_OUTLET_DISCOUNT || $parameter->getOriginal('parameter_type') === self::TYPE_OUTLET_DISCOUNT) {
-                PricingCalculationRow::where('price_type', 'outlet')->whereIn('pricing_project_id', array_filter([
-                    $parameter->pricing_project_id, $parameter->getOriginal('pricing_project_id'),
-                ]))->update(['requires_review' => true]);
+                foreach ([$parameter->getAttributes(), $parameter->getOriginal()] as $attributes) {
+                    if (empty($attributes['pricing_project_id'])) {
+                        continue;
+                    }
+                    PricingCalculationRow::where('price_type', 'outlet')->where('pricing_project_id', $attributes['pricing_project_id'])
+                        ->when(($attributes['scope_type'] ?? '') === self::SCOPE_PRODUCT,
+                            fn ($query) => $query->where('product_id', $attributes['product_id']))
+                        ->when(($attributes['scope_type'] ?? '') === self::SCOPE_ITEM_MAIN_GROUP,
+                            fn ($query) => $query->whereHas('product', fn ($product) => $product->where('item_main_group_id', $attributes['item_main_group_id'])))
+                        ->when(($attributes['scope_type'] ?? '') === self::SCOPE_SUPPLIER_COUNTRY,
+                            fn ($query) => $query->whereHas('supplier', fn ($supplier) => $supplier->where('country_code', $attributes['supplier_country_code'])))
+                        ->when($attributes['price_list_id'] ?? null, fn ($query, $id) => $query->where('price_list_id', $id))
+                        ->when($attributes['currency_id'] ?? null, fn ($query, $id) => $query->where('currency_id', $id))
+                        ->update(['requires_review' => true]);
+                }
             }
         };
         static::saved($invalidate);

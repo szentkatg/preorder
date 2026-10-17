@@ -30,7 +30,7 @@ class CostCalculationService
      *     errors: array<int, string>
      * }
      */
-    public function recalculate(PricingProject $project): array
+    public function recalculate(PricingProject $project, ?int $productId = null): array
     {
         CostCalculationAuthorization::authorizeRecalculation($project);
         $project->loadMissing('season');
@@ -45,6 +45,7 @@ class CostCalculationService
         }
 
         $productsWithoutActivePurchasePrice = Product::query()
+            ->when($productId !== null, fn ($query) => $query->whereKey($productId))
             ->where('season_id', $project->season_id)
             ->where('active', true)
             ->whereDoesntHave(
@@ -55,6 +56,7 @@ class CostCalculationService
             ->get();
 
         $purchasePrices = ProductPurchasePrice::query()
+            ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
             ->where('active', true)
             ->whereHas('product', function ($query) use ($project): void {
                 $query

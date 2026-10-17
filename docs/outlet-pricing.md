@@ -15,9 +15,11 @@ Az outlet bruttó kisker ár, azonos pénznemű normál kisker árból számítv
    Alapból globális, de a meglévő ország/főcsoport/modell szűkítés használható.
    Ha szükséges, adott outlet árlistára is szűkíthető.
 3. **Árkerekítési szabályok**: `Outlet` ártípus, megfelelő árprojekt, pénznem
-   és/vagy outlet árlista, a kívánt lépéssel, iránnyal és korrekcióval.
-   A lefelé kerekítés segíthet megtartani a minimum kedvezményt, de ez nem
-   automatikus: a tényleges végeredményt minden esetben ellenőrizzük.
+   és/vagy outlet árlista, a kívánt lépéssel és korrekcióval.
+   A 2026.10.17-i fejlesztéstől az irány automatikus: először felfelé
+   kerekítünk; ha a korrekció utáni ár túllépné a minimumkedvezményből
+   adódó felső határt, a legmagasabb még megfelelő alsó lépcsőt használjuk.
+   Outletnél a hagyományos irányválasztó nem használatos.
 4. Számítsd ki a forrás kisker árakat, majd a **HUF kisker árak** vagy a
    **Devizás kisker árak → CZK** oldalon az **Outlet árak újraszámítása** gombot.
 
@@ -34,7 +36,8 @@ az adott árprojekt/pénznem kisker munkalapján, nem a nagyker/disztribútor ol
   Üres bevitel törli a manuális árat; ez nem hagyja jóvá automatikusan.
 - A minimumot el nem érő tényleges kedvezmény és végleges ár **piros**.
   Az ilyen outlet ár egyik jóváhagyási szinten sem fogadható el.
-  Nem módosítjuk a kerekítést vagy árat észrevétlenül: a felhasználó javít.
+  Ez továbbra is érvényes a manuális/megtartott árakra. Az új kalkulált
+  ár már automatikusan minimumkedvezmény-biztos kerekítéssel készül.
 - A sor műveleti menüjében külön **Kisker ár jóváhagyása**, **Outlet ár
   jóváhagyása**, valamint **Minden ár jóváhagyása** szerepel. Mindháromhoz
   kijelöléses tömeges művelet is van. Egy termék kisker+outlet jóváhagyása

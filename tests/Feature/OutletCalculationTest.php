@@ -110,18 +110,19 @@ class OutletCalculationTest extends TestCase
         $this->assertSame('1990.0000', $row->base_price);
         $this->assertSame('20.000000', $row->outlet_discount_percent);
         $this->assertSame('1592.0000', $row->unrounded_price);
-        $this->assertSame('1490.0000', $row->final_price);
+        $this->assertSame('1590.0000', $row->final_price);
         $this->assertTrue($row->outletDiscountIsSufficient());
         $this->assertSame($this->source()->id, $row->source_retail_row_id);
         $this->assertSame(0, $this->calculate()['created']);
         $this->assertDatabaseCount('price_list_items', 0);
     }
 
-    public function test_rounding_below_minimum_is_visible_but_cannot_be_approved_and_combined_approval_rolls_back(): void
+    public function test_rounding_automatically_stays_below_minimum_and_invalid_manual_price_still_rolls_back_combined_approval(): void
     {
         $this->rounding->update(['mode' => 'nearest', 'adjustment' => 0]);
-        $this->assertSame(1, $this->calculate()['below_minimum']);
-        $this->assertSame('1600.0000', $this->row()->final_price);
+        $this->assertSame(0, $this->calculate()['below_minimum']);
+        $this->assertSame('1500.0000', $this->row()->final_price);
+        app(OutletPriceReviewService::class)->setManualPrice($this->row(), 1600);
         $this->assertFalse($this->row()->outletDiscountIsSufficient());
         try {
             app(RetailOutletReviewService::class)->approve($this->source(), [$this->outlet->id], 'all', 'approved');
@@ -157,7 +158,7 @@ class OutletCalculationTest extends TestCase
         app(RetailPriceReviewService::class)->setManualPrice($this->source(), 1800);
         $this->assertTrue($this->row()->requires_review);
         $this->calculate();
-        $this->assertSame('1490.0000', $this->row()->final_price);
+        $this->assertSame('1590.0000', $this->row()->final_price);
         $this->assertSame('1390.0000', $this->row()->calculated_price);
         $this->assertFalse($this->row()->outletDiscountIsSufficient());
         app(OutletPriceReviewService::class)->acceptCalculatedPrice($this->row());
@@ -176,7 +177,7 @@ class OutletCalculationTest extends TestCase
         foreach ([-1, 100] as $discount) {
             $this->discount->update(['value' => $discount]);
             $this->assertSame(1, $this->calculate()['skipped']);
-            $this->assertSame('1490.0000', $this->row()->final_price);
+            $this->assertSame('1590.0000', $this->row()->final_price);
         }
         $this->discount->update(['value' => 20]);
         $this->rounding->update(['active' => false]);
@@ -276,10 +277,10 @@ class OutletCalculationTest extends TestCase
         $name = 'outlet_'.$this->outlet->id.'_final_price';
         $columns = $page->instance()->getTable()->getColumns();
         $export = new AdminTableExport($page->instance()->getFilteredTableQuery(), [$columns[$name]]);
-        $this->assertSame([1490.0], $export->map($this->source()));
+        $this->assertSame([1590.0], $export->map($this->source()));
         $value = PricingCalculationRow::whereKey($this->source()->id)->selectRaw(OutletComparison::sql('outlet_'.$this->outlet->id.'_actual_discount').' AS discount')->value('discount');
         $this->assertEqualsWithDelta($this->row()->actual_outlet_discount, $value, 0.00001);
-        $page->searchTableColumns([$name => '1490'])->assertCanSeeTableRecords([$this->source()]);
+        $page->searchTableColumns([$name => '1590'])->assertCanSeeTableRecords([$this->source()]);
         $page->searchTableColumns([$name => '9999'])->assertCanNotSeeTableRecords([$this->source()]);
         $page->call('savePricingDecimalPlaces', [$name => 2])->assertHasNoErrors();
         $this->assertSame(2, $page->instance()->pricingDecimalPlacesFor($name));

@@ -111,6 +111,97 @@ kalkulációt. Első publikálás előtt nem készül ERP-export.
 
 ## Telepítés
 
+### 2026.10.17 – Termékenkénti árkezelés és teljes áttekintés
+
+- Minden Filament lista kijelölőoszlopa bal oldalon rögzített, a kijelölt
+  sorokon is. A fejléc függőleges rögzítése megmarad. Közös kompakt sorstílus
+  a paramétereknél és a többi törzsadatlistánál is.
+- A szűrőikon mögött többválasztós főcsoport-, katalóguscsoport-, márka-,
+  beszállító- és státuszszűrők jelennek meg, ahol a modell kapcsolatai ezt
+  lehetővé teszik. Meglévő szűrőt nem duplázunk. A terméktörzs beszállítója
+  az aktív beszerzési árakhoz kapcsolódik; a kalkulációé a kiválasztott beszállító.
+- **Termékenkénti árkezelés**: kiválasztott árprojektben a termék sorára
+  kattintva teljes szélességű szerkesztőablak nyílik. Aktív beszerzési árak,
+  szállítás/vám, kisker/országszorzó, nagyker szorzó, disztribútori/outlet
+  kedvezmény és manuális árak együtt kezelhetők. Több HUF forrásnál a
+  devizás listához választani kell; nem választjuk ki önkényesen az elsőt.
+- Minden átírt százalék/szorzó a kiválasztott árprojekt **adott modelljének**
+  paramétere, nem ír át globális, ország- vagy főcsoportszintű adatot.
+  A beszerzési ár ezzel szemben törzsadat: ugyanennek a modellnek más nyitott
+  árprojektben használt kalkulációit felülvizsgálatra jelöljük. Az árfolyam
+  és a kerekítési szabály továbbra is a meglévő szezon/árlista-beállításból jön.
+- Bevitel közben előnézet fut a valódi kalkulátorokkal, mindig visszagördített
+  tranzakcióban: nem marad mentett paraméter, ár, jóváhagyás vagy hibanapló.
+  A mentett, új kalkulált és mentendő ár egymás mellett látható. Üres manuális
+  mezőnél az új kalkulált ár kerül elfogadásra (a régi megtartott ár nem marad
+  automatikusan érvényben); kitöltött mezőnél a megadott ár marad érvényben.
+- **Minden ár mentése és jóváhagyása**: egy tranzakcióban, függőségi sorrendben
+  bekerülés → HUF kisker → devizás kisker → nagyker → disztribútor/outlet.
+  Bármely hibánál minden visszagördül. Időközben módosult adatoknál újranyitást
+  kérünk; lejárt előnézet nem hagyható jóvá. Lezárt projekten nincs írás.
+  Nem publikálunk `price_list_items` adatot: az továbbra is a projektlezárás feladata.
+- **Teljes áráttekintés**: külön, csak olvasható lista modellenként/színenként,
+  a tárolt végleges árakkal és használt paraméterekkel, köztes kerekítések nélkül.
+  Pénznemek közti bekerülési összehasonlításhoz a kalkuláció mentett devizás
+  kisker árfolyamát használjuk. Szorzók: ár HUF-ban / bekerülés; bruttó kisker /
+  nettó nagyker; nettó nagyker / nettó disztribútor; bruttó kisker / nettó
+  disztribútor. Nem számolunk implicit ÁFA-korrekciót. Hiányzó adat: üres,
+  nem nulla. Oszlopok, sorrend, szélesség, tizedesek felhasználónként
+  megjegyezve; minden ár és mutató szűrhető/rendezhető, Excelbe számként exportálható.
+- Outlet: a kerekítés automatikusan a minimumkedvezményből adódó felső határ
+  alatt tartja az új kalkulált árat, a korrekciót is figyelembe véve. A meglévő
+  manuális vagy jóváhagyott ár nem változik észrevétlenül, továbbra is ellenőrizzük.
+
+Új migráció: `2026_10_17_090000_add_product_pricing_page_permissions.php`.
+Létrehozza a `View:PricingProductWorkspace` és `View:PricingProductOverview`
+jogosultságot, de szerepkörhöz nem rendeli automatikusan. A super_admin
+alapból látja. Más szerepkörnek az oldaljog mellett a kalkulációs sorok
+listázási joga kell; íráshoz a projekt/sor/paraméter/beszerzési ár meglévő
+módosítási jogosultságait is ellenőrizzük. A migráció az új kerekítés miatt a
+**nyitott** projektek meglévő outlet sorait felülvizsgálatra jelöli. Lezárt
+projektekhez és publikált árakhoz nem nyúl. A migráció visszavonása nem
+töröl üzleti árat és nem szünteti meg automatikusan a felülvizsgálati jelzést.
+
+Git a pricing worktree-ben (csak a felsorolt fejlesztési fájlok):
+
+```bash
+git add -- app/Filament/Pages/PricingProductOverview.php app/Filament/Pages/PricingProductWorkspace.php app/Filament/Support/AdminTableFilters.php app/Filament/Support/AdminResourceTable.php app/Filament/Resources/PricingRoundingRules/Schemas/PricingRoundingRuleForm.php app/Models/PricingParameter.php app/Services/Pricing/CostCalculationService.php app/Services/Pricing/HufRetailCalculationService.php app/Services/Pricing/ForeignRetailCalculationService.php app/Services/Pricing/OutletCalculator.php app/Services/Pricing/PricingRoundingService.php app/Services/Pricing/PricingOverviewQuery.php app/Services/Pricing/ProductPricingService.php public/css/admin-table-scroll.css resources/views/filament/pricing/product-workspace-editor.blade.php database/migrations/2026_10_17_090000_add_product_pricing_page_permissions.php tests/Feature/ProductPricingWorkspaceTest.php tests/Feature/OutletCalculationTest.php tests/Unit/OutletSafeRoundingTest.php docs/outlet-pricing.md docs/pricing-publication-and-erp-export.md
+git add -- tests/Feature/ForeignRetailCalculationTest.php
+git commit -m "Add single-product pricing workflow and comprehensive price overview"
+git push origin feature/pricing-module
+```
+
+NAS csak külön kért telepítéskor:
+
+```powershell
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles WePanel/cPanel, csak külön jóváhagyott és az éles ágba integrált release:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan migrate --force
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+`composer install`, `npm run build`, `.env`-módosítás és kézi fájlfeltöltés
+nem kell. A CSS közvetlenül Gitből frissül, fájlidőbélyeges cache-verzióval.
+Manuális teendő: nem-superadmin szerepkörökhöz az új oldaljogok hozzárendelése;
+a nyitott projektek outlet árainak felülvizsgálata/újraszámítása és jóváhagyása.
+
+Ellenőrzés: 286 kapcsolódó regressziós teszt, 2199 assertion sikeres; a
+végső célzott futtatás 20 tesztje, 316 assertion szintén sikeres. A két
+korábbról ismert admin-resource darabszám-elvárást a regressziós futtatásból
+kihagytuk, nem módosítottuk. Az új szűrőkkel minden admin-resource lista
+betöltését külön teszteljük, fix darabszám helyett a tényleges resource-listából.
+Teszteltük a teljes tranzakció visszagördülését, az időközbeni módosítás
+észlelését, a readonly/jogosultság-határokat, az Excel numerikus cellatípusait,
+az új szorzókat és a valódi publikálási validátort is. A helyi böngészős
+ellenőrzéshez ebben a munkamenetben nem volt elérhető böngésző; a renderelt
+HTML és a Livewire-műveletek ellenőrzöttek, tényleges vizuális QA még szükséges.
+
 ### Jóváhagyásra / felülvizsgálatra váró sorok jelölése
 
 A HUF és devizás kisker-, nagyker-, disztribútori, bekerülési és általános

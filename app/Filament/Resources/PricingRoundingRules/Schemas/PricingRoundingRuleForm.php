@@ -7,6 +7,7 @@ use App\Models\PricingRoundingRule;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class PricingRoundingRuleForm
@@ -36,6 +37,7 @@ class PricingRoundingRuleForm
                         PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
                         PricingCalculationRow::TYPE_OUTLET => 'Outlet',
                     ])
+                    ->live()
                     ->required(),
 
                 Select::make('price_list_id')
@@ -61,6 +63,10 @@ class PricingRoundingRuleForm
 
                 Select::make('mode')
                     ->label('Mód')
+                    ->helperText(fn (Get $get) => $get('price_type') === 'outlet'
+                        ? 'Outletnél az irány automatikus: felfelé, ha a korrekció utáni ár teljesíti a minimumkedvezményt; különben lefelé. A kiválasztott hagyományos módot itt nem alkalmazzuk.' : null)
+                    ->disabled(fn (Get $get) => $get('price_type') === 'outlet')
+                    ->dehydrated()
                     ->options([
                         PricingRoundingRule::MODE_NEAREST => 'Legközelebbi',
                         PricingRoundingRule::MODE_UP => 'Felfelé',

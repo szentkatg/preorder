@@ -483,13 +483,13 @@ class ForeignRetailCalculationTest extends TestCase
         {
             private int $calls = 0;
 
-            public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null): array
+            public function recalculate(PricingProject $project, PriceList $sourceList, PriceList $targetList, ?string $runId = null, ?int $productId = null): array
             {
                 if (++$this->calls === 2) {
                     throw new \RuntimeException('Unexpected failure');
                 }
 
-                return parent::recalculate($project, $sourceList, $targetList, $runId);
+                return parent::recalculate($project, $sourceList, $targetList, $runId, $productId);
             }
         };
         try {

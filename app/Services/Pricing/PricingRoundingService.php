@@ -3,10 +3,27 @@
 namespace App\Services\Pricing;
 
 use App\Models\PricingRoundingRule;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use DomainException;
 
 class PricingRoundingService
 {
+    /** Highest permitted outlet ending; prefer rounding up when it remains below the discount ceiling. */
+    public function applyOutlet(float $ceiling, PricingRoundingRule $rule): float
+    {
+        $limit = BigDecimal::of((string) $ceiling);
+        $step = (float) $rule->round_to > 0
+            ? BigDecimal::of($rule->round_to)
+            : BigDecimal::one()->dividedBy(10 ** $rule->decimal_places, $rule->decimal_places);
+        $adjustment = BigDecimal::of($rule->adjustment ?? 0);
+        $up = $limit->dividedBy($step, 0, RoundingMode::CEILING)->multipliedBy($step)->plus($adjustment);
+
+        return ($up->isLessThanOrEqualTo($limit) ? $up
+            : $limit->minus($adjustment)->dividedBy($step, 0, RoundingMode::FLOOR)->multipliedBy($step)->plus($adjustment))
+            ->toScale(4, RoundingMode::FLOOR)->toFloat();
+    }
+
     public function resolve(int $projectId, string $priceType, int $priceListId, int $currencyId): ?PricingRoundingRule
     {
         $rules = PricingRoundingRule::query()

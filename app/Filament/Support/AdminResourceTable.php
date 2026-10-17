@@ -33,6 +33,7 @@ class AdminResourceTable
         string $modelClass,
         bool $withViewAction = true,
     ): Table {
+        AdminTableFilters::configure($table, $modelClass);
         $table->columnManagerApplyAction(
             fn (Action $action): Action => $action->alpineClickHandler('await applyTableColumnManager(); if (! error) close()'),
         );

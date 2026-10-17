@@ -18,7 +18,7 @@ class HufRetailCalculationService
         private readonly RetailCalculationDependencyService $dependencies,
     ) {}
 
-    public function recalculate(PricingProject $project, ?PriceList $priceList = null): array
+    public function recalculate(PricingProject $project, ?PriceList $priceList = null, ?int $productId = null): array
     {
         if (! $project->isOpenForPricing()) {
             throw new DomainException('Csak nem lezárt árprojekt számítható újra.');
@@ -41,13 +41,14 @@ class HufRetailCalculationService
 
         $result = ['run_id' => (string) Str::uuid(), 'created' => 0, 'updated' => 0, 'skipped' => 0, 'requires_review' => 0, 'errors' => []];
 
-        DB::transaction(function () use ($project, $huf, $lists, &$result): void {
+        DB::transaction(function () use ($project, $huf, $lists, $productId, &$result): void {
             // Serialize calculations for the same project, including concurrent requests.
             $project = PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
             if (! $project->isOpenForPricing()) {
                 throw new DomainException('Az árprojekt időközben lezárt lett.');
             }
             $costs = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
+                ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
                 ->where('price_type', PricingCalculationRow::TYPE_COST)->where('currency_id', $huf->id)
                 ->where('price_list_key', 0)
                 ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
