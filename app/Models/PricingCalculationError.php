@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PricingCalculationError extends Model
 {
+    public const TYPE_PROJECT = 'project';
+
     public const SEVERITY_ERROR = 'error';
 
     public const SEVERITY_WARNING = 'warning';

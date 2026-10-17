@@ -3,8 +3,16 @@
 namespace Tests\Feature;
 
 use App\Exports\AdminTableExport;
+use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Pages\PricingDistributorCalculations;
+use App\Filament\Pages\PricingForeignRetailCalculations;
+use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Filament\Pages\PricingProductOverview;
 use App\Filament\Pages\PricingProductWorkspace;
+use App\Filament\Pages\PricingWholesaleCalculations;
+use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
+use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
+use App\Filament\Support\ProductPricingNavigation;
 use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
@@ -21,10 +29,12 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Pricing\CostCalculationService;
 use App\Services\Pricing\HufRetailCalculationService;
+use App\Services\Pricing\PricingProjectCalculationService;
 use App\Services\Pricing\PricingProjectPublicationService;
 use App\Services\Pricing\ProductPricingService;
 use DomainException;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -355,5 +365,207 @@ class ProductPricingWorkspaceTest extends TestCase
         $this->actingAs($reader);
         Livewire::test(PricingProductOverview::class)->assertSuccessful();
         Livewire::test(PricingProductWorkspace::class)->assertForbidden();
+    }
+
+    public function test_project_button_calculates_every_level_without_approving_or_publishing(): void
+    {
+        PricingCalculationRow::query()->delete();
+        $parameters = PricingParameter::all()->toArray();
+        $result = app(PricingProjectCalculationService::class)->calculate($this->project);
+        $this->assertSame(2, $result['products']);
+        $this->assertSame(14, $result['prices']);
+        $this->assertSame(0, $result['failed']);
+        $this->assertDatabaseCount('pricing_calculation_rows', 14);
+        $this->assertSame(['calculated'], PricingCalculationRow::query()->distinct()->pluck('status')->all());
+        $this->assertSame($parameters, PricingParameter::all()->toArray());
+        $this->assertDatabaseCount('price_list_items', 0);
+        $rows = PricingCalculationRow::where('product_id', $this->product->id)->get()->keyBy('price_list_id');
+        $this->assertSame($rows[$this->lists['re']->id]->id, $rows[$this->lists['we']->id]->source_retail_row_id);
+        $this->assertSame($rows[$this->lists['we']->id]->id, $rows[$this->lists['de']->id]->source_wholesale_row_id);
+        $this->assertSame(0, app(PricingProjectCalculationService::class)->calculate($this->project)['failed']);
+        $this->assertDatabaseCount('pricing_calculation_rows', 14);
+    }
+
+    public function test_project_recalculation_retains_manual_approved_prices_and_propagates_review(): void
+    {
+        $settings = $this->settings();
+        $settings['data']['manual'][$this->lists['re']->id.'_0'] = 80;
+        app(ProductPricingService::class)->approve($this->project, $this->product, $settings['data'], $settings['fingerprint']);
+        $before = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', '!=', 'cost')->get()->keyBy('id');
+        PricingParameter::where('parameter_type', 'shipping_cost_percent')->firstOrFail()->update(['value' => 25]);
+        $result = app(PricingProjectCalculationService::class)->calculate($this->project);
+        $this->assertSame([], $result['errors']);
+        foreach ($before as $old) {
+            $new = $old->fresh();
+            $this->assertSame($old->status, $new->status);
+            $this->assertSame($old->manual_price, $new->manual_price);
+            $this->assertSame($old->final_price, $new->final_price);
+            $this->assertTrue($new->requires_review, $new->price_type);
+        }
+        $this->assertDatabaseHas('pricing_calculation_rows', ['product_id' => $this->product->id,
+            'price_list_id' => $this->lists['we']->id, 'base_price' => 80, 'final_price' => 32]);
+        $this->assertDatabaseCount('price_list_items', 0);
+    }
+
+    public function test_failed_model_is_rolled_back_logged_and_does_not_block_other_models(): void
+    {
+        $before = PricingCalculationRow::where('product_id', $this->product->id)->get()->keyBy('id');
+        PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'wholesale_margin',
+            'scope_type' => 'product', 'product_id' => $this->product->id, 'value' => 0, 'active' => true]);
+        $result = app(PricingProjectCalculationService::class)->calculate($this->project);
+        $this->assertSame(1, $result['products']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertStringContainsString($this->product->model_code, $result['errors'][0]);
+        $this->assertSame(2, PricingCalculationRow::where('product_id', $this->product->id)->count());
+        foreach ($before as $row) {
+            $this->assertSame($row->final_price, $row->fresh()->final_price);
+            $this->assertTrue($row->fresh()->requires_review);
+        }
+        $this->assertSame(7, PricingCalculationRow::where('product_id', $this->other->id)->count());
+        $this->assertDatabaseHas('pricing_calculation_errors', ['run_id' => $result['run_id'], 'product_id' => $this->product->id, 'price_type' => 'project']);
+        PricingParameter::where('product_id', $this->product->id)->firstOrFail()->update(['value' => 2.5]);
+        $this->assertSame(0, app(PricingProjectCalculationService::class)->calculate($this->project)['failed']);
+        $this->assertFalse($before->first()->fresh()->requires_review);
+    }
+
+    public function test_missing_rounding_is_a_visible_error_instead_of_silently_omitting_an_enabled_price(): void
+    {
+        PricingRoundingRule::where('price_list_id', $this->lists['de']->id)->delete();
+        $result = app(PricingProjectCalculationService::class)->calculate($this->project);
+        $this->assertSame(2, $result['failed']);
+        $this->assertSame(0, $result['products']);
+        $this->assertDatabaseCount('pricing_calculation_rows', 4);
+        $this->assertDatabaseCount('pricing_calculation_errors', 2);
+    }
+
+    public function test_ambiguous_foreign_source_requires_selection_and_selected_source_is_used(): void
+    {
+        $huf = $this->lists['rh']->replicate();
+        $huf->code = 'RH2';
+        $huf->save();
+        $rule = PricingRoundingRule::where('price_list_id', $this->lists['rh']->id)->firstOrFail()->replicate();
+        $rule->price_list_id = $huf->id;
+        $rule->save();
+        $this->assertSame(2, app(PricingProjectCalculationService::class)->calculate($this->project)['failed']);
+        $result = app(PricingProjectCalculationService::class)->calculate($this->project, [$this->lists['re']->id => $huf->id]);
+        $this->assertSame([], $result['errors']);
+        $source = PricingCalculationRow::where('product_id', $this->product->id)->where('price_list_id', $huf->id)->firstOrFail();
+        $this->assertDatabaseHas('pricing_calculation_rows', ['product_id' => $this->product->id,
+            'price_list_id' => $this->lists['re']->id, 'source_retail_row_id' => $source->id]);
+    }
+
+    public function test_navigation_is_available_on_all_pricing_grids_including_cost_and_overview(): void
+    {
+        $this->approve();
+        $pages = [PricingCostCalculations::class => 'cost',
+            PricingHufRetailCalculations::class => 'retail',
+            PricingForeignRetailCalculations::class => 'retail',
+            PricingWholesaleCalculations::class => 'wholesale',
+            PricingDistributorCalculations::class => 'wholesale',
+            PricingProductOverview::class => 'cost'];
+        foreach ($pages as $class => $type) {
+            $page = Livewire::test($class);
+            if ($class === PricingWholesaleCalculations::class) {
+                $page->call('selectWholesaleCurrency', 'EUR');
+            }
+            $record = $page->instance()->getTable()->getQuery()->where('product_id', $this->product->id)->firstOrFail();
+            $column = $page->instance()->getTable()->getColumn('pricing_operations')->record($record);
+            $this->assertStringContainsString('Termékenkénti árkezelés', $column->render(), $class);
+        }
+    }
+
+    public function test_forged_product_project_pair_cannot_open_another_seasons_product(): void
+    {
+        $season = Season::create(['code' => 'S28', 'name' => 'Másik szezon', 'active' => true]);
+        $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Másik', 'status' => 'active', 'active' => true]);
+        Livewire::withQueryParams(['project' => $project->id, 'product' => $this->product->id])->test(PricingProductWorkspace::class)->assertNotFound();
+    }
+
+    public function test_read_only_user_cannot_invoke_project_wide_calculation(): void
+    {
+        $reader = User::factory()->create();
+        foreach (['View:PricingProject', 'ViewAny:PricingProject', 'ViewAny:PricingCalculationRow'] as $permission) {
+            $reader->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($reader);
+        Livewire::test(ListPricingProjects::class)
+            ->assertTableActionHidden('calculateAllPrices', $this->project);
+        $this->expectException(AuthorizationException::class);
+        app(PricingProjectCalculationService::class)->calculate($this->project);
+    }
+
+    public function test_project_recalculation_rejects_invalid_source_pair_before_writes(): void
+    {
+        $before = PricingCalculationRow::all()->toArray();
+        try {
+            app(PricingProjectCalculationService::class)->calculate($this->project, [$this->lists['re']->id => $this->lists['we']->id]);
+            $this->fail('Invalid source was accepted.');
+        } catch (DomainException) {
+            $this->assertSame($before, PricingCalculationRow::all()->toArray());
+        }
+    }
+
+    public function test_project_calculation_action_is_available_on_list_and_detail_and_hidden_when_closed(): void
+    {
+        $page = Livewire::test(ListPricingProjects::class);
+        $page->assertTableActionVisible('calculateAllPrices', $this->project)
+            ->callTableAction('calculateAllPrices', $this->project)->assertHasNoErrors();
+        $this->assertDatabaseCount('pricing_calculation_rows', 14);
+        Livewire::test(ViewPricingProject::class, ['record' => $this->project->id])
+            ->assertActionVisible('calculateAllPrices');
+        $this->project->update(['status' => 'closed']);
+        Livewire::test(ListPricingProjects::class)
+            ->assertTableActionHidden('calculateAllPrices', $this->project);
+        $this->expectException(DomainException::class);
+        app(PricingProjectCalculationService::class)->calculate($this->project);
+    }
+
+    public function test_preview_tables_show_live_cost_and_commercial_multipliers(): void
+    {
+        $settings = $this->settings();
+        $settings['data']['manual'][$this->lists['re']->id.'_0'] = 80;
+        $result = app(ProductPricingService::class)->preview($this->project, $this->product, $settings['data'], $settings['fingerprint']);
+        $prices = collect($result['prices'])->keyBy('list');
+        $this->assertEqualsWithDelta(80 * 400 / 4596.48, $prices['RE']['cost_multiplier'], .00001);
+        $this->assertNull($prices['RE']['retail_multiplier']);
+        $this->assertEqualsWithDelta(2.5, $prices['WE']['retail_multiplier'], .00001);
+        $this->assertEqualsWithDelta(32 / 28.8, $prices['DE']['wholesale_multiplier'], .00001);
+        $this->assertEqualsWithDelta(80 / 28.8, $prices['DE']['retail_multiplier'], .00001);
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $page = Livewire::test(PricingProductWorkspace::class)->mountTableAction('editProductPricing', $cost);
+        $html = $page->instance()->getMountedAction()->getModalContent()->render();
+        $this->assertStringContainsString('product-pricing-tables', $html);
+        $this->assertStringContainsString('product-pricing-parameters', $html);
+        $this->assertStringContainsString('Bekerülési szorzó', $html);
+        $this->assertStringContainsString('Nagyker / adott ár', $html);
+    }
+
+    public function test_navigation_opens_selected_product_and_project_even_with_another_saved_context(): void
+    {
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $items = ProductPricingNavigation::items($cost);
+        $this->assertCount(1, $items);
+        $this->assertStringContainsString('product='.$this->product->id, $items[0]['url']);
+        $otherProject = $this->project->replicate();
+        $otherProject->name = 'Másik projekt';
+        $otherProject->save();
+        Livewire::test(PricingProductWorkspace::class)->call('selectPricingProject', $otherProject->id);
+        $page = Livewire::withQueryParams(['project' => $this->project->id, 'product' => $this->product->id])->test(PricingProductWorkspace::class);
+        $this->assertSame($this->project->id, $page->instance()->pricingProjectId);
+        $this->assertSame(['table' => true, 'recordKey' => (string) $cost->id], $page->instance()->defaultActionContext);
+        $page->call('mountAction', 'editProductPricing', [], ['table' => true, 'recordKey' => (string) $cost->id])->assertHasNoErrors();
+        $this->assertSame($this->product->id, $page->instance()->pricingEditorProductId);
+    }
+
+    public function test_navigation_and_direct_link_do_not_bypass_edit_permissions(): void
+    {
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $reader = User::factory()->create();
+        foreach (['View:PricingProductWorkspace', 'ViewAny:PricingCalculationRow', 'View:PricingCalculationRow'] as $permission) {
+            $reader->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($reader);
+        $this->assertSame([], ProductPricingNavigation::items($cost));
+        Livewire::withQueryParams(['project' => $this->project->id, 'product' => $this->product->id])->test(PricingProductWorkspace::class)->assertForbidden();
     }
 }

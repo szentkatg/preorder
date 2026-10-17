@@ -68,10 +68,7 @@ class ProductPricingService
                 'sources' => $sources,
                 'manual' => $rows->where('price_type', '!=', 'cost')->mapWithKeys(fn ($row) => [$row->price_list_id.'_'.$row->color_key => $row->manual_price])->all()],
             'initial_preview' => ['costs' => $rows->where('price_type', 'cost')->map(fn ($row) => ['color' => $row->color?->name_hu ?? 'Modell', 'price' => $row->final_price])->values()->all(),
-                'prices' => $rows->filter(fn ($row) => $row->priceList && $row->price_type !== 'cost')->map(fn ($row) => [
-                    'key' => $row->price_list_id.'_'.$row->color_key, 'list' => $row->priceList->code, 'currency' => $row->priceList->currency?->code,
-                    'color' => $row->color?->name_hu ?? 'Modell', 'calculated' => $row->calculated_price, 'final' => $row->final_price,
-                    'manual' => $row->manual_price, 'status' => $row->status])->values()->all()],
+                'prices' => $this->pricePreview($project, $product)],
             'fingerprint' => $this->fingerprint($project, $product)];
     }
 
@@ -101,6 +98,19 @@ class ProductPricingService
     public function approve(PricingProject $project, Product $product, array $input, string $fingerprint): array
     {
         return DB::transaction(fn () => $this->apply($project, $product, $input, $fingerprint));
+    }
+
+    /** Recalculate only: never edit parameters, manual prices or approval statuses. */
+    public function recalculate(PricingProject $project, Product $product, array $sources = []): array
+    {
+        return DB::transaction(function () use ($project, $product, $sources): array {
+            $project = PricingProject::lockForUpdate()->findOrFail($project->id);
+            $product = Product::lockForUpdate()->findOrFail($product->id);
+            $product->purchasePrices()->lockForUpdate()->get();
+            $this->authorize($project, $product);
+
+            return $this->calculatePrices($project, $product, [], $sources, approve: false);
+        });
     }
 
     private function apply(PricingProject $project, Product $product, array $input, string $fingerprint): array
@@ -141,25 +151,33 @@ class ProductPricingService
             Gate::authorize($parameter->exists ? 'update' : 'create', $parameter->exists ? $parameter : PricingParameter::class);
             $parameter->fill(['value' => $value, 'active' => true])->save();
         }
+
+        return $this->calculatePrices($project, $product, $input['manual'], $input['sources']);
+    }
+
+    private function calculatePrices(PricingProject $project, Product $product, array $manual, array $sources, bool $approve = true): array
+    {
         $run = app(CostCalculationService::class)->recalculate($project, $product->id);
         $this->assertRun($run);
         if ($run['products_without_active_purchase_price'] || ! $run['candidate_groups']) {
             throw new DomainException('Nincs érvényes aktív beszerzési ár a termékhez.');
         }
-        $this->rows($project, $product)->where('price_type', 'cost')->get()->each(fn ($row) => $row->update(['requires_review' => false]));
+        $pendingReview = [];
+        // Costs have no separate approval workflow; a successful recalculation makes them current.
+        $this->rows($project, $product)->where('price_type', 'cost')->update(['requires_review' => false]);
         $lists = $this->lists($project, $product);
-        $result = [];
         foreach ($lists->filter(fn ($l) => $l->type === 'retail' && $l->currency->code === 'HUF') as $list) {
             $this->assertRun(app(HufRetailCalculationService::class)->recalculate($project, $list, $product->id));
-            $this->approveList($project, $product, $list, $input['manual'], $result);
+            $this->finishList($project, $product, $list, $manual, $approve, $pendingReview);
         }
         foreach ($lists->filter(fn ($l) => $l->type === 'retail' && $l->currency->code !== 'HUF') as $list) {
-            $source = $lists->firstWhere('id', $input['sources'][$list->id] ?? null);
+            $huf = $lists->filter(fn ($l) => $l->type === 'retail' && $l->currency->code === 'HUF');
+            $source = $lists->firstWhere('id', $sources[$list->id] ?? ($huf->count() === 1 ? $huf->first()->id : null));
             if (! $source || $source->type !== 'retail' || $source->currency->code !== 'HUF') {
                 throw new DomainException($list->code.': válassz HUF forrásárlistát.');
             }
             $this->assertRun(app(ForeignRetailCalculationService::class)->recalculate($project, $source, $list, productId: $product->id));
-            $this->approveList($project, $product, $list, $input['manual'], $result);
+            $this->finishList($project, $product, $list, $manual, $approve, $pendingReview);
         }
         foreach (['wholesale' => WholesaleCalculator::class, 'distributor' => DistributorCalculator::class, 'outlet' => OutletCalculator::class] as $type => $calculatorClass) {
             foreach ($lists->where('type', $type) as $list) {
@@ -167,26 +185,74 @@ class ProductPricingService
                     'wholesale' => $list->retail_price_list_id, 'distributor' => $list->source_wholesale_price_list_id,
                     'outlet' => $list->source_retail_price_list_id,
                 };
-                $sources = $this->rows($project, $product)->where('price_list_id', $sourceListId)
+                $sourceRows = $this->rows($project, $product)->where('price_list_id', $sourceListId)
                     ->where('price_type', $type === 'distributor' ? 'wholesale' : 'retail')->with(['product', 'supplier', 'currency', 'priceList'])->get();
-                if ($sources->isEmpty()) {
+                if ($sourceRows->isEmpty()) {
                     throw new DomainException($list->code.': hiányzó forráskalkuláció.');
                 }
                 $calculator = app($calculatorClass);
-                foreach ($sources as $source) {
+                foreach ($sourceRows as $source) {
                     app(DerivedPriceRowWriter::class)->save($project, $source, $list, $calculator->calculate($project, $source, $list), $calculator, (string) Str::uuid());
                 }
-                $this->approveList($project, $product, $list, $input['manual'], $result);
+                $this->finishList($project, $product, $list, $manual, $approve, $pendingReview);
             }
+        }
+
+        if (! $approve && $pendingReview) {
+            // Only successfully recalculated sources are temporarily usable inside this transaction.
+            // Restore their review flags AND propagate them, without changing any approval or price.
+            $ids = array_keys($pendingReview);
+            $this->rows($project, $product)->whereIn('id', $ids)->update(['requires_review' => true]);
+            app(RetailCalculationDependencyService::class)->invalidateRetailDependents($ids);
+            $this->rows($project, $product)->whereIn('source_wholesale_row_id', $ids)->update(['requires_review' => true]);
         }
 
         return ['costs' => $this->rows($project, $product)->where('price_type', 'cost')->with(['color', 'supplier', 'purchaseCurrency'])->get()
             ->map(fn ($row) => ['color' => $row->color?->name_hu ?? 'Modell', 'price' => $row->final_price,
                 'supplier' => $row->supplier?->name, 'purchase' => $row->purchase_price, 'currency' => $row->purchaseCurrency?->code,
-                'rate' => $row->exchange_rate, 'shipping' => $row->shipping_cost_percent, 'customs' => $row->customs_percent])->all(), 'prices' => $result];
+                'rate' => $row->exchange_rate, 'shipping' => $row->shipping_cost_percent, 'customs' => $row->customs_percent])->all(),
+            'prices' => $this->pricePreview($project, $product)];
     }
 
-    private function approveList(PricingProject $project, Product $product, PriceList $list, array $manual, array &$result): void
+    private function finishList(PricingProject $project, Product $product, PriceList $list, array $manual, bool $approve, array &$pendingReview): void
+    {
+        if ($approve) {
+            $this->approveList($project, $product, $list, $manual);
+        } else {
+            $this->prepareCalculatedSources($project, $product, $list->id, $pendingReview);
+        }
+    }
+
+    private function prepareCalculatedSources(PricingProject $project, Product $product, int $listId, array &$pendingReview): void
+    {
+        $query = $this->rows($project, $product)->where('price_list_key', $listId);
+        foreach ((clone $query)->where('requires_review', true)->pluck('id') as $id) {
+            $pendingReview[$id] = true;
+        }
+        $query->update(['requires_review' => false]);
+    }
+
+    private function pricePreview(PricingProject $project, Product $product): array
+    {
+        $rows = $this->rows($project, $product)->with(['color', 'priceList.currency'])->get();
+
+        return $rows->filter(fn ($row) => $row->priceList && $row->price_type !== 'cost')->map(function ($row) use ($rows): array {
+            $cost = $rows->where('price_type', 'cost')->firstWhere('color_key', $row->color_key);
+            $retail = $rows->firstWhere('id', $row->source_retail_row_id);
+            $wholesale = $rows->firstWhere('id', $row->source_wholesale_row_id);
+            $rate = $row->priceList->currency?->code === 'HUF' ? 1 : ($row->retail_exchange_rate ?? $retail?->retail_exchange_rate);
+            $final = (float) $row->final_price;
+
+            return ['key' => $row->price_list_id.'_'.$row->color_key, 'list' => $row->priceList->code, 'currency' => $row->priceList->currency?->code,
+                'color' => $row->color?->name_hu ?? 'Modell', 'calculated' => $row->calculated_price, 'final' => $row->final_price,
+                'manual' => $row->manual_price, 'status' => $row->status,
+                'cost_multiplier' => (float) $cost?->final_price > 0 && (float) $rate > 0 ? $final * (float) $rate / (float) $cost->final_price : null,
+                'retail_multiplier' => $row->price_type !== 'retail' && $retail && $final > 0 ? (float) $retail->final_price / $final : null,
+                'wholesale_multiplier' => $row->price_type === 'distributor' && $wholesale && $final > 0 ? (float) $wholesale->final_price / $final : null];
+        })->values()->all();
+    }
+
+    private function approveList(PricingProject $project, Product $product, PriceList $list, array $manual): void
     {
         $service = app(match ($list->type) {
             'retail' => RetailPriceReviewService::class, 'wholesale' => WholesalePriceReviewService::class,
@@ -200,9 +266,6 @@ class ProductPricingService
             } else {
                 $row = $service->acceptCalculatedPrice($row);
             }
-            $result[] = ['key' => $key, 'list' => $list->code, 'currency' => $list->currency->code,
-                'color' => $row->color?->name_hu ?? 'Modell', 'calculated' => $row->calculated_price,
-                'final' => $row->final_price, 'manual' => $row->manual_price, 'status' => $row->status];
         }
     }
 
@@ -266,9 +329,9 @@ class ProductPricingService
 
         return PriceList::where('active', true)->whereIn('type', ['retail', 'wholesale', 'distributor', 'outlet'])
             ->whereHas('currency', fn ($q) => $q->where('active', true))->with('currency')->orderBy('id')->get()
-            ->filter(fn ($list) => in_array($list->id, $existing) || (app(PricingParameterResolver::class)->resolve(
+            ->filter(fn ($list) => in_array($list->id, $existing) || app(PricingParameterResolver::class)->resolve(
                 $project->id, $this->parameterType($list), $product, $country, priceListId: $list->id, currencyId: $list->currency_id)
-                && app(PricingRoundingService::class)->resolve($project->id, $list->type, $list->id, $list->currency_id)));
+            );
     }
 
     private function parameterType(PriceList $list): string

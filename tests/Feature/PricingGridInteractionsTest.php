@@ -60,13 +60,14 @@ class PricingGridInteractionsTest extends TestCase
         $this->retail = PricingCalculationRow::where('price_type', 'retail')->firstOrFail();
     }
 
-    public function test_editors_and_modals_are_lazy_and_huf_menu_has_four_items(): void
+    public function test_editors_and_modals_are_lazy_and_huf_menu_has_five_items(): void
     {
         $page = Livewire::test(PricingHufRetailCalculations::class)->assertSuccessful()->assertDontSee('textInputTableColumn', false);
         $this->assertSame([], $page->instance()->getTable()->getRecordActions());
         $column = $page->instance()->getTable()->getColumn('manual_price')->record($this->retail);
         $this->assertSame('true', $column->getExtraCellAttributes()['data-pricing-editable']);
-        $this->assertCount(4, $page->instance()->pricingRowOperations($this->retail));
+        $this->assertCount(5, $page->instance()->pricingRowOperations($this->retail));
+        $this->assertSame('Termékenkénti árkezelés', $page->instance()->pricingRowOperations($this->retail)[4]['label']);
         $page->call('openPricingDetails', $this->retail->id)->assertActionMounted('pricingDetails');
         $this->assertStringContainsString('Bekerülési', $page->instance()->getMountedAction()->getModalContent()->render());
     }

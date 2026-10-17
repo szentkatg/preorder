@@ -186,7 +186,8 @@ class WholesaleCalculationTest extends TestCase
         $this->assertStringContainsString('Nagyker szorzó', $html);
         $this->assertStringContainsString('Nettó/nettó szorzó', $html);
         $this->assertStringContainsString('1000', str_replace(' ', '', strip_tags($html)));
-        $this->assertCount(3, $page->instance()->pricingRowOperations($this->row()));
+        $this->assertCount(4, $page->instance()->pricingRowOperations($this->row()));
+        $this->assertSame('Termékenkénti árkezelés', $page->instance()->pricingRowOperations($this->row())[3]['label']);
         $this->assertSame([], $page->instance()->getTable()->getRecordActions());
         $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->row()])->assertHasNoErrors();
         $this->assertNull($this->row()->manual_price);

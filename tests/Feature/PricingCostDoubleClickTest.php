@@ -60,6 +60,8 @@ class PricingCostDoubleClickTest extends TestCase
         $page = Livewire::test(PricingCostCalculations::class)->assertSuccessful()->assertDontSee('textInputTableColumn', false);
         $table = $page->instance()->getTable();
         $this->assertSame([], $table->getRecordActions());
+        $operations = $table->getColumn('pricing_operations')->record($this->cost)->render();
+        $this->assertStringContainsString('Termékenkénti árkezelés', $operations);
         foreach (['shipping_cost_percent', 'customs_percent'] as $field) {
             $column = $table->getColumn($field)->record($this->cost);
             $this->assertInstanceOf(TextColumn::class, $column);

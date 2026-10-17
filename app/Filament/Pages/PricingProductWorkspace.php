@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\PricingCalculationRow;
+use App\Models\PricingProject;
 use App\Models\Product;
 use App\Services\Pricing\ProductPricingService;
 use DomainException;
@@ -40,6 +41,33 @@ class PricingProductWorkspace extends PricingProductOverview
     public ?string $pricingEditorError = null;
 
     public array $pricingEditor = [];
+
+    public function mount(): void
+    {
+        parent::mount();
+        if (! request()->hasAny(['project', 'product'])) {
+            return;
+        }
+        $projectId = request()->query('project');
+        $productId = request()->query('product');
+        abort_unless(is_scalar($projectId) && ctype_digit((string) $projectId)
+            && is_scalar($productId) && ctype_digit((string) $productId), 404);
+        $project = PricingProject::findOrFail((int) $projectId);
+        $this->pricingArchive = $project->status === PricingProject::STATUS_CLOSED;
+        $this->pricingProjectId = $project->id;
+        unset($this->pricingSelectedProject, $this->pricingProjectOptions);
+        abort_unless($this->canEditProductPricing(), 403);
+        $cost = $this->scopePricingProjectContext(PricingCalculationRow::query())->where('price_type', 'cost')
+            ->where('product_id', (int) $productId)
+            ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))->first();
+        abort_unless($cost, 404);
+        Gate::authorize('view', $cost);
+        $this->selectPricingProject($project->id);
+        // Filament opens this lazily via wire:init, after the table and action are booted.
+        $this->defaultAction = 'editProductPricing';
+        $this->defaultActionArguments = [];
+        $this->defaultActionContext = ['table' => true, 'recordKey' => (string) $cost->id];
+    }
 
     public function pricingWorkspaceDescription(): string
     {

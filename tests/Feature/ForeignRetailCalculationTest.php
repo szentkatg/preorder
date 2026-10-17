@@ -235,7 +235,8 @@ class ForeignRetailCalculationTest extends TestCase
         $html = $page->instance()->getMountedAction()->getModalContent()->render();
         $this->assertStringContainsString('Szezonárfolyam', $html);
         $this->assertStringContainsString('Országszorzó', $html);
-        $this->assertCount(3, $page->instance()->pricingRowOperations($this->retail()));
+        $this->assertCount(4, $page->instance()->pricingRowOperations($this->retail()));
+        $this->assertSame('Termékenkénti árkezelés', $page->instance()->pricingRowOperations($this->retail())[3]['label']);
         $this->assertSame([], $page->instance()->getTable()->getRecordActions());
         $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->retail()])->assertHasNoErrors();
         $this->assertNull($this->retail()->manual_price);

@@ -7,6 +7,7 @@ use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
 use App\Filament\Support\Actions\PairPreviousSeasonProductAction;
+use App\Filament\Support\ProductPricingNavigation;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\DistributorPriceReviewService;
 use App\Services\Pricing\RetailPriceReviewService;
@@ -44,7 +45,7 @@ trait HasPricingGridInteractions
     {
         $row = $this->pricingEditableRow($source);
         if (! $row) {
-            return [];
+            return ProductPricingNavigation::items($source);
         }
         $items = [];
         if ($this->canEditPricingGridRow($source)) {
@@ -63,7 +64,7 @@ trait HasPricingGridInteractions
             $items[] = ['action' => 'pricingDetails', 'label' => 'Részletek'];
         }
 
-        return $items;
+        return [...$items, ...ProductPricingNavigation::items($source)];
     }
 
     protected function canPairPricingProduct(): bool

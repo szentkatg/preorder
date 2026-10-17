@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingProjects\Tables;
 
+use App\Filament\Support\Actions\CalculateAllProjectPricesAction;
 use App\Filament\Support\Actions\PricingProjectLifecycleActions;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -29,6 +30,7 @@ class PricingProjectsTable
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([EditAction::make(),
+                CalculateAllProjectPricesAction::make(),
                 PricingProjectLifecycleActions::close(),
                 PricingProjectLifecycleActions::reopen(),
                 PricingProjectLifecycleActions::export(),

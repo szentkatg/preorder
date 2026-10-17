@@ -244,7 +244,8 @@ class DistributorCalculationTest extends TestCase
         $this->assertSame($before, $this->source()->getAttributes());
         $page->call('openPricingDetails', $this->source()->id);
         $this->assertStringContainsString('Disztribútori kedvezmény', $page->instance()->getMountedAction()->getModalContent()->render());
-        $this->assertCount(3, $page->instance()->pricingRowOperations($this->source()));
+        $this->assertCount(4, $page->instance()->pricingRowOperations($this->source()));
+        $this->assertSame('Termékenkénti árkezelés', $page->instance()->pricingRowOperations($this->source())[3]['label']);
         $this->assertSame([], $page->instance()->getTable()->getRecordActions());
         $page->call('unmountAction')->callTableBulkAction('pricingAcceptBulk', [$this->source()])->assertHasNoErrors();
         $this->assertNull($this->row()->manual_price);

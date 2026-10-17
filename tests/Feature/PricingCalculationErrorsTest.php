@@ -37,9 +37,9 @@ class PricingCalculationErrorsTest extends TestCase
     public function test_all_price_types_are_visible_without_an_automatic_filter_and_can_be_filtered(): void
     {
         $this->signInWith([]);
-        $errors = collect(['cost', 'retail', 'wholesale', 'distributor'])->map(fn ($type) => $this->error($type));
+        $errors = collect(['cost', 'retail', 'wholesale', 'distributor', 'outlet', 'project'])->map(fn ($type) => $this->error($type));
         $page = Livewire::test(ListPricingCalculationErrors::class)->assertSuccessful()
-            ->assertCanSeeTableRecords($errors)->assertCountTableRecords(4);
+            ->assertCanSeeTableRecords($errors)->assertCountTableRecords(6);
         $this->assertNull($page->instance()->getTable()->getFilter('price_type')->getDefaultState());
         foreach ($errors as $error) {
             $page->filterTable('price_type', $error->price_type)->assertCanSeeTableRecords([$error])

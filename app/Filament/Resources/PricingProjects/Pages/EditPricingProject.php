@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PricingProjects\Pages;
 
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
+use App\Filament\Support\Actions\CalculateAllProjectPricesAction;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\Actions\PricingProjectLifecycleActions;
 use App\Models\PricingProject;
@@ -35,6 +36,7 @@ class EditPricingProject extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            CalculateAllProjectPricesAction::make()->record(fn () => $this->record),
             PricingProjectLifecycleActions::close()->record(fn () => $this->record),
             PricingProjectLifecycleActions::reopen()->record(fn () => $this->record),
             PricingProjectLifecycleActions::export()->record(fn () => $this->record),

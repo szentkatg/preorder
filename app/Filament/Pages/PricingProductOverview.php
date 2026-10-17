@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
+use App\Filament\Support\PricingGrid;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PricingOverviewQuery;
@@ -139,6 +140,9 @@ class PricingProductOverview extends Page implements HasTable
                 }
                 $columns[] = $column;
             }
+        }
+        if (static::class === self::class) {
+            $columns[] = PricingGrid::operationsColumn();
         }
         $table = AdminResourceTable::configure($table->query($query)->columns($columns)->recordActions([])->recordAction(null)->recordUrl(null)
             ->recordClasses(fn (PricingCalculationRow $record) => ['pricing-needs-attention' => $this->overviewNeedsAttention($record)])

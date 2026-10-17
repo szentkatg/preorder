@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Filament\Support\PricingGrid;
+use App\Filament\Support\ProductPricingNavigation;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Services\Pricing\CostCalculationAuthorization;
@@ -129,6 +131,7 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('final_price')->label('Végleges ár')->numeric(decimalPlaces: 2),
                 TextColumn::make('status')->label('Státusz')->badge(),
+                ...($lightweightCost ? [PricingGrid::operationsColumn()] : []),
             ])
             ->filters([
                 SelectFilter::make('pricing_project_id')
@@ -172,6 +175,7 @@ class PricingCalculationRowsTable
                 'pricing-needs-attention' => $record->needsPricingAttention(),
             ])
             ->recordActions($lightweightCost ? [] : [
+                ProductPricingNavigation::action(),
                 Action::make('calculationDetails')
                     ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
                     ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))

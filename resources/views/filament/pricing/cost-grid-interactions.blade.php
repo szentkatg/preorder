@@ -20,8 +20,8 @@
     [data-cost-grid-error] { padding: .5rem; color: #dc2626; }
     [data-pricing-operations-menu] { position:fixed; z-index:100; min-width:16rem; max-width:calc(100vw - 1rem); border:1px solid #d1d5db; border-radius:.5rem; padding:.25rem; background:#fff; color:#111827; box-shadow:0 8px 24px #0003; }
     .dark [data-pricing-operations-menu] { background:#1f2937; color:#f3f4f6; border-color:#4b5563; }
-    [data-pricing-operations-menu] button { display:block; text-align:left; width:100%; padding:.5rem .75rem; border-radius:.25rem; font-size:.875rem; }
-    [data-pricing-operations-menu] button:hover, [data-pricing-operations-menu] button:focus-visible { background:rgba(59,130,246,.15); outline:2px solid #3b82f6; outline-offset:-2px; }
+    [data-pricing-operations-menu] :is(button,a) { display:block; text-align:left; width:100%; padding:.5rem .75rem; border-radius:.25rem; font-size:.875rem; }
+    [data-pricing-operations-menu] :is(button,a):hover, [data-pricing-operations-menu] :is(button,a):focus-visible { background:rgba(59,130,246,.15); outline:2px solid #3b82f6; outline-offset:-2px; }
 </style>
 <script>
 (() => {
@@ -154,7 +154,7 @@
         event.preventDefault(); event.stopPropagation();
         if (menuTrigger === trigger) { closeMenu(true); return; }
         closeMenu();
-        const grid = trigger.closest('[data-pricing-price-grid]');
+        const grid = trigger.closest('[data-pricing-operations-grid]');
         const wire = grid && wireFor(grid);
         if (!wire || active?.saving || openingDetails) return;
         let items;
@@ -166,9 +166,12 @@
         menu.setAttribute('role', 'menu');
         menu.setAttribute('aria-label', 'Műveletek');
         items.forEach(item => {
-            const button = document.createElement('button');
-            button.type = 'button'; button.setAttribute('role', 'menuitem'); button.textContent = item.label;
+            const button = document.createElement(item.url ? 'a' : 'button');
+            if (item.url) button.href = item.url;
+            else button.type = 'button';
+            button.setAttribute('role', 'menuitem'); button.textContent = item.label;
             button.addEventListener('click', async () => {
+                if (item.url) return;
                 closeMenu(true);
                 if (openingDetails || active?.saving) return;
                 openingDetails = true;
@@ -179,7 +182,7 @@
             menu.append(button);
         });
         menu.addEventListener('keydown', event => {
-            const buttons = Array.from(menu.querySelectorAll('button'));
+            const buttons = Array.from(menu.querySelectorAll('[role="menuitem"]'));
             const index = buttons.indexOf(document.activeElement);
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault(); buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
@@ -190,7 +193,7 @@
         const rect = trigger.getBoundingClientRect();
         menu.style.left = `${Math.max(8, Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8))}px`;
         menu.style.top = `${Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8))}px`;
-        menu.querySelector('button')?.focus();
+        menu.querySelector('[role="menuitem"]')?.focus();
     });
     window.addEventListener('resize', () => closeMenu());
     document.addEventListener('scroll', () => closeMenu(), true);

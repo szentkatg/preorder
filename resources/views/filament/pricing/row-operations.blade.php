@@ -1,4 +1,6 @@
-@php($operations = $getLivewire()->pricingRowOperations($getRecord()))
+@php($operations = method_exists($getLivewire(), 'pricingRowOperations')
+    ? $getLivewire()->pricingRowOperations($getRecord())
+    : \App\Filament\Support\ProductPricingNavigation::items($getRecord()))
 @if ($operations)
     <button type="button" data-pricing-operations data-pricing-record-id="{{ $getRecord()->id }}"
         data-pricing-menu="{{ json_encode($operations, JSON_UNESCAPED_UNICODE) }}" aria-label="Műveletek"

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PricingProjects\Pages;
 
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
+use App\Filament\Support\Actions\CalculateAllProjectPricesAction;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\Actions\PricingProjectLifecycleActions;
 use App\Filament\Support\Pages\ReadOnlyRecord;
@@ -19,6 +20,7 @@ class ViewPricingProject extends ReadOnlyRecord
     protected function getHeaderActions(): array
     {
         return [
+            CalculateAllProjectPricesAction::make()->record(fn () => $this->record),
             PricingProjectLifecycleActions::close()->record(fn () => $this->record),
             PricingProjectLifecycleActions::reopen()->record(fn () => $this->record),
             PricingProjectLifecycleActions::export()->record(fn () => $this->record),

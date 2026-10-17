@@ -166,6 +166,7 @@
 
         <div
             data-pricing-resizable-columns
+            data-pricing-operations-grid
             @if (method_exists($this, 'openCostDetails')) data-pricing-cost-grid @endif
             @if (method_exists($this, 'openPricingDetails')) data-pricing-price-grid @endif
             data-pricing-storage-key="{{ $this->pricingColumnStorageKey() }}"
@@ -175,9 +176,7 @@
         </div>
     </div>
 
-    @if (method_exists($this, 'openCostDetails') || method_exists($this, 'openPricingDetails'))
-        @include('filament.pricing.cost-grid-interactions')
-    @endif
+    @include('filament.pricing.cost-grid-interactions')
 
     <style>
         .pricing-project-selection {
