@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
+use App\Filament\Support\Concerns\HasProductPricingEditor;
 use App\Filament\Support\PricingGrid;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
@@ -31,6 +32,7 @@ class PricingProductOverview extends Page implements HasTable
         HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
         HasPricingTablePreferences::persistHasReorderedTableColumns insteadof InteractsWithTable;
     }
+    use HasProductPricingEditor;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table-cells';
 

@@ -10,6 +10,7 @@ use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Filament\Pages\PricingProductOverview;
 use App\Filament\Pages\PricingProductWorkspace;
 use App\Filament\Pages\PricingWholesaleCalculations;
+use App\Filament\Resources\PricingCalculationRows\Pages\ListPricingCalculationRows;
 use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
 use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
 use App\Filament\Support\ProductPricingNavigation;
@@ -34,6 +35,7 @@ use App\Services\Pricing\PricingProjectPublicationService;
 use App\Services\Pricing\ProductPricingService;
 use DomainException;
 use Filament\Facades\Filament;
+use Filament\Tables\Columns\TextColumn;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -540,12 +542,13 @@ class ProductPricingWorkspaceTest extends TestCase
         $this->assertStringContainsString('Nagyker / adott ár', $html);
     }
 
-    public function test_navigation_opens_selected_product_and_project_even_with_another_saved_context(): void
+    public function test_legacy_direct_link_opens_selected_product_and_project_but_menus_use_local_actions(): void
     {
         $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
         $items = ProductPricingNavigation::items($cost);
         $this->assertCount(1, $items);
-        $this->assertStringContainsString('product='.$this->product->id, $items[0]['url']);
+        $this->assertSame('productPricing', $items[0]['action']);
+        $this->assertArrayNotHasKey('url', $items[0]);
         $otherProject = $this->project->replicate();
         $otherProject->name = 'Másik projekt';
         $otherProject->save();
@@ -567,5 +570,186 @@ class ProductPricingWorkspaceTest extends TestCase
         $this->actingAs($reader);
         $this->assertSame([], ProductPricingNavigation::items($cost));
         Livewire::withQueryParams(['project' => $this->project->id, 'product' => $this->product->id])->test(PricingProductWorkspace::class)->assertForbidden();
+    }
+
+    public function test_each_pricing_list_opens_the_clicked_product_in_place_and_cancel_keeps_list_state(): void
+    {
+        $this->approve();
+        $pages = [PricingCostCalculations::class, PricingHufRetailCalculations::class,
+            PricingForeignRetailCalculations::class, PricingWholesaleCalculations::class,
+            PricingDistributorCalculations::class, PricingProductOverview::class,
+            ListPricingCalculationRows::class];
+        foreach ($pages as $class) {
+            $page = Livewire::test($class)->filterTable('common_brand_id', [$this->product->brand_id])->sortTable('final_price', 'desc');
+            $row = $page->instance()->getTable()->getQuery()->where('product_id', $this->product->id)->firstOrFail();
+            $before = $this->pricingListState($page->instance());
+            $page->call('mountAction', 'productPricing', ['record_id' => $row->id])->assertActionMounted('productPricing')->assertHasNoErrors();
+            $this->assertSame($this->product->id, $page->instance()->pricingEditorProductId, $class);
+            $this->assertSame($this->project->id, $page->instance()->pricingEditorProjectId, $class);
+            $this->assertArrayNotHasKey('redirect', $page->effects);
+            $page->call('unmountAction')->assertActionNotMounted('productPricing');
+            $this->assertSame($before, $this->pricingListState($page->instance()), $class);
+            $this->assertSame([], $page->instance()->pricingEditor);
+            $this->assertNull($page->instance()->pricingEditorProductId);
+            $this->assertArrayNotHasKey('redirect', $page->effects);
+        }
+    }
+
+    public function test_in_place_save_refreshes_prices_without_resetting_filters_pagination_or_columns(): void
+    {
+        $this->approve();
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->filterTable('common_brand_id', [$this->product->brand_id])->sortTable('final_price', 'desc');
+        $row = $page->instance()->getTable()->getQuery()->where('product_id', $this->product->id)->firstOrFail();
+        $page->set('paginators.page', 2);
+        $before = $this->pricingListState($page->instance());
+        $otherBefore = PricingCalculationRow::where('product_id', $this->other->id)->get()->toArray();
+        $page->call('mountAction', 'productPricing', ['record_id' => $row->id])
+            ->set('pricingEditor.manual.'.$this->lists['re']->id.'_0', '80')
+            ->callMountedAction()->assertHasNoErrors()->assertActionNotMounted('productPricing');
+        $this->assertSame($before, $this->pricingListState($page->instance()));
+        $this->assertSame($otherBefore, PricingCalculationRow::where('product_id', $this->other->id)->get()->toArray());
+        $this->assertArrayNotHasKey('redirect', $page->effects);
+        $this->assertDatabaseHas('pricing_calculation_rows', ['product_id' => $this->product->id, 'price_list_id' => $this->lists['re']->id,
+            'manual_price' => 80, 'status' => 'modified_approved']);
+        $this->assertDatabaseHas('pricing_calculation_rows', ['product_id' => $this->product->id, 'price_list_id' => $this->lists['we']->id, 'final_price' => 32]);
+    }
+
+    public function test_general_list_uses_record_project_instead_of_saved_workspace_context(): void
+    {
+        $otherProject = $this->project->replicate();
+        $otherProject->name = 'Másik';
+        $otherProject->save();
+        Livewire::test(PricingProductWorkspace::class)->call('selectPricingProject', $otherProject->id);
+        $row = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $page = Livewire::test(ListPricingCalculationRows::class)
+            ->call('mountAction', 'productPricing', ['record_id' => $row->id])->assertActionMounted('productPricing');
+        $this->assertSame($this->project->id, $page->instance()->pricingEditorProjectId);
+        $this->assertSame($this->product->id, $page->instance()->pricingEditorProductId);
+        $page->call('unmountAction');
+        $saved = Livewire::test(PricingProductWorkspace::class);
+        $this->assertSame($otherProject->id, $saved->instance()->pricingProjectId);
+    }
+
+    public function test_overview_adds_new_price_columns_after_in_place_save_without_losing_filters(): void
+    {
+        $page = Livewire::test(PricingProductOverview::class)->filterTable('common_brand_id', [$this->product->brand_id]);
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $column = 'overview_'.$this->lists['we']->id.'_price';
+        $this->assertNull($page->instance()->getTable()->getColumn($column));
+        $before = $page->instance()->tableFilters;
+        $page->call('mountAction', 'productPricing', ['record_id' => $cost->id])->callMountedAction()->assertHasNoErrors();
+        $this->assertNotNull($page->instance()->getTable()->getColumn($column));
+        $this->assertSame($before, $page->instance()->tableFilters);
+        $this->assertArrayNotHasKey('redirect', $page->effects);
+    }
+
+    public function test_general_list_has_lazy_percent_cells_grouped_operations_and_type_specific_details(): void
+    {
+        $this->approve();
+        $class = ListPricingCalculationRows::class;
+        $page = Livewire::test($class)->assertDontSee('textInputTableColumn', false);
+        $this->assertSame([], $page->instance()->getTable()->getRecordActions());
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $this->assertNull($page->instance()->getTable()->getRecordAction($cost));
+        $this->assertNull($page->instance()->getTable()->getRecordUrl($cost));
+        foreach (['shipping_cost_percent', 'customs_percent'] as $field) {
+            $column = $page->instance()->getTable()->getColumn($field)->record($cost);
+            $this->assertInstanceOf(TextColumn::class, $column);
+            $this->assertSame('true', $column->getExtraCellAttributes()['data-cost-editable']);
+        }
+        $this->assertCount(5, $page->instance()->pricingRowOperations($cost));
+        foreach (['cost' => 'pricing-detail-table', 'retail' => 'Bekerülési', 'wholesale' => 'pricing-wholesale-details',
+            'distributor' => 'pricing-distributor-details', 'outlet' => 'Outlet kalkuláció'] as $type => $expected) {
+            $row = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', $type)->firstOrFail();
+            $page->call('openCostDetails', $row->id)->assertActionMounted('costDetails');
+            $this->assertStringContainsString($expected, $page->instance()->getMountedAction()->getModalContent()->render());
+            $page->call('unmountAction');
+        }
+    }
+
+    public function test_general_inline_percent_waits_for_scope_confirmation_and_can_be_cancelled(): void
+    {
+        $class = ListPricingCalculationRows::class;
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $before = PricingParameter::all()->toArray();
+        $page = Livewire::test($class)->call('startInlineCostPercentParameterAdjustment', $cost->id, 'customs_percent', '15,5')
+            ->assertActionMounted('updateCustomsPercent')->assertSchemaStateSet(['value' => '15.5']);
+        $this->assertSame($before, PricingParameter::all()->toArray());
+        $this->assertSame('12.0000', $cost->fresh()->customs_percent);
+        $page->call('unmountAction');
+        $this->assertSame($before, PricingParameter::all()->toArray());
+        $page->call('startInlineCostPercentParameterAdjustment', $cost->id, 'customs_percent', '15,5')
+            ->fillForm(['scope_type' => 'product', 'value' => 15.5])->callMountedAction()->assertHasNoErrors();
+        $this->assertDatabaseHas('pricing_parameters', ['product_id' => $this->product->id, 'parameter_type' => 'customs_percent', 'value' => 15.5]);
+        $this->assertSame('15.5000', $cost->fresh()->customs_percent);
+    }
+
+    public function test_general_list_blocks_percent_writes_on_non_cost_closed_or_read_only_records(): void
+    {
+        $class = ListPricingCalculationRows::class;
+        $retail = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'retail')->firstOrFail();
+        Livewire::test($class)->call('startInlineCostPercentParameterAdjustment', $retail->id, 'customs_percent', '9')->assertForbidden();
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $reader = User::factory()->create();
+        foreach (['ViewAny:PricingCalculationRow', 'View:PricingCalculationRow'] as $permission) {
+            $reader->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($reader);
+        $page = Livewire::test($class);
+        $this->assertSame([['action' => 'costDetails', 'label' => 'Részletek']], $page->instance()->pricingRowOperations($cost));
+        $page->call('openCostDetails', $cost->id)->assertActionMounted('costDetails');
+        Livewire::test($class)->call('startInlineCostPercentParameterAdjustment', $cost->id, 'customs_percent', '9')->assertForbidden();
+        Livewire::test($class)->call('mountAction', 'productPricing', ['record_id' => $cost->id])->assertActionNotMounted('productPricing');
+    }
+
+    public function test_local_product_editor_rejects_cross_project_ids_and_cannot_preview_after_cancel(): void
+    {
+        $otherProject = $this->project->replicate();
+        $otherProject->name = 'Másik';
+        $otherProject->save();
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $foreign = $cost->replicate();
+        $foreign->pricing_project_id = $otherProject->id;
+        $foreign->save();
+        $class = PricingCostCalculations::class;
+        Livewire::test($class)->call('selectPricingProject', $this->project->id)
+            ->call('mountAction', 'productPricing', ['record_id' => $foreign->id])->assertNotFound();
+        $page = Livewire::test($class)->call('selectPricingProject', $this->project->id)
+            ->call('mountAction', 'productPricing', ['record_id' => $cost->id])->assertActionMounted('productPricing');
+        $page->call('unmountAction')->call('refreshProductPricingPreview')->assertForbidden();
+    }
+
+    public function test_local_editor_and_generic_inline_edit_cannot_write_after_project_is_closed(): void
+    {
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $page = Livewire::test(PricingCostCalculations::class)
+            ->call('mountAction', 'productPricing', ['record_id' => $cost->id])->assertActionMounted('productPricing');
+        $before = PricingCalculationRow::all()->toArray();
+        $this->project->update(['status' => 'closed']);
+        $page->call('refreshProductPricingPreview')->assertNotFound();
+        $class = ListPricingCalculationRows::class;
+        Livewire::test($class)->call('startInlineCostPercentParameterAdjustment', $cost->id, 'customs_percent', '9')->assertForbidden();
+        Livewire::test($class)->call('mountAction', 'productPricing', ['record_id' => $cost->id])->assertActionNotMounted('productPricing');
+        $this->assertSame($before, PricingCalculationRow::all()->toArray());
+    }
+
+    public function test_generic_inline_edit_rejects_invalid_values_without_writing(): void
+    {
+        $class = ListPricingCalculationRows::class;
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
+        $before = PricingParameter::all()->toArray();
+        foreach (['', '-1', '1e999', '10000', ['value' => 9]] as $value) {
+            Livewire::test($class)->call('startInlineCostPercentParameterAdjustment', $cost->id, 'customs_percent', $value)->assertStatus(422);
+        }
+        $this->assertSame($before, PricingParameter::all()->toArray());
+        $this->assertSame('12.0000', $cost->fresh()->customs_percent);
+    }
+
+    private function pricingListState($page): array
+    {
+        return ['filters' => $page->tableFilters, 'search' => $page->tableSearch, 'sort' => $page->tableSort,
+            'pagination' => $page->paginators, 'columns' => $page->tableColumns,
+            'selected' => $page->selectedTableRecords, 'per_page' => $page->tableRecordsPerPage];
     }
 }

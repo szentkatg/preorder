@@ -43,6 +43,7 @@ class PricingCalculationRowResource extends Resource
         return AdminResourceTable::configure(
             PricingCalculationRowsTable::configure($table),
             PricingCalculationRow::class,
+            withViewAction: false,
         );
     }
 

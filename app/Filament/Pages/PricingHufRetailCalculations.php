@@ -9,6 +9,7 @@ use App\Filament\Support\Concerns\HasOutletPricing;
 use App\Filament\Support\Concerns\HasPricingGridInteractions;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
+use App\Filament\Support\Concerns\HasProductPricingEditor;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use App\Services\Pricing\PricingMultiplierAverage;
@@ -35,6 +36,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
         HasPricingTablePreferences::persistHasReorderedTableColumns insteadof InteractsWithTable;
         updateTableColumnState as protected updatePricingTableColumnState;
     }
+    use HasProductPricingEditor;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
 

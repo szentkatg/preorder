@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
 use App\Filament\Support\PricingGrid;
-use App\Filament\Support\ProductPricingNavigation;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Services\Pricing\CostCalculationAuthorization;
@@ -12,13 +11,10 @@ use App\Services\Pricing\PricingParameterAdjustmentService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +22,7 @@ use InvalidArgumentException;
 
 class PricingCalculationRowsTable
 {
-    public static function configure(Table $table, bool $lightweightCost = false): Table
+    public static function configure(Table $table): Table
     {
         return $table
             ->columns([
@@ -55,62 +51,8 @@ class PricingCalculationRowsTable
                     ->label('Árfolyam')
                     ->numeric(decimalPlaces: 4)
                     ->toggleable(isToggledHiddenByDefault: true),
-                $lightweightCost ? self::costPercentColumn('shipping_cost_percent', 'Száll. %', PricingParameter::TYPE_SHIPPING_COST_PERCENT) : TextInputColumn::make('shipping_cost_percent')
-                    ->getStateUsing(
-                        fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->shipping_cost_percent)
-                    )
-                    ->label('Száll. %')
-                    ->type('text')
-                    ->inputMode('decimal')
-                    ->suffix('%', true)
-                    ->width('6.25rem')
-                    ->extraInputAttributes(['class' => 'pricing-percent-input'])
-                    ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
-                    ->rules(['required', 'numeric', 'min:0'])
-                    ->disabled(
-                        fn (PricingCalculationRow $record): bool => ! CostCalculationAuthorization::canAdjustParameter($record)
-                    )
-                    ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
-                        CostCalculationAuthorization::authorizeParameterAdjustment($record);
-                        if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
-                            $livewire->startInlineCostPercentParameterAdjustment(
-                                (int) $record->getKey(),
-                                PricingParameter::TYPE_SHIPPING_COST_PERCENT,
-                                $state,
-                            );
-                        }
-
-                        return self::formatPercentInput($state);
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true),
-                $lightweightCost ? self::costPercentColumn('customs_percent', 'Vám %', PricingParameter::TYPE_CUSTOMS_PERCENT) : TextInputColumn::make('customs_percent')
-                    ->getStateUsing(
-                        fn (PricingCalculationRow $record): ?string => self::formatPercentInput($record->customs_percent)
-                    )
-                    ->label('Vám %')
-                    ->type('text')
-                    ->inputMode('decimal')
-                    ->suffix('%', true)
-                    ->width('6.25rem')
-                    ->extraInputAttributes(['class' => 'pricing-percent-input'])
-                    ->tooltip('Írd át az értéket, majd válaszd ki lent, milyen szűkítéssel legyen érvényes.')
-                    ->rules(['required', 'numeric', 'min:0'])
-                    ->disabled(
-                        fn (PricingCalculationRow $record): bool => ! CostCalculationAuthorization::canAdjustParameter($record)
-                    )
-                    ->updateStateUsing(function (PricingCalculationRow $record, mixed $state, mixed $livewire): mixed {
-                        CostCalculationAuthorization::authorizeParameterAdjustment($record);
-                        if (method_exists($livewire, 'startInlineCostPercentParameterAdjustment')) {
-                            $livewire->startInlineCostPercentParameterAdjustment(
-                                (int) $record->getKey(),
-                                PricingParameter::TYPE_CUSTOMS_PERCENT,
-                                $state,
-                            );
-                        }
-
-                        return self::formatPercentInput($state);
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true),
+                self::costPercentColumn('shipping_cost_percent', 'Száll. %', PricingParameter::TYPE_SHIPPING_COST_PERCENT),
+                self::costPercentColumn('customs_percent', 'Vám %', PricingParameter::TYPE_CUSTOMS_PERCENT),
                 TextColumn::make('candidate_count')
                     ->label('Vizsgált aktív árak')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -131,7 +73,7 @@ class PricingCalculationRowsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('final_price')->label('Végleges ár')->numeric(decimalPlaces: 2),
                 TextColumn::make('status')->label('Státusz')->badge(),
-                ...($lightweightCost ? [PricingGrid::operationsColumn()] : []),
+                PricingGrid::operationsColumn(),
             ])
             ->filters([
                 SelectFilter::make('pricing_project_id')
@@ -167,60 +109,13 @@ class PricingCalculationRowsTable
             ->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
+            ->recordAction(null)->recordUrl(null)
             ->recordClasses(fn (PricingCalculationRow $record): array => [
-                ...($lightweightCost ? [
-                    'pricing-cost-row', 'pricing-cost-row-id-'.$record->getKey(),
-                    Gate::allows('view', $record) ? 'pricing-cost-details-enabled' : '',
-                ] : []),
+                'pricing-cost-row', 'pricing-cost-row-id-'.$record->getKey(),
+                Gate::allows('view', $record) ? 'pricing-cost-details-enabled' : '',
                 'pricing-needs-attention' => $record->needsPricingAttention(),
             ])
-            ->recordActions($lightweightCost ? [] : [
-                ProductPricingNavigation::action(),
-                Action::make('calculationDetails')
-                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
-                    ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('view', $record))
-                    ->label('Részletek')
-                    ->icon('heroicon-o-document-magnifying-glass')
-                    ->modalHeading('Kalkuláció részletei')
-                    ->modalWidth(Width::Screen)
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Bezárás')
-                    ->modalContent(
-                        fn (PricingCalculationRow $record) => view(
-                            match ($record->price_type) {
-                                'retail' => 'filament.pricing.retail-with-outlet-details',
-                                'outlet' => 'filament.pricing.outlet-calculation-details',
-                                default => 'filament.pricing.calculation-details',
-                            },
-                            ['record' => $record]
-                        )
-                    ),
-                self::parameterAction(
-                    'updateShippingCostPercent',
-                    'Szállítás %',
-                    PricingParameter::TYPE_SHIPPING_COST_PERCENT,
-                    'shipping_cost_percent'
-                )
-                    ->icon('heroicon-o-truck')
-                    ->visible(
-                        fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record)
-                    ),
-                self::parameterAction(
-                    'updateCustomsPercent',
-                    'Vám %',
-                    PricingParameter::TYPE_CUSTOMS_PERCENT,
-                    'customs_percent'
-                )
-                    ->icon('heroicon-o-receipt-percent')
-                    ->visible(
-                        fn (PricingCalculationRow $record): bool => CostCalculationAuthorization::canAdjustParameter($record)
-                    ),
-                EditAction::make()
-                    ->visible(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record)
-                        && ($record->pricingProject?->isOpenForPricing() ?? false))
-                    ->authorize(fn (PricingCalculationRow $record): bool => Gate::allows('update', $record)
-                        && ($record->pricingProject?->isOpenForPricing() ?? false)),
-            ])
+            ->recordActions([])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
@@ -266,7 +161,7 @@ class PricingCalculationRowsTable
             : $value;
     }
 
-    private static function parameterAction(
+    public static function parameterAction(
         string $name,
         string $label,
         string $parameterType,
@@ -279,9 +174,9 @@ class PricingCalculationRowsTable
             ->modalHeading($label)
             ->modalDescription('A módosítás az árképzési paraméterek közé kerül mentésre a kiválasztott szűkítési szinten, majd a rendszer újraszámolja az árprojekt bekerülési értékeit.')
             ->fillForm(
-                fn (PricingCalculationRow $record): array => [
+                fn (PricingCalculationRow $record, array $arguments): array => [
                     'scope_type' => self::defaultParameterScope($record),
-                    'value' => (float) $record->{$rowAttribute},
+                    'value' => $arguments['value'] ?? (float) $record->{$rowAttribute},
                 ]
             )
             ->schema([
@@ -296,11 +191,12 @@ class PricingCalculationRowsTable
                     ->label('Új érték')
                     ->numeric()
                     ->minValue(0)
+                    ->maxValue(9999.9999)
                     ->step('0.01')
                     ->suffix('%')
                     ->required(),
             ])
-            ->action(function (array $data, PricingCalculationRow $record) use ($parameterType): void {
+            ->action(function (array $data, PricingCalculationRow $record, $livewire) use ($parameterType): void {
                 try {
                     $parameter = app(PricingParameterAdjustmentService::class)
                         ->updateCostPercentParameter(
@@ -312,6 +208,7 @@ class PricingCalculationRowsTable
 
                     $result = app(CostCalculationService::class)
                         ->recalculate($record->pricingProject);
+                    $livewire->flushCachedTableRecords();
 
                     Notification::make()
                         ->title('Paraméter mentve és újraszámolva')

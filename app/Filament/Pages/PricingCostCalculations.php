@@ -6,6 +6,7 @@ use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsT
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
+use App\Filament\Support\Concerns\HasProductPricingEditor;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Services\Pricing\CostCalculationAuthorization;
@@ -34,6 +35,7 @@ class PricingCostCalculations extends Page implements HasTable
         HasPricingTablePreferences::persistTableColumns insteadof InteractsWithTable;
         HasPricingTablePreferences::persistHasReorderedTableColumns insteadof InteractsWithTable;
     }
+    use HasProductPricingEditor;
 
     protected static string|\BackedEnum|null $navigationIcon =
         'heroicon-o-calculator';
@@ -275,7 +277,7 @@ class PricingCostCalculations extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        $table = PricingCalculationRowsTable::configure($table, lightweightCost: true)
+        $table = PricingCalculationRowsTable::configure($table)
             ->recordAction(null)->recordUrl(null)
             ->query(
                 PricingCalculationRow::query()

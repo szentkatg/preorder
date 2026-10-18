@@ -17,7 +17,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -55,7 +54,7 @@ class PricingCostDoubleClickTest extends TestCase
             'shipping_cost_percent' => 8, 'customs_percent' => 12, 'calculated_price' => 120.96]);
     }
 
-    public function test_cost_workspace_has_only_text_cells_and_no_row_actions_while_generic_resource_is_unchanged(): void
+    public function test_cost_workspace_and_generic_resource_both_use_text_cells_and_operation_menus(): void
     {
         $page = Livewire::test(PricingCostCalculations::class)->assertSuccessful()->assertDontSee('textInputTableColumn', false);
         $table = $page->instance()->getTable();
@@ -68,8 +67,9 @@ class PricingCostDoubleClickTest extends TestCase
             $this->assertSame('true', $column->getExtraCellAttributes()['data-cost-editable']);
         }
         $legacy = PricingCalculationRowsTable::configure(Table::make($page->instance()));
-        $this->assertInstanceOf(TextInputColumn::class, $legacy->getColumn('customs_percent'));
-        $this->assertNotEmpty($legacy->getRecordActions());
+        $this->assertInstanceOf(TextColumn::class, $legacy->getColumn('customs_percent'));
+        $this->assertNotNull($legacy->getColumn('pricing_operations'));
+        $this->assertSame([], $legacy->getRecordActions());
     }
 
     public function test_row_warning_on_cost_and_generic_tables_preserves_double_click_classes(): void

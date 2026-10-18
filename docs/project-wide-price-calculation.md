@@ -41,14 +41,26 @@ projektfrissítés. A futás nem írja az árlistatételeket és nem változtat 
 
 A bekerülési, HUF/devizás kisker-, nagyker-, disztribútori és teljes áttekintő
 listák **Műveletek → Termékenkénti árkezelés** pontja a megfelelő projektet és
-modellt nyitja meg a szerkesztőablakban. Az általános Árkalkulációs sorok listán
-is elérhető ugyanez a művelet. A bekerülési lista új menüjében ez az egy művelet van.
+modellt nyitja meg **helyben**, a kiinduló listán megjelenő szerkesztőmodalban.
+Nincs átirányítás a Termékenkénti árkezelés menübe; bezárás és mentés után is
+megmaradnak a kiinduló lista szűrői, rendezése, lapozása, kijelölése és oszlopbeállításai.
+Az általános Árkalkulációs sorok listán is elérhető ugyanez a művelet.
+A bekerülési lista új menüjében ez az egy művelet van.
 A dupla kattintásos bevitel és részletezés változatlan marad.
 
 A céloldal önálló jogosultsága (`View:PricingProductWorkspace`), projekt- és
-kalkulációs módosítási jogok szükségesek. A közvetlen URL sem kerüli meg ezeket,
+kalkulációs módosítási jogok a helyben nyíló modalhoz is szükségesek. A korábbi
+közvetlen URL-ek kompatibilitásból továbbra is működnek, de a műveletmenük már
+nem ilyen URL-eket használnak. A közvetlen URL sem kerüli meg ezeket,
 a projekt/szezon/modell egyezését vagy a lezárás védelmét. A felhasználó korábbi
 projektválasztása nem téríti el a hivatkozás célját.
+
+Az általános Árkalkulációs sorok listán sincsenek folyamatosan megjelenő beviteli
+mezők: a szállítás/vám százalékok megfelelő jogosultsággal dupla kattintásra
+szerkeszthetők, a tényleges mentés előtt szűkítési szintet kell választani.
+A sor más részén a dupla kattintás az ártípusnak megfelelő részletezőt nyitja.
+A korábbi soronkénti műveletek a hárompontos **Műveletek** menüben vannak.
+A mostani változtatás külön telepítési leírása: [Helyben nyíló árkezelő](pricing-in-place-editor.md).
 
 ## Termékszerkesztő elrendezése
 
