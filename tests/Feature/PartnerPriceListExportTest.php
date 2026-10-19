@@ -20,6 +20,7 @@ use App\Services\PartnerPriceListService;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
+use Filament\Support\Enums\Width;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -90,6 +91,12 @@ class PartnerPriceListExportTest extends TestCase
             ->fillForm($this->configuration)->call('loadProducts')->assertHasNoFormErrors()->assertCanSeeTableRecords([$this->product]);
         $this->assertSame([(string) $this->product->id], $page->instance()->selectedTableRecords);
         $this->assertEquals(7200.5, $page->instance()->getTableRecords()->first()->export_net_price);
+        $page->assertSee('data-compact-column-manager="true"', false);
+        $table = $page->instance()->getTable();
+        $this->assertSame(1, $table->getColumnManagerColumns());
+        $this->assertSame(Width::Small, $table->getColumnManagerWidth());
+        $this->assertArrayHasKey('x-on:partner-price-list-selection.window', $table->getExtraAttributes());
+        $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
     }
 
     public function test_filters_are_combined_and_do_not_mix_seasons_or_inactive_products(): void

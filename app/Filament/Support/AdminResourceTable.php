@@ -14,6 +14,7 @@ use App\Services\Pricing\OutletComparison;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -34,9 +35,7 @@ class AdminResourceTable
         bool $withViewAction = true,
     ): Table {
         AdminTableFilters::configure($table, $modelClass);
-        $table->columnManagerApplyAction(
-            fn (Action $action): Action => $action->alpineClickHandler('await applyTableColumnManager(); if (! error) close()'),
-        );
+        self::configureColumnManager($table);
 
         foreach ($table->getColumns() as $column) {
             self::configureColumn($column, $modelClass);
@@ -79,6 +78,16 @@ class AdminResourceTable
         }
 
         return $table;
+    }
+
+    public static function configureColumnManager(Table $table): Table
+    {
+        return $table->columnManagerColumns(1)
+            ->columnManagerWidth(Width::Small)
+            ->extraAttributes(['data-compact-column-manager' => 'true'], merge: true)
+            ->columnManagerApplyAction(
+                fn (Action $action): Action => $action->alpineClickHandler('await applyTableColumnManager(); if (! error) close()'),
+            );
     }
 
     /**

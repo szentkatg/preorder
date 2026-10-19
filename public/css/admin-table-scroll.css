@@ -170,13 +170,13 @@
 .product-pricing-preview :is(th, td):first-child { text-align: left; }
 .product-pricing-preview input { width: 7rem; text-align: right; }
 
-/* HUF retail pilot: scroll only the choices, keeping Apply and Reset visible. */
-[data-pricing-compact-column-manager] .fi-ta-col-manager-dropdown .fi-ta-col-manager {
+/* Shared column chooser: scroll only the choices, keeping Apply and Reset visible. */
+[data-compact-column-manager] .fi-ta-col-manager-dropdown .fi-ta-col-manager {
     padding: .75rem;
     gap: .625rem;
 }
 
-[data-pricing-compact-column-manager] .fi-ta-col-manager-items {
+[data-compact-column-manager] .fi-ta-col-manager-items {
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -188,22 +188,40 @@
     scrollbar-gutter: stable;
 }
 
-[data-pricing-compact-column-manager] .fi-ta-col-manager-item {
+[data-compact-column-manager] .fi-ta-col-manager-item {
     gap: .5rem;
     padding-block: .1875rem;
     min-width: 0;
 }
 
-[data-pricing-compact-column-manager] .fi-ta-col-manager-label {
+[data-compact-column-manager] .fi-ta-col-manager-label {
     gap: .5rem;
     min-width: 0;
     line-height: 1.25;
 }
 
-[data-pricing-compact-column-manager] .fi-ta-col-manager-label > span {
+[data-compact-column-manager] .fi-ta-col-manager-label > span {
     overflow-wrap: anywhere;
 }
 
-[data-pricing-compact-column-manager] .fi-ta-col-manager-reorder-handle {
+[data-compact-column-manager] .fi-ta-col-manager-reorder-handle {
     flex-shrink: 0;
 }
+
+.pricing-workflow { display: grid; gap: 1rem; }
+.pricing-workflow-project { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: 1rem; border: 1px solid #64748b; border-radius: .75rem; }
+.pricing-workflow-project select { max-width: 100%; padding: .375rem .5rem; border: 1px solid #64748b; border-radius: .375rem; background: transparent; color: inherit; }
+.pricing-workflow-archive { display: inline-flex; align-items: center; gap: .5rem; }
+.pricing-workflow-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; list-style: none; padding: 0; }
+.pricing-workflow-step { display: flex; flex-direction: column; align-items: start; gap: .75rem; padding: 1rem; border: 1px solid #64748b; border-radius: .75rem; }
+.pricing-workflow-step-heading { display: flex; align-items: center; gap: .75rem; }
+.pricing-workflow h2 { font-weight: 700; }
+.pricing-workflow-number { display: inline-grid; place-items: center; min-width: 2rem; height: 2rem; border-radius: 50%; background: rgb(245 158 11 / .18); font-weight: 700; }
+.pricing-workflow-help, .pricing-workflow-step > p { font-size: .875rem; line-height: 1.5; opacity: .85; }
+.pricing-workflow-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; width: 100%; margin-top: auto; }
+.pricing-workflow-counts > div { padding: .5rem; border: 1px solid #64748b; border-radius: .5rem; }
+.pricing-workflow-counts dt { font-size: .75rem; }
+.pricing-workflow-counts dd { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pricing-workflow-counts small { display: block; font-size: .75rem; font-weight: 400; }
+.pricing-workflow-count-approved { background: rgb(34 197 94 / .12); }
+.pricing-workflow-count-pending { background: rgb(239 68 68 / .12); }

@@ -106,7 +106,6 @@ class PricingCalculationRowsTable
             ])
             ->defaultSort('updated_at', 'desc')
             ->reorderableColumns()
-            ->columnManagerColumns(3)
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordAction(null)->recordUrl(null)

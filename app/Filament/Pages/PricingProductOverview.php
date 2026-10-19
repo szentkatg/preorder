@@ -148,7 +148,7 @@ class PricingProductOverview extends Page implements HasTable
         }
         $table = AdminResourceTable::configure($table->query($query)->columns($columns)->recordActions([])->recordAction(null)->recordUrl(null)
             ->recordClasses(fn (PricingCalculationRow $record) => ['pricing-needs-attention' => $this->overviewNeedsAttention($record)])
-            ->reorderableColumns()->columnManagerColumns(3)->defaultSort('product_id')->defaultPaginationPageOption(100)
+            ->reorderableColumns()->defaultSort('product_id')->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all']), PricingCalculationRow::class, withViewAction: false);
         foreach ($expressions as $name => $definition) {
             $expression = $definition['query'];

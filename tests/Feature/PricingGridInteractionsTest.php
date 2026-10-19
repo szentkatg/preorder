@@ -2,8 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Pages\PricingDistributorCalculations;
 use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
+use App\Filament\Pages\PricingProductOverview;
+use App\Filament\Pages\PricingProductWorkspace;
+use App\Filament\Pages\PricingWholesaleCalculations;
+use App\Filament\Resources\PricingCalculationRows\Pages\ListPricingCalculationRows;
 use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
@@ -62,20 +68,45 @@ class PricingGridInteractionsTest extends TestCase
         $this->retail = PricingCalculationRow::where('price_type', 'retail')->firstOrFail();
     }
 
-    public function test_compact_column_manager_is_limited_to_the_huf_retail_page(): void
+    public function test_compact_column_manager_is_shared_by_every_pricing_list(): void
     {
-        $page = Livewire::test(PricingHufRetailCalculations::class)
-            ->assertSuccessful()->assertSee('data-pricing-compact-column-manager="true"', false);
-        $table = $page->instance()->getTable();
-        $this->assertSame(1, $table->getColumnManagerColumns());
-        $this->assertSame(Width::Small, $table->getColumnManagerWidth());
-        $this->assertTrue($table->hasReorderableColumns());
-        $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class,
+            PricingForeignRetailCalculations::class, PricingWholesaleCalculations::class,
+            PricingDistributorCalculations::class, PricingProductOverview::class,
+            PricingProductWorkspace::class, ListPricingCalculationRows::class] as $pageClass) {
+            $page = Livewire::test($pageClass)
+                ->assertSuccessful()->assertSee('data-compact-column-manager="true"', false);
+            $table = $page->instance()->getTable();
+            $this->assertSame(1, $table->getColumnManagerColumns(), $pageClass);
+            $this->assertSame(Width::Small, $table->getColumnManagerWidth(), $pageClass);
+            $this->assertTrue($table->hasReorderableColumns(), $pageClass);
+            $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
+        }
+    }
 
-        $foreign = Livewire::test(PricingForeignRetailCalculations::class)
-            ->assertSuccessful()->assertDontSee('data-pricing-compact-column-manager', false);
-        $this->assertSame(3, $foreign->instance()->getTable()->getColumnManagerColumns());
-        $this->assertSame(Width::FourExtraLarge, $foreign->instance()->getTable()->getColumnManagerWidth());
+    public function test_compact_chooser_preserves_saved_order_visibility_widths_and_decimals(): void
+    {
+        foreach ([PricingHufRetailCalculations::class, PricingForeignRetailCalculations::class] as $pageClass) {
+            $page = Livewire::test($pageClass);
+            $page->call('savePricingColumnWidths', ['final-price' => 112])
+                ->callAction('decimalPlaces', ['final_price' => 2]);
+            $columns = array_reverse($page->instance()->tableColumns);
+            foreach ($columns as &$column) {
+                if ($column['name'] === 'purchase_price') {
+                    $column['isToggled'] = false;
+                }
+            }
+            unset($column);
+            $page->call('applyTableColumnManager', $columns, true)->assertHasNoErrors();
+            $saved = $page->instance()->tableColumns;
+            session()->flush();
+
+            $fresh = Livewire::test($pageClass)->assertSuccessful();
+            $this->assertSame($saved, $fresh->instance()->tableColumns);
+            $this->assertTrue($fresh->instance()->isTableColumnToggledHidden('purchase_price'));
+            $this->assertSame(['final-price' => 112], $fresh->instance()->pricingColumnWidths);
+            $this->assertSame(['final_price' => 2], $fresh->instance()->pricingDecimalPlaces);
+        }
     }
 
     public function test_editors_and_modals_are_lazy_and_huf_menu_has_five_items(): void

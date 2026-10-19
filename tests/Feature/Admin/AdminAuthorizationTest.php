@@ -305,6 +305,9 @@ class AdminAuthorizationTest extends TestCase
         ]);
 
         $this->assertTrue($relationManager->instance()->getTable()->hasAction('exportExcel'));
+        $relationManager->assertSee('data-compact-column-manager="true"', false);
+        $this->assertSame(1, $relationManager->instance()->getTable()->getColumnManagerColumns());
+        $this->assertSame(Width::Small, $relationManager->instance()->getTable()->getColumnManagerWidth());
 
         foreach ($relationManager->instance()->getTable()->getColumns() as $column) {
             $this->assertTrue($column->isSortable());
@@ -315,6 +318,27 @@ class AdminAuthorizationTest extends TestCase
             ->assertTableActionHidden('create')
             ->assertTableActionHidden('edit', $color)
             ->assertTableActionHidden('delete', $color);
+    }
+
+    public function test_every_admin_resource_uses_the_compact_column_manager(): void
+    {
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('test', 8))]);
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $resources = collect(Filament::getPanel('admin')->getResources())
+            ->filter(fn (string $resource): bool => str_starts_with($resource, 'App\\Filament\\Resources\\'));
+        $this->assertNotEmpty($resources);
+        foreach ($resources as $resource) {
+            $page = Livewire::test($resource::getPages()['index']->getPage())
+                ->assertSuccessful()->assertSee('data-compact-column-manager="true"', false);
+            $table = $page->instance()->getTable();
+            $this->assertSame(1, $table->getColumnManagerColumns(), $resource);
+            $this->assertSame(Width::Small, $table->getColumnManagerWidth(), $resource);
+            $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
+        }
     }
 
     public function test_every_admin_resource_has_a_read_only_page_and_standard_table_features(): void

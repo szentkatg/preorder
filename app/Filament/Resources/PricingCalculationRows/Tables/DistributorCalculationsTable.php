@@ -42,7 +42,7 @@ class DistributorCalculationsTable
             ->checkIfRecordIsSelectableUsing(fn (PricingCalculationRow $record, $livewire) => ($row = $livewire->pricingEditableRow($record))
                 && (Gate::allows('view', $row) || $livewire->canEditPricingGridRow($record)))
             ->deselectAllRecordsWhenFiltered()
-            ->defaultSort('updated_at', 'desc')->reorderableColumns()->columnManagerColumns(3)
+            ->defaultSort('updated_at', 'desc')->reorderableColumns()
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
     }
 }

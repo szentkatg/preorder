@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Exports\PartnerPriceListExport as PriceListWorkbook;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\Brand;
 use App\Models\ItemMainGroup;
 use App\Models\Language;
@@ -161,7 +162,7 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
 
     public function table(Table $table): Table
     {
-        return $table->query(function () {
+        return AdminResourceTable::configureColumnManager($table)->query(function () {
             abort_unless(static::canAccess(), 403);
 
             return app(PartnerPriceListService::class)->productsQuery($this->appliedFilters);
@@ -184,7 +185,7 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
                 TextColumn::make('promised_delivery_date')->label('Várható beérkezés')->date('Y.m.d')->sortable(),
                 TextColumn::make('catalog_page')->label('Katalógusoldal')->sortable(),
             ])->selectable()->trackDeselectedRecords(false)->currentSelectionLivewireProperty('selectedTableRecords')
-            ->extraAttributes(['x-on:partner-price-list-selection.window' => 'if ($event.detail.componentId === $wire.$id) { selectedRecords = new Set($event.detail.ids.map(String)); deselectedRecords = new Set(); isTrackingDeselectedRecords = false; updatedSelectedRecords() }'])
+            ->extraAttributes(['x-on:partner-price-list-selection.window' => 'if ($event.detail.componentId === $wire.$id) { selectedRecords = new Set($event.detail.ids.map(String)); deselectedRecords = new Set(); isTrackingDeselectedRecords = false; updatedSelectedRecords() }'], merge: true)
             ->recordActions([])->recordAction(null)->recordUrl(null)
             ->defaultSort('model_code')->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500])
             ->emptyStateHeading('Nincs megjeleníthető termék')->emptyStateDescription('Állítsd be a feltételeket, és töltsd be a terméklistát.');

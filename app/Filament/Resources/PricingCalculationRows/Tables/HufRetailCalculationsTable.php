@@ -138,7 +138,7 @@ class HufRetailCalculationsTable
         ])->selectable(fn ($livewire) => self::canApproveBulk($livewire) || Gate::allows('view', new PricingCalculationRow))
             ->checkIfRecordIsSelectableUsing(fn (PricingCalculationRow $record) => self::canEdit($record) || Gate::allows('view', $record))
             ->deselectAllRecordsWhenFiltered()
-            ->defaultSort('updated_at', 'desc')->reorderableColumns()->columnManagerColumns(3)
+            ->defaultSort('updated_at', 'desc')->reorderableColumns()
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
     }
 

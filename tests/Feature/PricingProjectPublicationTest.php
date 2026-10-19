@@ -9,6 +9,7 @@ use App\Filament\Resources\PricingParameters\Pages\EditPricingParameter;
 use App\Filament\Resources\PricingParameters\Pages\ListPricingParameters;
 use App\Filament\Resources\PricingProjects\Pages\EditPricingProject;
 use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
+use App\Filament\Resources\PricingProjects\RelationManagers\CalculationRowsRelationManager;
 use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
@@ -32,6 +33,7 @@ use App\Services\Pricing\ForeignRetailCalculationService;
 use App\Services\Pricing\HufRetailCalculationService;
 use App\Services\Pricing\OutletCalculationService;
 use App\Services\Pricing\OutletPriceReviewService;
+use App\Services\Pricing\PricingProjectItemDeletionService;
 use App\Services\Pricing\PricingProjectPublicationService;
 use App\Services\Pricing\RetailPriceReviewService;
 use App\Services\Pricing\WholesaleCalculationService;
@@ -52,6 +54,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class PricingProjectPublicationTest extends TestCase
@@ -92,6 +95,157 @@ class PricingProjectPublicationTest extends TestCase
         app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
 
         return app(PricingProjectPublicationService::class)->publish($this->project);
+    }
+
+    public function test_project_item_delete_waits_for_confirmation_and_preserves_published_prices_and_snapshot(): void
+    {
+        $publication = $this->publish();
+        $snapshot = $publication->getAttributes();
+        $items = PriceListItem::all()->map->getAttributes()->all();
+        app(PricingProjectPublicationService::class)->reopen($this->project->fresh());
+        $cost = $this->project->calculationRows()->where('price_type', 'cost')->firstOrFail();
+        $page = Livewire::test(CalculationRowsRelationManager::class, [
+            'ownerRecord' => $this->project->fresh(), 'pageClass' => EditPricingProject::class,
+        ])->mountTableAction('delete', $cost)->assertActionMounted();
+        $this->assertSame(PricingProjectItemDeletionService::WARNING, $page->instance()->getMountedAction()->getModalDescription());
+        $this->assertModelExists($cost);
+        $this->assertModelExists($this->row);
+        $page->callMountedTableAction()->assertHasNoTableActionErrors();
+        $this->assertSame(0, $this->project->calculationRows()->count());
+        $this->assertSame($items, PriceListItem::all()->map->getAttributes()->all());
+        // Reopen audit changes are allowed; the publication's immutable price snapshot is not.
+        $this->assertSame($snapshot['snapshot'], $publication->fresh()->getAttributes()['snapshot']);
+        $this->assertModelExists($this->product);
+    }
+
+    public function test_project_bulk_delete_expands_all_price_types_but_not_other_colors_or_projects(): void
+    {
+        $cost = $this->project->calculationRows()->where('price_type', 'cost')->firstOrFail();
+        foreach (['outlet', 'wholesale', 'distributor'] as $type) {
+            $list = PriceList::create(['code' => 'DELETE-'.$type, 'name_hu' => $type, 'type' => $type,
+                'currency_id' => $cost->currency_id, 'active' => true]);
+            PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
+                'currency_id' => $cost->currency_id, 'price_type' => $type, 'price_list_id' => $list->id,
+                'calculated_price' => 100, 'source_retail_row_id' => $this->row->id]);
+        }
+        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
+        $eurList = PriceList::create(['code' => 'DELETE-EUR', 'name_hu' => 'EUR', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
+            'currency_id' => $eur->id, 'price_type' => 'retail', 'price_list_id' => $eurList->id,
+            'calculated_price' => 10, 'source_retail_row_id' => $this->row->id]);
+        $secondProduct = $this->product->replicate();
+        $secondProduct->model_code = 'DELETE-SECOND';
+        $secondProduct->save();
+        $secondCost = $cost->replicate();
+        $secondCost->product_id = $secondProduct->id;
+        $secondCost->save();
+        $secondRetail = $this->row->replicate();
+        $secondRetail->product_id = $secondProduct->id;
+        $secondRetail->save();
+        $color = Color::create(['product_id' => $this->product->id, 'code' => 'KEEP', 'name_hu' => 'Marad']);
+        $otherColor = $cost->replicate();
+        $otherColor->color_id = $color->id;
+        $otherColor->save();
+        $otherProject = $this->project->replicate();
+        $otherProject->save();
+        $otherRow = $cost->replicate();
+        $otherRow->pricing_project_id = $otherProject->id;
+        $otherRow->save();
+
+        $page = Livewire::test(CalculationRowsRelationManager::class, [
+            'ownerRecord' => $this->project, 'pageClass' => EditPricingProject::class,
+        ])->mountTableBulkAction('delete', [$cost, $secondCost])->assertActionMounted();
+        $this->assertModelExists($this->row);
+        $this->assertSame(PricingProjectItemDeletionService::WARNING, $page->instance()->getMountedAction()->getModalDescription());
+        $page->callMountedTableBulkAction()->assertHasNoTableBulkActionErrors();
+        $this->assertSame([$otherColor->id], $this->project->calculationRows()->pluck('id')->all());
+        $this->assertModelExists($otherRow);
+    }
+
+    public function test_project_single_delete_does_not_require_bulk_delete_permission(): void
+    {
+        $user = User::factory()->create();
+        foreach (['ViewAny:PricingCalculationRow', 'View:PricingCalculationRow', 'Delete:PricingCalculationRow',
+            'View:PricingProject', 'Update:PricingProject'] as $permission) {
+            $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($user);
+        $cost = $this->project->calculationRows()->where('price_type', 'cost')->firstOrFail();
+        Livewire::test(CalculationRowsRelationManager::class, [
+            'ownerRecord' => $this->project, 'pageClass' => EditPricingProject::class,
+        ])->assertTableBulkActionHidden('delete')->callTableAction('delete', $cost)->assertHasNoTableActionErrors();
+        $this->assertSame(0, $this->project->calculationRows()->count());
+    }
+
+    public function test_project_read_only_page_cannot_delete_even_with_a_forged_action_call(): void
+    {
+        $cost = $this->project->calculationRows()->where('price_type', 'cost')->firstOrFail();
+        Livewire::test(CalculationRowsRelationManager::class, [
+            'ownerRecord' => $this->project, 'pageClass' => ViewPricingProject::class,
+        ])->assertTableActionHidden('delete', $cost)->assertTableBulkActionHidden('delete')
+            ->call('mountAction', 'delete', [], ['table' => true, 'recordKey' => (string) $cost->id])
+            ->assertSet('mountedActions', []);
+        $this->assertSame(2, $this->project->calculationRows()->count());
+    }
+
+    public function test_deleting_multiple_rows_of_the_same_item_is_deduplicated(): void
+    {
+        $ids = $this->project->calculationRows()->pluck('id')->all();
+        $this->assertSame(2, app(PricingProjectItemDeletionService::class)->delete($this->project, [...$ids, $ids[0]], bulk: true));
+        $this->assertSame(0, $this->project->calculationRows()->count());
+    }
+
+    public function test_project_item_delete_rejects_foreign_selection_and_stale_closed_projects(): void
+    {
+        $other = $this->project->replicate();
+        $other->save();
+        $foreign = $this->row->replicate();
+        $foreign->pricing_project_id = $other->id;
+        $foreign->save();
+        try {
+            app(PricingProjectItemDeletionService::class)->delete($this->project, [$this->row->id, $foreign->id], bulk: true);
+            $this->fail('Cross-project selection must not be deleted.');
+        } catch (HttpException $exception) {
+            $this->assertSame(404, $exception->getStatusCode());
+        }
+        $this->assertModelExists($this->row);
+        $this->assertModelExists($foreign);
+        $this->project->fresh()->update(['status' => 'closed']);
+        try {
+            app(PricingProjectItemDeletionService::class)->delete($this->project, [$this->row->id]);
+            $this->fail('A stale open project must be rechecked.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $this->assertModelExists($this->row);
+    }
+
+    public function test_bulk_delete_permission_alone_cannot_delete_expanded_price_rows(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo([Permission::findOrCreate('Update:PricingProject', 'web'),
+            Permission::findOrCreate('DeleteAny:PricingCalculationRow', 'web')]);
+        $this->actingAs($user);
+        $this->expectException(AuthorizationException::class);
+        try {
+            app(PricingProjectItemDeletionService::class)->delete($this->project, [$this->row->id], bulk: true);
+        } finally {
+            $this->assertSame(2, $this->project->calculationRows()->count());
+        }
+    }
+
+    public function test_project_item_delete_rolls_back_every_row_and_dependency_update_on_failure(): void
+    {
+        $before = $this->project->calculationRows()->orderBy('id')->get()->map->getAttributes()->all();
+        Event::listen('eloquent.deleting: '.PricingCalculationRow::class,
+            fn (PricingCalculationRow $row) => $row->id === $this->row->id ? false : null);
+        try {
+            app(PricingProjectItemDeletionService::class)->delete($this->project, [$this->row->id]);
+            $this->fail('A failed row delete must abort the entire operation.');
+        } catch (HttpException $exception) {
+            $this->assertSame(409, $exception->getStatusCode());
+        }
+        $this->assertSame($before, $this->project->calculationRows()->orderBy('id')->get()->map->getAttributes()->all());
     }
 
     public function test_publication_updates_only_matching_season_and_closes_atomically_with_audit(): void
