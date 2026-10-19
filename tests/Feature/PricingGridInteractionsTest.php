@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Models\Color;
 use App\Models\Currency;
@@ -18,6 +19,7 @@ use App\Services\Pricing\HufRetailCalculationService;
 use App\Services\Pricing\RetailCalculationDependencyService;
 use App\Services\Pricing\RetailPriceReviewService;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -58,6 +60,22 @@ class PricingGridInteractionsTest extends TestCase
             'price_type' => 'retail', 'round_to' => 1, 'mode' => 'nearest', 'adjustment' => 0, 'active' => true]);
         app(HufRetailCalculationService::class)->recalculate($this->project, $list);
         $this->retail = PricingCalculationRow::where('price_type', 'retail')->firstOrFail();
+    }
+
+    public function test_compact_column_manager_is_limited_to_the_huf_retail_page(): void
+    {
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->assertSuccessful()->assertSee('data-pricing-compact-column-manager="true"', false);
+        $table = $page->instance()->getTable();
+        $this->assertSame(1, $table->getColumnManagerColumns());
+        $this->assertSame(Width::Small, $table->getColumnManagerWidth());
+        $this->assertTrue($table->hasReorderableColumns());
+        $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
+
+        $foreign = Livewire::test(PricingForeignRetailCalculations::class)
+            ->assertSuccessful()->assertDontSee('data-pricing-compact-column-manager', false);
+        $this->assertSame(3, $foreign->instance()->getTable()->getColumnManagerColumns());
+        $this->assertSame(Width::FourExtraLarge, $foreign->instance()->getTable()->getColumnManagerWidth());
     }
 
     public function test_editors_and_modals_are_lazy_and_huf_menu_has_five_items(): void

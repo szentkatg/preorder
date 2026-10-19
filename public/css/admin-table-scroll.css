@@ -169,3 +169,41 @@
 .product-pricing-parameters select { max-width: 12rem; }
 .product-pricing-preview :is(th, td):first-child { text-align: left; }
 .product-pricing-preview input { width: 7rem; text-align: right; }
+
+/* HUF retail pilot: scroll only the choices, keeping Apply and Reset visible. */
+[data-pricing-compact-column-manager] .fi-ta-col-manager-dropdown .fi-ta-col-manager {
+    padding: .75rem;
+    gap: .625rem;
+}
+
+[data-pricing-compact-column-manager] .fi-ta-col-manager-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 0;
+    max-height: min(26rem, calc(100dvh - 14rem));
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+}
+
+[data-pricing-compact-column-manager] .fi-ta-col-manager-item {
+    gap: .5rem;
+    padding-block: .1875rem;
+    min-width: 0;
+}
+
+[data-pricing-compact-column-manager] .fi-ta-col-manager-label {
+    gap: .5rem;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+[data-pricing-compact-column-manager] .fi-ta-col-manager-label > span {
+    overflow-wrap: anywhere;
+}
+
+[data-pricing-compact-column-manager] .fi-ta-col-manager-reorder-handle {
+    flex-shrink: 0;
+}

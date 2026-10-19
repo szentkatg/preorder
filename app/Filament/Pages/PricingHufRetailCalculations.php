@@ -15,6 +15,7 @@ use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use App\Services\Pricing\PricingMultiplierAverage;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -123,6 +124,13 @@ class PricingHufRetailCalculations extends Page implements HasTable
     public function table(Table $table): Table
     {
         $table = HufRetailCalculationsTable::configure($table, $this->retailCurrencyCode());
+        // Pilot on this page only: the other pricing pages inherit this class.
+        if (static::class === self::class) {
+            $table->columnManagerColumns(1)
+                ->columnManagerWidth(Width::Small)
+                ->extraAttributes(['data-pricing-compact-column-manager' => 'true'], merge: true);
+        }
+
         $filters = $table->getFilters();
         unset($filters['pricing_project_id']);
         $table->filters(array_values($filters))
