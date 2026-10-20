@@ -45,7 +45,7 @@ class PricingProjectCalculationService
                 }
             }
             $result = ['run_id' => (string) Str::uuid(), 'products' => 0, 'prices' => 0, 'failed' => 0, 'requires_review' => 0, 'errors' => []];
-            Product::where('season_id', $project->season_id)->where('active', true)->orderBy('id')->chunkById(100,
+            Product::forPricingProject($project->id)->where('season_id', $project->season_id)->where('active', true)->orderBy('id')->chunkById(100,
                 function ($products) use ($project, $sources, &$result): void {
                     foreach ($products as $product) {
                         try {
@@ -66,7 +66,7 @@ class PricingProjectCalculationService
                     }
                 });
             $result['requires_review'] = PricingCalculationRow::where('pricing_project_id', $project->id)
-                ->where('requires_review', true)->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))->count();
+                ->where('requires_review', true)->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))->count();
 
             return $result;
         });

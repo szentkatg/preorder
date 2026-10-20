@@ -82,7 +82,7 @@ class ForeignRetailCalculator
                     'retail_exchange_rate' => (float) $rate->rate_to_huf, 'base_price' => $base->toFloat(),
                     'multiplier' => (float) $parameter->value, 'unrounded_price' => $unrounded],
                 'retail_parameter' => $parameter->only(['id', 'scope_type', 'product_id', 'item_main_group_id',
-                    'supplier_country_code', 'price_list_id', 'currency_id', 'value']),
+                    'supplier_country_code', 'material_composition', 'price_list_id', 'currency_id', 'value']),
                 'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment'])
                     + ['rounded_before_adjustment' => $price - (float) $rule->adjustment],
                 'calculated_price' => $price,

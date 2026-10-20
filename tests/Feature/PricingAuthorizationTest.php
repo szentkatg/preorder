@@ -64,6 +64,7 @@ class PricingAuthorizationTest extends TestCase
             'currency_id' => $currency->id, 'purchase_price' => 100, 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Jogosultság teszt',
             'status' => PricingProject::STATUS_ACTIVE, 'active' => true]);
+        $this->project->products()->attach($product);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id,
             'product_id' => $product->id, 'currency_id' => $currency->id, 'price_type' => 'cost', 'calculated_price' => 100]);
         $this->retail = PricingCalculationRow::create(['pricing_project_id' => $this->project->id,

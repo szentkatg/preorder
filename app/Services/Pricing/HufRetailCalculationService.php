@@ -51,7 +51,7 @@ class HufRetailCalculationService
                 ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
                 ->where('price_type', PricingCalculationRow::TYPE_COST)->where('currency_id', $huf->id)
                 ->where('price_list_key', 0)
-                ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
+                ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))
                 ->with(['product.itemMainGroup', 'supplier', 'currency'])->lockForUpdate()->get();
 
             if ($costs->isEmpty()) {

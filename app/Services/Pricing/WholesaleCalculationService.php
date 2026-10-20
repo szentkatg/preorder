@@ -44,7 +44,7 @@ class WholesaleCalculationService
                 }
                 if (! PricingCalculationRow::query()->where('pricing_project_id', $project->id)->where('price_type', 'retail')
                     ->where('price_list_id', $retail->id)->where('currency_id', $list->currency_id)
-                    ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))->exists()) {
+                    ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))->exists()) {
                     throw new DomainException($retail->code.': előbb számítsd ki a kisker árakat.');
                 }
             }
@@ -52,7 +52,7 @@ class WholesaleCalculationService
             foreach ($lists as $list) {
                 $sources = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
                     ->where('price_type', 'retail')->where('price_list_id', $list->retail_price_list_id)->where('currency_id', $list->currency_id)
-                    ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
+                    ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))
                     ->with(['currency', 'supplier', 'product.itemMainGroup', 'priceList'])->lockForUpdate()->get();
                 foreach ($sources as $source) {
                     $query = PricingCalculationRow::query()->where('pricing_project_id', $project->id)

@@ -48,6 +48,7 @@ class PricingCostDoubleClickTest extends TestCase
         ProductPurchasePrice::create(['product_id' => $product->id, 'supplier_id' => $supplier->supplier_id,
             'currency_id' => $currency->id, 'purchase_price' => 100, 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt projekt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($product);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id,
             'supplier_id' => $supplier->supplier_id, 'currency_id' => $currency->id, 'purchase_currency_id' => $currency->id,
             'price_type' => 'cost', 'purchase_price' => 100, 'exchange_rate' => 1,

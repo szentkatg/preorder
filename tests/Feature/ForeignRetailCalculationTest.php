@@ -59,6 +59,7 @@ class ForeignRetailCalculationTest extends TestCase
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'MODEL27', 'name_hu' => 'NACKW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Tél', 'status' => 'active', 'active' => false]);
+        $this->project->products()->attach($product);
         $this->hufList = PriceList::create(['code' => 'HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);

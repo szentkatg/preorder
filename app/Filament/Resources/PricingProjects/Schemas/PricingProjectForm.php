@@ -17,6 +17,7 @@ class PricingProjectForm
                 Select::make('season_id')
                     ->disabled(fn (?PricingProject $record) => $record?->exists)
                     ->label('Szezon')
+                    ->helperText('Létrehozás után a szezon még szabad termékei közül választhatod ki az árprojekt tételeit.')
                     ->relationship('season', 'name')
                     ->searchable()
                     ->preload()

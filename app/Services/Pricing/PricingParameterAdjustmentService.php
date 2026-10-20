@@ -51,6 +51,7 @@ class PricingParameterAdjustmentService
             'scope_type' => $scopeType,
             'supplier_country_code' => null,
             'item_main_group_id' => null,
+            'material_composition' => null,
             'product_id' => null,
             'price_list_id' => null,
             'currency_id' => null,
@@ -67,6 +68,9 @@ class PricingParameterAdjustmentService
             PricingParameter::SCOPE_PRODUCT => $attributes['product_id'] =
                 $row->product_id
                     ?: throw new InvalidArgumentException('A sorhoz nincs modell, ezért modell szinten nem menthető paraméter.'),
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => $attributes['material_composition'] =
+                $row->product?->material_composition
+                    ?: throw new InvalidArgumentException('A termékhez nincs anyagösszetétel megadva.'),
             default => throw new InvalidArgumentException('Ismeretlen árképzési paraméter szűkítési szint.'),
         };
 

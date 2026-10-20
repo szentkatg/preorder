@@ -141,6 +141,51 @@
     }
 }
 
+/* Product editor: title, always-visible top actions, then a separately scrollable body. */
+.fi-modal > .fi-modal-window-ctn > .fi-modal-window.product-pricing-modal {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.product-pricing-modal > .fi-modal-header {
+    grid-row: 1;
+}
+
+.product-pricing-modal > .fi-modal-footer {
+    grid-row: 2;
+    grid-column: 1;
+    background: inherit;
+    border-bottom: 1px solid rgb(100 116 139 / .3);
+}
+
+.fi-modal > .fi-modal-window-ctn > .product-pricing-modal > .fi-modal-footer {
+    position: static;
+    margin: 0;
+    padding-block: .75rem;
+}
+
+.product-pricing-modal > .fi-modal-content {
+    grid-row: 3;
+    grid-column: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.product-pricing-modal > :is(.fi-modal-header, .fi-modal-footer) {
+    min-width: 0;
+    z-index: 10;
+}
+
 .product-pricing-tables {
     display: grid;
     grid-template-columns: minmax(18rem, 1fr) minmax(0, 2.5fr);

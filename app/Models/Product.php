@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
@@ -38,6 +40,16 @@ class Product extends Model
     public function previousSeasonProduct(): BelongsTo
     {
         return $this->belongsTo(self::class, 'previous_season_product_id');
+    }
+
+    public function pricingProjects(): BelongsToMany
+    {
+        return $this->belongsToMany(PricingProject::class, 'pricing_project_products')->withTimestamps();
+    }
+
+    public function scopeForPricingProject(Builder $query, int $projectId): Builder
+    {
+        return $query->whereHas('pricingProjects', fn (Builder $projects) => $projects->whereKey($projectId));
     }
 
     public function season()

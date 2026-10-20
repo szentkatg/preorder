@@ -53,7 +53,7 @@ class OutletCalculationService
                 }
                 $sources = PricingCalculationRow::query()->where('pricing_project_id', $project->id)->where('price_type', 'retail')
                     ->where('price_list_id', $list->source_retail_price_list_id)->where('currency_id', $list->currency_id)
-                    ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
+                    ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))
                     ->with(['product', 'supplier', 'currency', 'priceList'])->lockForUpdate()->get();
                 if ($sources->isEmpty()) {
                     throw new DomainException($list->code.': előbb számítsd ki a forrás kisker árakat.');

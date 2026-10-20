@@ -56,6 +56,7 @@ class PricingGridInteractionsTest extends TestCase
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST-COST', 'name_hu' => 'Teszt modell', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt projekt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($product);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id,
             'currency_id' => $currency->id, 'price_type' => 'cost', 'calculated_price' => 120.96, 'calculation_snapshot' => ['test_source' => true]]);
         $list = PriceList::create(['code' => 'RETAIL_HUF', 'name_hu' => 'Kisker', 'type' => 'retail',

@@ -142,7 +142,7 @@ class ProductPricingService
             }
             $attributes = ['pricing_project_id' => $project->id, 'product_id' => $product->id,
                 'scope_type' => 'product', 'parameter_type' => $field['type'], 'price_list_id' => $field['price_list_id'],
-                'currency_id' => $field['currency_id'], 'supplier_country_code' => null, 'item_main_group_id' => null];
+                'currency_id' => $field['currency_id'], 'supplier_country_code' => null, 'item_main_group_id' => null, 'material_composition' => null];
             $matches = PricingParameter::where($attributes)->get();
             if ($matches->count() > 1) {
                 throw new DomainException('Több modellszintű paraméter van: '.$field['label']);
@@ -304,7 +304,8 @@ class ProductPricingService
         Gate::authorize('update', $project);
         Gate::authorize('create', PricingCalculationRow::class);
         Gate::authorize('update', new PricingCalculationRow);
-        if (! $project->isOpenForPricing() || ! $product->active || $product->season_id != $project->season_id) {
+        if (! $project->isOpenForPricing() || ! $product->active || $product->season_id != $project->season_id
+            || ! $project->products()->whereKey($product->id)->exists()) {
             throw new DomainException('Csak nem lezárt árprojekt aktív, azonos szezonú terméke kezelhető.');
         }
     }

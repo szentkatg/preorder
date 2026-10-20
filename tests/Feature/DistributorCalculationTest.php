@@ -75,6 +75,7 @@ class DistributorCalculationTest extends TestCase
         $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'BAG27', 'name_hu' => 'BAGW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => '2027 árprojekt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($product);
         $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
         $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
         $retailHuf = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);

@@ -40,6 +40,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Livewire\Mechanisms\ExtendBlade\ExtendBlade;
 use Maatwebsite\Excel\Excel;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
@@ -85,6 +86,7 @@ class ProductPricingWorkspaceTest extends TestCase
                 'currency_id' => $usd->id, 'purchase_price' => 10, 'active' => true]);
         }
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach([$this->product->id, $this->other->id]);
         foreach (['shipping_cost_percent' => 8, 'customs_percent' => 12, 'retail_multiplier' => 4.7,
             'country_multiplier' => 1.1, 'wholesale_margin' => 2.5, 'distributor_discount' => 10, 'outlet_discount' => 30] as $type => $value) {
             PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => $type,
@@ -218,6 +220,7 @@ class ProductPricingWorkspaceTest extends TestCase
         $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->firstOrFail();
         $page = Livewire::test(PricingProductWorkspace::class)->mountTableAction('editProductPricing', $cost);
         $this->assertSame('editProductPricing', $page->instance()->getMountedAction()->getName());
+        $this->assertProductPricingModalLayout($page);
         $this->assertNull($page->instance()->pricingEditorError);
         $this->assertCount(6, $page->instance()->pricingEditorPreview['prices']);
         $this->assertDatabaseCount('pricing_calculation_rows', 4);
@@ -584,6 +587,7 @@ class ProductPricingWorkspaceTest extends TestCase
             $row = $page->instance()->getTable()->getQuery()->where('product_id', $this->product->id)->firstOrFail();
             $before = $this->pricingListState($page->instance());
             $page->call('mountAction', 'productPricing', ['record_id' => $row->id])->assertActionMounted('productPricing')->assertHasNoErrors();
+            $this->assertProductPricingModalLayout($page);
             $this->assertSame($this->product->id, $page->instance()->pricingEditorProductId, $class);
             $this->assertSame($this->project->id, $page->instance()->pricingEditorProjectId, $class);
             $this->assertArrayNotHasKey('redirect', $page->effects);
@@ -593,6 +597,41 @@ class ProductPricingWorkspaceTest extends TestCase
             $this->assertNull($page->instance()->pricingEditorProductId);
             $this->assertArrayNotHasKey('redirect', $page->effects);
         }
+    }
+
+    private function assertProductPricingModalLayout($page): void
+    {
+        $action = $page->instance()->getMountedAction();
+        $this->assertTrue($action->isModalHeaderSticky());
+        $this->assertSame('product-pricing-modal', $action->getExtraModalWindowAttributes()['class']);
+        $this->assertFalse($action->getModalSubmitAction()->isDisabled());
+        // Render the modal in its Livewire context, independently of the page's modal render flag.
+        $blade = app(ExtendBlade::class);
+        $blade->startLivewireRendering($page->instance());
+        try {
+            $modalHtml = $action->toModalHtmlable()->toHtml();
+        } finally {
+            $blade->endLivewireRendering();
+        }
+        $this->assertStringContainsString('product-pricing-modal', $modalHtml);
+        $this->assertStringContainsString('Minden ár mentése és jóváhagyása', $modalHtml);
+        $this->assertStringContainsString('Mégse', $modalHtml);
+
+        $html = new \DOMDocument;
+        @$html->loadHTML('<?xml encoding="UTF-8">'.$modalHtml);
+        $xpath = new \DOMXPath($html);
+        $window = "//*[contains(concat(' ', normalize-space(@class), ' '), ' product-pricing-modal ')]";
+        $footer = $xpath->query($window."/*[contains(concat(' ', normalize-space(@class), ' '), ' fi-modal-footer ')]");
+        $this->assertSame(1, $footer->length);
+        $this->assertGreaterThanOrEqual(2, $xpath->query('.//button', $footer->item(0))->length);
+    }
+
+    public function test_product_editor_css_keeps_top_actions_above_a_bounded_scrollable_body(): void
+    {
+        $css = file_get_contents(public_path('css/admin-table-scroll.css'));
+        $this->assertMatchesRegularExpression('/\.fi-modal-window\.product-pricing-modal\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\);[^}]*max-height:\s*100dvh;[^}]*overflow:\s*hidden;/s', $css);
+        $this->assertMatchesRegularExpression('/\.product-pricing-modal\s*>\s*\.fi-modal-footer\s*\{[^}]*grid-row:\s*2;/s', $css);
+        $this->assertMatchesRegularExpression('/\.product-pricing-modal\s*>\s*\.fi-modal-content\s*\{[^}]*grid-row:\s*3;[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s', $css);
     }
 
     public function test_in_place_save_refreshes_prices_without_resetting_filters_pagination_or_columns(): void

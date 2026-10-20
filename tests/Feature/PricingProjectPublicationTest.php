@@ -82,6 +82,7 @@ class PricingProjectPublicationTest extends TestCase
         $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'B10024W27', 'name_hu' => 'ERVIN', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($this->product);
         $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460.125]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);

@@ -56,7 +56,7 @@ class OutletCalculator extends WholesaleCalculator
                 'price_list' => ['id' => $list->id, 'code' => $list->code],
                 'inputs' => ['base_price' => (float) $source->final_price, 'multiplier' => $factor->toFloat(),
                     'outlet_discount_percent' => (float) $parameter->value, 'unrounded_price' => $unrounded],
-                'outlet_parameter' => $parameter->only(['id', 'scope_type', 'value', 'currency_id', 'price_list_id', 'product_id', 'item_main_group_id']),
+                'outlet_parameter' => $parameter->only(['id', 'scope_type', 'value', 'currency_id', 'price_list_id', 'product_id', 'item_main_group_id', 'material_composition']),
                 'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment'])
                     + ['discount_safe' => true], 'calculated_price' => $price,
             ]];

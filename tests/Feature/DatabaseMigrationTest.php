@@ -57,6 +57,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumns('pricing_projects', ['closed_at', 'closed_by']));
         $this->assertTrue(Schema::hasTable('pricing_project_publications'));
         $this->assertTrue(Schema::hasTable('pricing_parameters'));
+        $this->assertTrue(Schema::hasColumn('pricing_parameters', 'material_composition'));
+        $this->assertTrue(Schema::hasColumns('pricing_project_products', ['pricing_project_id', 'product_id']));
         $this->assertTrue(Schema::hasTable('pricing_rounding_rules'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_errors'));

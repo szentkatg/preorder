@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PricingRoundingRules\Tables;
 
+use App\Filament\Support\Actions\CopyPricingConfigurationAction;
+use App\Models\PricingRoundingRule;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -29,7 +31,10 @@ class PricingRoundingRulesTable
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([EditAction::make()])
             ->toolbarActions([
-                BulkActionGroup::make([DeleteBulkAction::make()->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false)]),
+                BulkActionGroup::make([
+                    CopyPricingConfigurationAction::make(PricingRoundingRule::class),
+                    DeleteBulkAction::make()->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false),
+                ]),
             ]);
     }
 }

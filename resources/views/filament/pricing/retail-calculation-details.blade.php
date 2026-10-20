@@ -6,7 +6,7 @@
     $currency = $snapshot['currency'] ?? $record->currency?->code ?? 'HUF';
     $foreign = $currency !== 'HUF';
     $scope = match ($parameter['scope_type'] ?? '') {
-        'product' => 'Modell', 'item_main_group' => 'Főcsoport', 'supplier_country' => 'Beszállító ország', default => 'Globális',
+        'product' => 'Modell', 'material_composition' => 'Anyagösszetétel', 'item_main_group' => 'Főcsoport', 'supplier_country' => 'Beszállító ország', default => 'Globális',
     };
     $mode = match ($rounding['mode'] ?? '') { 'up' => 'Felfelé', 'down' => 'Lefelé', default => 'Legközelebbi' };
 @endphp

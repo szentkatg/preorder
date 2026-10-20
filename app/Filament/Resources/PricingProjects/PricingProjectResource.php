@@ -5,8 +5,10 @@ namespace App\Filament\Resources\PricingProjects;
 use App\Filament\Resources\PricingProjects\Pages\CreatePricingProject;
 use App\Filament\Resources\PricingProjects\Pages\EditPricingProject;
 use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
+use App\Filament\Resources\PricingProjects\Pages\SelectPricingProjectProducts;
 use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
 use App\Filament\Resources\PricingProjects\RelationManagers\CalculationRowsRelationManager;
+use App\Filament\Resources\PricingProjects\RelationManagers\ProductsRelationManager;
 use App\Filament\Resources\PricingProjects\Schemas\PricingProjectForm;
 use App\Filament\Resources\PricingProjects\Tables\PricingProjectsTable;
 use App\Filament\Support\AdminResourceTable;
@@ -58,6 +60,7 @@ class PricingProjectResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ProductsRelationManager::class,
             CalculationRowsRelationManager::class,
         ];
     }
@@ -67,6 +70,7 @@ class PricingProjectResource extends Resource
         return [
             'index' => ListPricingProjects::route('/'),
             'create' => CreatePricingProject::route('/create'),
+            'products' => SelectPricingProjectProducts::route('/{record}/products'),
             'view' => ViewPricingProject::route('/{record}'),
             'edit' => EditPricingProject::route('/{record}/edit'),
         ];

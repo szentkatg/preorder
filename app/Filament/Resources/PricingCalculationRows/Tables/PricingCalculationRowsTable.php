@@ -255,6 +255,10 @@ class PricingCalculationRowsTable
                 );
         }
 
+        if (filled($record->product?->material_composition)) {
+            $options[PricingParameter::SCOPE_MATERIAL_COMPOSITION] = 'Anyagösszetétel - '.$record->product->material_composition;
+        }
+
         if (filled($record->product_id)) {
             $options[PricingParameter::SCOPE_PRODUCT] =
                 'Modell - '.($record->product?->model_code ?: $record->product_id);
@@ -316,6 +320,8 @@ class PricingCalculationRowsTable
                 fn ($productQuery) => $productQuery->where('item_main_group_id', $record->product?->item_main_group_id)
             ),
             PricingParameter::SCOPE_PRODUCT => $query->where('product_id', $record->product_id),
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => $query->whereHas('product',
+                fn ($productQuery) => $productQuery->where('material_composition', $record->product?->material_composition)),
             default => null,
         };
 
@@ -336,6 +342,7 @@ class PricingCalculationRowsTable
         return match ($parameter->scope_type) {
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország: '.$parameter->supplier_country_code,
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport ID: '.$parameter->item_main_group_id,
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => 'Anyagösszetétel: '.$parameter->material_composition,
             PricingParameter::SCOPE_PRODUCT => 'Modell ID: '.$parameter->product_id,
             default => 'Globális paraméter',
         };

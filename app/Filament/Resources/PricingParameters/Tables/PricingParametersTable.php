@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PricingParameters\Tables;
 
+use App\Filament\Support\Actions\CopyPricingConfigurationAction;
+use App\Models\PricingParameter;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -20,6 +22,7 @@ class PricingParametersTable
                 TextColumn::make('scope_type')->label('Szűkítés')->badge(),
                 TextColumn::make('supplier_country_code')->label('Ország'),
                 TextColumn::make('itemMainGroup.name_hu')->label('Főcsoport'),
+                TextColumn::make('material_composition')->label('Anyagösszetétel'),
                 TextColumn::make('product.model_code')->label('Modell'),
                 TextColumn::make('priceList.code')->label('Árlista'),
                 TextColumn::make('currency.code')->label('Pénznem'),
@@ -30,7 +33,10 @@ class PricingParametersTable
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->recordActions([EditAction::make()])
             ->toolbarActions([
-                BulkActionGroup::make([DeleteBulkAction::make()->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false)]),
+                BulkActionGroup::make([
+                    CopyPricingConfigurationAction::make(PricingParameter::class),
+                    DeleteBulkAction::make()->authorizeIndividualRecords(fn ($record) => $record->pricingProject?->isOpenForPricing() ?? false),
+                ]),
             ]);
     }
 }

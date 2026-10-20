@@ -19,6 +19,7 @@ class PricingProjectsTable
             ->columns([
                 TextColumn::make('season.name')->label('Szezon'),
                 TextColumn::make('name')->label('Név'),
+                TextColumn::make('products_count')->counts('products')->label('Termékek száma'),
                 TextColumn::make('status')->label('Státusz')->badge()->formatStateUsing(fn ($state) => match ($state) {
                     'draft' => 'Tervezet', 'active' => 'Aktív', 'closed' => 'Lezárt', default => $state,
                 }),

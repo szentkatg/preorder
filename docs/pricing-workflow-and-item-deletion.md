@@ -13,7 +13,9 @@ Az **Árprojektek → Szerkesztés → Árkalkulációs sorok** táblában:
   maradnak**. Sem a `price_list_items`, sem a publikálási snapshot nem módosul.
 - Más projektek, más színek, a terméktörzs, beszerzési árak és paraméterek
   nem törlődnek. A továbbiakban végzett újraszámítás ezekből ismét létrehozhatja
-  a kalkulációkat; a figyelmeztetés erre is kitér. Nincs tartós kizárási lista.
+  a kalkulációkat; a figyelmeztetés erre is kitér. A modell tartós kivételéhez
+  az új **Árprojekt termékei → Kijelölt termékek kivétele** művelet használható;
+  ez a termék-hozzárendelést is eltávolítja. Lásd: `pricing-project-products.md`.
 - A különálló **Árkalkulációs sorok** menü meglévő törlése nem változik;
   az összes árat érintő törlés kifejezetten a projekt alatti kapcsolt listán van.
 

@@ -55,6 +55,8 @@ trait HasProductPricingEditor
             ->authorize(fn (PricingCalculationRow $record) => $this->canEditProductPricing($record))
             ->modalHeading(fn () => ($this->pricingEditorSettings['product']['model_code'] ?? '').' – '.($this->pricingEditorSettings['product']['name_hu'] ?? 'Termék árkezelése'))
             ->modalWidth(Width::Screen)->modalSubmitActionLabel('Minden ár mentése és jóváhagyása')->modalCancelActionLabel('Mégse')
+            ->stickyModalHeader()
+            ->extraModalWindowAttributes(['class' => 'product-pricing-modal'])
             ->modalSubmitAction(fn ($action) => $action->disabled(fn () => $this->pricingEditorError !== null))
             ->mountUsing(function (PricingCalculationRow $record, Action $action): void {
                 $record = $this->productPricingSourceRecord($record->id);

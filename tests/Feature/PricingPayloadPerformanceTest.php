@@ -39,6 +39,7 @@ class PricingPayloadPerformanceTest extends TestCase
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'PERF-001', 'name_hu' => 'Teszt termék', 'active' => true]);
         $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt projekt', 'status' => 'active', 'active' => true]);
+        $project->products()->attach($product);
         $list = PriceList::create(['code' => 'PERF-HUF', 'name_hu' => 'Teszt kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         $cost = PricingCalculationRow::create(['pricing_project_id' => $project->id, 'product_id' => $product->id,
             'price_type' => 'cost', 'currency_id' => $huf->id, 'calculated_price' => 460]);

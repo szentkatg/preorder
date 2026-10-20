@@ -63,7 +63,7 @@ class WholesaleCalculator
                 'source_retail_price_list' => ['id' => $source->price_list_id, 'code' => $list->retailPriceList->code],
                 'price_list' => ['id' => $list->id, 'code' => $list->code],
                 'inputs' => ['base_price' => (float) $source->final_price, 'multiplier' => (float) $parameter->value, 'unrounded_price' => $unrounded],
-                'wholesale_parameter' => $parameter->only(['id', 'scope_type', 'value', 'price_list_id', 'currency_id', 'product_id', 'item_main_group_id']),
+                'wholesale_parameter' => $parameter->only(['id', 'scope_type', 'value', 'price_list_id', 'currency_id', 'product_id', 'item_main_group_id', 'material_composition']),
                 'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment']),
                 'calculated_price' => $price]];
     }

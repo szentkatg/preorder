@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PricingParameters\Schemas;
 
 use App\Models\PricingParameter;
+use App\Models\Product;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -41,6 +42,7 @@ class PricingParameterForm
                         PricingParameter::SCOPE_GLOBAL => 'Globális',
                         PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország',
                         PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport',
+                        PricingParameter::SCOPE_MATERIAL_COMPOSITION => 'Anyagösszetétel',
                         PricingParameter::SCOPE_PRODUCT => 'Modell',
                     ])
                     ->default(PricingParameter::SCOPE_GLOBAL)
@@ -60,6 +62,16 @@ class PricingParameterForm
                     ->preload()
                     ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP)
                     ->dehydrated(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP),
+
+                Select::make('material_composition')
+                    ->label('Anyagösszetétel')
+                    ->options(fn () => Product::query()->whereNotNull('material_composition')
+                        ->where('material_composition', '!=', '')->distinct()->orderBy('material_composition')
+                        ->pluck('material_composition', 'material_composition'))
+                    ->searchable()->required()
+                    ->helperText('Pontos egyezés a terméktörzs anyagösszetételével. Elsőbbség: globális → ország → főcsoport → anyagösszetétel → modell.')
+                    ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_MATERIAL_COMPOSITION)
+                    ->dehydrated(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_MATERIAL_COMPOSITION),
 
                 Select::make('product_id')
                     ->label('Modell')

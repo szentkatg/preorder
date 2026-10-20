@@ -18,6 +18,10 @@ class PricingCalculationRowForm
                     ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Árprojekt')
                     ->relationship('pricingProject', 'name')
+                    ->live()->afterStateUpdated(function ($set): void {
+                        $set('product_id', null);
+                        $set('color_id', null);
+                    })
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -25,7 +29,7 @@ class PricingCalculationRowForm
                 Select::make('product_id')
                     ->disabled(fn (?PricingCalculationRow $record) => self::isManagedPrice($record))
                     ->label('Modell')
-                    ->relationship('product', 'model_code')
+                    ->relationship('product', 'model_code', modifyQueryUsing: fn ($query, $get) => $query->forPricingProject((int) $get('pricing_project_id')))
                     ->searchable()
                     ->preload()
                     ->required(),

@@ -45,6 +45,7 @@ class CostCalculationService
         }
 
         $productsWithoutActivePurchasePrice = Product::query()
+            ->forPricingProject($project->id)
             ->when($productId !== null, fn ($query) => $query->whereKey($productId))
             ->where('season_id', $project->season_id)
             ->where('active', true)
@@ -60,6 +61,7 @@ class CostCalculationService
             ->where('active', true)
             ->whereHas('product', function ($query) use ($project): void {
                 $query
+                    ->forPricingProject($project->id)
                     ->where('season_id', $project->season_id)
                     ->where('active', true);
             })
@@ -88,9 +90,14 @@ class CostCalculationService
             'errors' => [],
         ];
 
-        DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $hufCurrency, $runId, &$result): void {
+        DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $productId, $hufCurrency, $runId, &$result): void {
             $lockedProject = PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
             CostCalculationAuthorization::authorizeRecalculation($lockedProject);
+            $memberIds = $lockedProject->products()->when($productId !== null, fn ($query) => $query->whereKey($productId))->pluck('products.id')->all();
+            $productsWithoutActivePurchasePrice = $productsWithoutActivePurchasePrice->whereIn('id', $memberIds);
+            $purchasePriceGroups = $purchasePriceGroups->filter(fn ($prices) => in_array($prices->first()->product_id, $memberIds));
+            $result['candidate_groups'] = $purchasePriceGroups->count();
+            $result['products_without_active_purchase_price'] = $productsWithoutActivePurchasePrice->count();
             foreach ($productsWithoutActivePurchasePrice as $product) {
                 PricingCalculationError::query()->create([
                     'run_id' => $runId,

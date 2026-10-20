@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Gate;
 
@@ -86,6 +87,11 @@ class PricingProject extends Model
     public function calculationRows(): HasMany
     {
         return $this->hasMany(PricingCalculationRow::class);
+    }
+
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'pricing_project_products')->withTimestamps();
     }
 
     public function calculationErrors(): HasMany

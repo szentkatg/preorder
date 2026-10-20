@@ -11,7 +11,7 @@
         <tbody>
             @foreach ([
                 ['Bruttó kisker alapár', $snapshot['source_retail_price_list']['code'] ?? '-', $record->base_price],
-                ['Minimum kedvezmény %', 'Paraméter #'.($parameter['id'] ?? '-').' · '.match($parameter['scope_type'] ?? '') { 'product' => 'Modell', 'item_main_group' => 'Főcsoport', 'supplier_country' => 'Beszállító ország', default => 'Globális' }, $record->outlet_discount_percent],
+                ['Minimum kedvezmény %', 'Paraméter #'.($parameter['id'] ?? '-').' · '.match($parameter['scope_type'] ?? '') { 'product' => 'Modell', 'material_composition' => 'Anyagösszetétel', 'item_main_group' => 'Főcsoport', 'supplier_country' => 'Beszállító ország', default => 'Globális' }, $record->outlet_discount_percent],
                 ['Kerekítés előtti ár', 'Kisker alapár × (1 − kedvezmény% / 100)', $record->unrounded_price],
                 ['Kalkulált outlet ár', ($rounding['name'] ?? '-').' · lépés: '.($rounding['round_to'] ?? '-').' · '.($rounding['mode'] ?? '-').' · korrekció: '.($rounding['adjustment'] ?? 0), $record->calculated_price],
                 ['Végleges outlet ár', $record->manual_price !== null ? 'Manuális ár' : ($record->retained_price !== null ? 'Megtartott ár' : 'Kalkulált ár'), $record->final_price],

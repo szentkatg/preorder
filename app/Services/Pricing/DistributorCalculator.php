@@ -56,7 +56,7 @@ class DistributorCalculator extends WholesaleCalculator
                 'price_list' => ['id' => $list->id, 'code' => $list->code],
                 'inputs' => ['base_price' => (float) $source->final_price, 'source_retail_price' => (float) $source->base_price,
                     'multiplier' => $factor->toFloat(), 'distributor_discount_percent' => (float) $parameter->value, 'unrounded_price' => $unrounded],
-                'distributor_parameter' => $parameter->only(['id', 'scope_type', 'value', 'price_list_id', 'currency_id', 'product_id', 'item_main_group_id']),
+                'distributor_parameter' => $parameter->only(['id', 'scope_type', 'value', 'price_list_id', 'currency_id', 'product_id', 'item_main_group_id', 'material_composition']),
                 'rounding' => $rule->only(['id', 'name', 'round_to', 'decimal_places', 'mode', 'adjustment']), 'calculated_price' => $price]];
     }
 

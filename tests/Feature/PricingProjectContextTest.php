@@ -290,6 +290,7 @@ class PricingProjectContextTest extends TestCase
         $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Árprojekt '.$code, 'status' => PricingProject::STATUS_ACTIVE, 'active' => $active]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => ItemMainGroup::firstOrFail()->id,
             'model_code' => 'CTX-'.$code, 'name_hu' => 'Teszt '.$code, 'active' => true]);
+        $project->products()->attach($product);
         PricingCalculationRow::create(['pricing_project_id' => $project->id, 'product_id' => $product->id,
             'price_type' => 'cost', 'currency_id' => $this->currency->id, 'calculated_price' => 460, 'shipping_cost_percent' => 8, 'customs_percent' => 12]);
         PricingParameter::create(['pricing_project_id' => $project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);

@@ -68,7 +68,7 @@ class ForeignRetailCalculationService
             $sources = PricingCalculationRow::query()->where('pricing_project_id', $project->id)
                 ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
                 ->where('price_type', 'retail')->where('price_list_id', $sourceList->id)->where('currency_id', $sourceList->currency_id)
-                ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id))
+                ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id))
                 ->with(['currency', 'product.itemMainGroup', 'supplier', 'priceList'])->lockForUpdate()->get();
             if ($sources->isEmpty()) {
                 throw new DomainException('Előbb számítsd ki a kiválasztott HUF árlista kisker árait.');

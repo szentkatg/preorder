@@ -46,6 +46,12 @@ class PricingParameterResolver
                             ->where('item_main_group_id', $product->item_main_group_id);
                     })
                     ->orWhere(function ($query) use ($product): void {
+                        $query->where('scope_type', PricingParameter::SCOPE_MATERIAL_COMPOSITION)
+                            ->whereNotNull('material_composition')
+                            ->where('material_composition', '!=', '')
+                            ->where('material_composition', $product->material_composition ?: '');
+                    })
+                    ->orWhere(function ($query) use ($product): void {
                         $query->where('scope_type', PricingParameter::SCOPE_PRODUCT)
                             ->where('product_id', $product->id);
                     });
@@ -78,6 +84,7 @@ class PricingParameterResolver
     {
         return match ($parameter->scope_type) {
             PricingParameter::SCOPE_PRODUCT => 400,
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => 350,
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => 300,
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => 200,
             default => 100,

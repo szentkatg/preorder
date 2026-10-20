@@ -64,7 +64,11 @@ class PricingProjectPublicationService
         $snapshot = ['season_id' => $project->season_id, 'season_code' => $project->season?->code,
             'products' => [], 'lists' => [], 'prices' => []];
         $groups = [];
+        $memberIds = $project->products()->pluck('products.id')->all();
         foreach ($rows as $row) {
+            if (! in_array($row->product_id, $memberIds)) {
+                throw new DomainException($row->product->model_code.': a termék nincs felvéve az árprojektbe.');
+            }
             if ($row->product->season_id != $project->season_id) {
                 throw new DomainException($row->product->model_code.': eltérő szezonú termék az árprojektben.');
             }

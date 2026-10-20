@@ -75,6 +75,6 @@ class DistributorCalculationService
     {
         return PricingCalculationRow::query()->where('pricing_project_id', $project->id)->where('price_type', 'wholesale')
             ->where('price_list_id', $list->source_wholesale_price_list_id)->where('currency_id', $list->currency_id)
-            ->whereHas('product', fn ($query) => $query->where('active', true)->where('season_id', $project->season_id));
+            ->whereHas('product', fn ($query) => $query->forPricingProject($project->id)->where('active', true)->where('season_id', $project->season_id));
     }
 }

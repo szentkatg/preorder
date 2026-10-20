@@ -55,6 +55,7 @@ try {
     }
 
     $expectedCommit = Invoke-ProjectGit -GitArguments @('rev-parse', 'HEAD')
+    $requiresAssignmentCheck = [bool] (Invoke-ProjectGit -GitArguments @('ls-tree', '--name-only', 'HEAD', '--', 'database/migrations/2026_10_19_140000_add_material_scope_and_pricing_project_products.php'))
 
     if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
         throw 'Could not determine the local commit.'
@@ -66,6 +67,7 @@ try {
 $branch = '__BRANCH__';
 $expected = '__COMMIT__';
 $checkOnly = __CHECK_ONLY__;
+$checkAssignments = __ASSIGNMENT_CHECK__;
 $run = static function (string $command): void {
     echo "Running: {$command}\n";
     passthru($command, $status);
@@ -103,6 +105,21 @@ try {
         throw new \RuntimeException('Local HEAD does not match the published branch. Push first, or update the local worktree.');
     }
     echo "NAS branch: {$branch}\nCurrent commit: {$before}\nTarget commit: {$expected}\n";
+    // Run on the OLD application before updating files: a blocked migration must not
+    // leave new code running against the old schema while assignments are resolved.
+    if ($checkAssignments && \Illuminate\Support\Facades\Schema::hasTable('pricing_calculation_rows')) {
+        $conflicts = \Illuminate\Support\Facades\DB::table('pricing_calculation_rows')
+            ->select('product_id')->groupBy('product_id')->havingRaw('COUNT(DISTINCT pricing_project_id) > 1')->pluck('product_id');
+        if ($conflicts->isNotEmpty()) {
+            foreach ($conflicts as $id) {
+                $product = \Illuminate\Support\Facades\DB::table('products')->find($id);
+                $projects = \Illuminate\Support\Facades\DB::table('pricing_calculation_rows')->where('product_id', $id)->distinct()->pluck('pricing_project_id');
+                echo 'CONFLICT: product #' . $id . ' (' . ($product->model_code ?? '?') . '), projects: ' . $projects->implode(', ') . "\n";
+            }
+            throw new \RuntimeException('Resolve product assignments manually first. No NAS application files, schema or prices were changed.');
+        }
+        echo "Product assignments: no conflicts.\n";
+    }
     if ($checkOnly) {
         echo "CHECK OK. No Git update, migration, dependency install or cache change was performed.\n";
         return;
@@ -144,6 +161,7 @@ try {
 
     $remotePhp = $remotePhp.Replace('__BRANCH__', $Branch).Replace('__COMMIT__', $expectedCommit)
     $remotePhp = $remotePhp.Replace('__CHECK_ONLY__', $(if ($CheckOnly) { 'true' } else { 'false' }))
+    $remotePhp = $remotePhp.Replace('__ASSIGNMENT_CHECK__', $(if ($requiresAssignmentCheck) { 'true' } else { 'false' }))
     $encodedPhp = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remotePhp))
     $remoteScript = "set -e`nsudo -n /usr/local/sbin/preorder-admin artisan tinker --execute=`"eval(base64_decode('$encodedPhp'));`"`n"
     $sshConfig = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh\config'

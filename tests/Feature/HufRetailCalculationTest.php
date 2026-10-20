@@ -66,6 +66,7 @@ class HufRetailCalculationTest extends TestCase
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'B10024W27', 'name_hu' => 'Teszt táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt árprojekt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($product);
         $this->list = PriceList::create(['code' => 'RETAIL-HUF', 'name_hu' => 'HUF kisker', 'type' => 'retail',
             'currency_id' => $currency->id, 'active' => true]);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id,
@@ -199,6 +200,7 @@ class HufRetailCalculationTest extends TestCase
         $product->season_id = $season->id;
         $product->model_code = 'B10024W28';
         $product->save();
+        $project->products()->attach($product);
         $cost = $this->cost->replicate();
         $cost->pricing_project_id = $project->id;
         $cost->product_id = $product->id;
@@ -508,8 +510,13 @@ class HufRetailCalculationTest extends TestCase
         $otherCost = $this->cost->replicate();
         $otherCost->product_id = $product->id;
         $otherCost->save();
+        $this->project->products()->attach($product);
         $otherProject = $this->project->replicate();
         $otherProject->save();
+        $otherProjectProduct = $this->cost->product->replicate();
+        $otherProjectProduct->model_code = 'OTHER-PROJECT';
+        $otherProjectProduct->save();
+        $otherProject->products()->attach($otherProjectProduct);
         foreach ([$this->multiplier, $this->rounding] as $input) {
             $copy = $input->replicate();
             $copy->pricing_project_id = $otherProject->id;
@@ -517,6 +524,7 @@ class HufRetailCalculationTest extends TestCase
         }
         $projectCost = $this->cost->replicate();
         $projectCost->pricing_project_id = $otherProject->id;
+        $projectCost->product_id = $otherProjectProduct->id;
         $projectCost->save();
         PriceList::create(['code' => 'HUF-SECOND', 'name_hu' => 'Második árlista', 'type' => 'retail',
             'currency_id' => $this->list->currency_id, 'active' => true]);

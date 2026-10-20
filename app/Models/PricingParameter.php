@@ -30,6 +30,8 @@ class PricingParameter extends Model
 
     public const SCOPE_ITEM_MAIN_GROUP = 'item_main_group';
 
+    public const SCOPE_MATERIAL_COMPOSITION = 'material_composition';
+
     public const SCOPE_PRODUCT = 'product';
 
     protected $fillable = [
@@ -38,6 +40,7 @@ class PricingParameter extends Model
         'scope_type',
         'supplier_country_code',
         'item_main_group_id',
+        'material_composition',
         'product_id',
         'price_list_id',
         'currency_id',
@@ -55,6 +58,12 @@ class PricingParameter extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $parameter): void {
+            if ($parameter->scope_type !== self::SCOPE_MATERIAL_COMPOSITION) {
+                $parameter->material_composition = null;
+            }
+        });
+
         $invalidate = static function (self $parameter): void {
             if ($parameter->parameter_type === self::TYPE_OUTLET_DISCOUNT || $parameter->getOriginal('parameter_type') === self::TYPE_OUTLET_DISCOUNT) {
                 foreach ([$parameter->getAttributes(), $parameter->getOriginal()] as $attributes) {
@@ -66,6 +75,8 @@ class PricingParameter extends Model
                             fn ($query) => $query->where('product_id', $attributes['product_id']))
                         ->when(($attributes['scope_type'] ?? '') === self::SCOPE_ITEM_MAIN_GROUP,
                             fn ($query) => $query->whereHas('product', fn ($product) => $product->where('item_main_group_id', $attributes['item_main_group_id'])))
+                        ->when(($attributes['scope_type'] ?? '') === self::SCOPE_MATERIAL_COMPOSITION,
+                            fn ($query) => $query->whereHas('product', fn ($product) => $product->where('material_composition', $attributes['material_composition'])))
                         ->when(($attributes['scope_type'] ?? '') === self::SCOPE_SUPPLIER_COUNTRY,
                             fn ($query) => $query->whereHas('supplier', fn ($supplier) => $supplier->where('country_code', $attributes['supplier_country_code'])))
                         ->when($attributes['price_list_id'] ?? null, fn ($query, $id) => $query->where('price_list_id', $id))
