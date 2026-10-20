@@ -3,16 +3,29 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Pages\PricingDistributorCalculations;
+use App\Filament\Pages\PricingForeignRetailCalculations;
+use App\Filament\Pages\PricingHufRetailCalculations;
+use App\Filament\Pages\PricingProductOverview;
+use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Pages\PricingWorkflow;
+use App\Filament\Resources\PricingCalculationRows\Pages\ListPricingCalculationRows;
+use App\Filament\Resources\PricingProjects\Pages\EditPricingProject;
+use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
+use App\Filament\Resources\PricingProjects\Pages\SelectPricingProjectProducts;
+use App\Filament\Resources\PricingProjects\RelationManagers\CalculationRowsRelationManager;
+use App\Filament\Resources\PricingProjects\RelationManagers\ProductsRelationManager;
 use App\Models\AdminUiPreference;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
+use App\Models\PricingParameter;
 use App\Models\PricingProject;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Pricing\PricingAttentionQuery;
 use App\Services\Pricing\PricingWorkflowSummary;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -150,5 +163,169 @@ class PricingWorkflowTest extends TestCase
     {
         $this->expectException(CannotUpdateLockedPropertyException::class);
         Livewire::test(PricingWorkflow::class)->set('pricingProjectId', $this->other->id);
+    }
+
+    public function test_project_list_filters_by_project_and_season_together(): void
+    {
+        $season = Season::create(['code' => 'S28', 'name' => 'Nyár', 'active' => true]);
+        $third = PricingProject::create(['name' => 'Nyári projekt', 'season_id' => $season->id, 'status' => 'draft', 'active' => true]);
+        Livewire::test(ListPricingProjects::class)->assertCanSeeTableRecords([$this->project, $this->other, $third])
+            ->filterTable('id', [$this->project->id, $third->id])->assertCanNotSeeTableRecords([$this->other])
+            ->filterTable('season_id', [$this->project->season_id])->assertCanSeeTableRecords([$this->project])
+            ->assertCanNotSeeTableRecords([$this->other, $third]);
+    }
+
+    public function test_calculation_rows_have_no_default_price_type_filter(): void
+    {
+        $page = Livewire::test(ListPricingCalculationRows::class);
+        $this->assertNull($page->instance()->getTableFilterState('price_type')['value'] ?? null);
+        $page->assertCanSeeTableRecords($this->project->calculationRows()->get());
+        $page->filterTable('price_type', 'cost')->assertCanNotSeeTableRecords($this->project->calculationRows()->where('price_type', 'retail')->get());
+    }
+
+    public function test_product_related_tables_use_same_page_sizes_and_default_as_calculations(): void
+    {
+        $rows = Livewire::test(CalculationRowsRelationManager::class, ['ownerRecord' => $this->project, 'pageClass' => EditPricingProject::class]);
+        $products = Livewire::test(ProductsRelationManager::class, ['ownerRecord' => $this->project, 'pageClass' => EditPricingProject::class]);
+        $selector = Livewire::test(SelectPricingProjectProducts::class, ['record' => $this->project->id]);
+        foreach ([$rows, $products, $selector] as $page) {
+            $this->assertSame([50, 100, 250, 500, 'all'], $page->instance()->getTable()->getPaginationPageOptions());
+            $this->assertSame(100, $page->instance()->getTableRecordsPerPage());
+        }
+    }
+
+    public function test_all_six_workflow_cards_link_each_count_to_the_matching_state_and_project(): void
+    {
+        $page = Livewire::test(PricingWorkflow::class)->call('selectPricingProject', $this->project->id);
+        foreach ($page->instance()->workflowSteps as $key => $step) {
+            foreach (['total', 'approved', 'pending'] as $state) {
+                parse_str(parse_url($step['countUrls'][$state], PHP_URL_QUERY), $query);
+                $this->assertSame((string) $this->project->id, $query['workflowProject']);
+                $this->assertSame($state === 'total' ? '' : $state, $query['tableFilters']['workflow_state']['value']);
+                $page->assertSee("openPricingStep('{$key}', '{$state}')", false);
+                $page->call('openPricingStep', $key, $state)->assertRedirect($step['countUrls'][$state]);
+            }
+        }
+    }
+
+    public function test_workflow_status_link_survives_mount_and_restores_project_from_another_tab(): void
+    {
+        Livewire::test(PricingCostCalculations::class)->call('selectPricingProject', $this->other->id);
+        $page = Livewire::withQueryParams(['workflowProject' => (string) $this->project->id, 'workflowArchive' => '0',
+            'tableFilters' => ['workflow_state' => ['value' => 'approved']]])
+            ->test(PricingCostCalculations::class)->assertSet('pricingProjectId', $this->project->id);
+        $this->assertSame('approved', $page->instance()->getTableFilterState('workflow_state')['value']);
+        $page->assertCanSeeTableRecords($this->project->calculationRows()->where('price_type', 'cost')->get());
+        $page->filterTable('workflow_state', 'pending')->assertCountTableRecords(0);
+        $page->filterTable('workflow_state', null)->assertCountTableRecords(2);
+    }
+
+    public function test_workflow_state_query_agrees_with_model_including_outlet_boundaries(): void
+    {
+        foreach ([['base_price' => 2000, 'outlet_discount_percent' => 20, 'manual_price' => 1600],
+            ['base_price' => 2000, 'outlet_discount_percent' => 20, 'manual_price' => 1600.0001],
+            ['base_price' => 2000, 'outlet_discount_percent' => null, 'manual_price' => 1500],
+            ['base_price' => 2000, 'outlet_discount_percent' => 100, 'manual_price' => 1500],
+            ['base_price' => 0, 'outlet_discount_percent' => 20, 'manual_price' => 1500]] as $data) {
+            $outlet = $this->project->calculationRows()->where('price_type', 'outlet')->first();
+            $outlet->update($data + ['status' => 'approved', 'requires_review' => false]);
+            foreach ($this->project->calculationRows()->get() as $row) {
+                foreach (['approved', 'pending'] as $state) {
+                    $this->assertSame($row->needsPricingAttention() === ($state === 'pending'),
+                        PricingAttentionQuery::apply(PricingCalculationRow::whereKey($row->id), $state)->exists());
+                }
+            }
+        }
+    }
+
+    public function test_retail_pending_includes_outlet_without_hiding_approved_retail(): void
+    {
+        $retail = $this->project->calculationRows()->where('price_type', 'retail')->whereHas('currency', fn ($q) => $q->where('code', 'HUF'))->first();
+        $outlet = $this->project->calculationRows()->where('price_type', 'outlet')->whereHas('currency', fn ($q) => $q->where('code', 'HUF'))->first();
+        $outlet->update(['source_retail_row_id' => $retail->id]);
+        // The existing outlet column is activated by a configured discount parameter.
+        PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => PricingParameter::TYPE_OUTLET_DISCOUNT,
+            'scope_type' => 'global', 'price_list_id' => $outlet->price_list_id, 'value' => 20, 'active' => true]);
+        $page = Livewire::withQueryParams(['workflowProject' => (string) $this->project->id, 'workflowArchive' => '0',
+            'tableFilters' => ['workflow_state' => ['value' => 'pending']]])->test(PricingHufRetailCalculations::class);
+        $page->assertCanSeeTableRecords([$retail])->filterTable('workflow_state', 'approved')->assertCanSeeTableRecords([$retail]);
+    }
+
+    public function test_foreign_and_wholesale_pages_filter_current_currency_by_workflow_state(): void
+    {
+        foreach ([PricingForeignRetailCalculations::class => 'retail', PricingWholesaleCalculations::class => 'wholesale'] as $class => $type) {
+            $page = Livewire::test($class)->call('selectPricingProject', $this->project->id);
+            if ($type === 'wholesale') {
+                $page->call('selectWholesaleCurrency', 'EUR');
+            }
+            $row = $this->project->calculationRows()->where('price_type', $type)->whereHas('currency', fn ($q) => $q->where('code', 'EUR'))->first();
+            $page->filterTable('workflow_state', $type === 'retail' ? 'approved' : 'pending')->assertCanSeeTableRecords([$row]);
+            $page->filterTable('workflow_state', $type === 'retail' ? 'pending' : 'approved')->assertCanNotSeeTableRecords([$row]);
+        }
+    }
+
+    public function test_distributor_filter_checks_target_not_the_wholesale_source(): void
+    {
+        $source = $this->project->calculationRows()->where('price_type', 'wholesale')->first();
+        $target = $this->project->calculationRows()->where('price_type', 'distributor')->first();
+        $target->priceList->update(['source_wholesale_price_list_id' => $source->price_list_id]);
+        $target->refresh()->update(['source_wholesale_row_id' => $source->id, 'status' => 'approved', 'requires_review' => false]);
+        $page = Livewire::test(PricingDistributorCalculations::class)->call('selectPricingProject', $this->project->id);
+        $page->filterTable('workflow_state', 'approved')->assertCanSeeTableRecords([$source]);
+        $page->filterTable('workflow_state', 'pending')->assertCanNotSeeTableRecords([$source]);
+        $target->update(['requires_review' => true]);
+        $page->call('$refresh')->assertCanSeeTableRecords([$source]);
+    }
+
+    public function test_overview_pending_checks_all_prices_not_just_its_base_cost_row(): void
+    {
+        $page = Livewire::test(PricingProductOverview::class)->call('selectPricingProject', $this->project->id);
+        $costs = $this->project->calculationRows()->where('price_type', 'cost')->get();
+        $page->filterTable('workflow_state', 'pending')->assertCanSeeTableRecords($costs);
+        $page->filterTable('workflow_state', 'approved')->assertCountTableRecords(0);
+    }
+
+    public function test_unknown_workflow_status_is_rejected(): void
+    {
+        Livewire::test(PricingWorkflow::class)->call('selectPricingProject', $this->project->id)
+            ->call('openPricingStep', 'cost', 'unexpected')->assertStatus(422);
+    }
+
+    public function test_archive_count_link_preserves_archive_scope_and_read_only_mode(): void
+    {
+        $this->project->update(['status' => 'closed']);
+        $page = Livewire::test(PricingWorkflow::class)->call('setPricingArchive', true);
+        $url = $page->instance()->workflowSteps['cost']['countUrls']['approved'];
+        parse_str(parse_url($url, PHP_URL_QUERY), $query);
+        $target = Livewire::withQueryParams($query)->test(PricingCostCalculations::class)
+            ->assertSet('pricingProjectId', $this->project->id)->assertSet('pricingArchive', true);
+        $this->assertFalse($target->instance()->pricingWorkspaceIsEditable());
+        $target->assertCanSeeTableRecords($this->project->calculationRows()->where('price_type', 'cost')->get());
+        $query['workflowArchive'] = '0';
+        Livewire::withQueryParams($query)->test(PricingCostCalculations::class)->assertStatus(422);
+    }
+
+    public function test_explicit_url_filters_survive_page_mount_and_total_link_removes_status_filter(): void
+    {
+        $page = Livewire::withQueryParams(['workflowProject' => (string) $this->project->id,
+            'tableFilters' => ['workflow_state' => ['value' => 'pending'], 'requires_review' => ['value' => true]]])
+            ->test(PricingCostCalculations::class);
+        $this->assertTrue((bool) $page->instance()->getTableFilterState('requires_review')['value']);
+        $this->assertSame('pending', $page->instance()->getTableFilterState('workflow_state')['value']);
+        $page = Livewire::withQueryParams(['workflowProject' => (string) $this->project->id,
+            'tableFilters' => ['workflow_state' => ['value' => '']]])->test(PricingCostCalculations::class);
+        $this->assertNull($page->instance()->getTableFilterState('workflow_state')['value']);
+        $page->assertCountTableRecords(2);
+    }
+
+    public function test_invalid_workflow_url_status_is_rejected_and_destination_rights_still_apply(): void
+    {
+        Livewire::withQueryParams(['tableFilters' => ['workflow_state' => ['value' => 'not-a-state']]])
+            ->test(PricingCostCalculations::class)->assertStatus(422);
+        $reader = User::factory()->create();
+        $this->actingAs($reader);
+        Livewire::withQueryParams(['workflowProject' => (string) $this->project->id,
+            'tableFilters' => ['workflow_state' => ['value' => 'approved']]])
+            ->test(PricingCostCalculations::class)->assertForbidden();
     }
 }

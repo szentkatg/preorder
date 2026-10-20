@@ -4,11 +4,13 @@ namespace App\Filament\Resources\PricingProjects\Tables;
 
 use App\Filament\Support\Actions\CalculateAllProjectPricesAction;
 use App\Filament\Support\Actions\PricingProjectLifecycleActions;
+use App\Models\PricingProject;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class PricingProjectsTable
@@ -27,6 +29,12 @@ class PricingProjectsTable
                 TextColumn::make('closer.name')->label('Lezárta')->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('active')->label('Aktív')->boolean(),
                 TextColumn::make('updated_at')->label('Módosítva')->dateTime(),
+            ])
+            ->filters([
+                SelectFilter::make('id')->label('Árprojekt')->multiple()->searchable()
+                    ->options(fn () => PricingProject::query()->orderBy('name')->pluck('name', 'id')->all()),
+                SelectFilter::make('season_id')->label('Szezon')->relationship('season', 'name')
+                    ->multiple()->searchable()->preload(),
             ])
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])

@@ -33,7 +33,7 @@ class ProductsRelationManager extends RelationManager
                 ->formatStateUsing(fn ($state, $record) => $record->orderSheetType?->translate('name') ?: $state),
             TextColumn::make('material_composition')->label('Anyagösszetétel'),
             IconColumn::make('active')->label('Aktív')->boolean(),
-        ])->defaultPaginationPageOption(100)->headerActions([
+        ])->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all'])->headerActions([
             Action::make('selectProducts')->label('Termékek felvétele')->icon('heroicon-o-plus')
                 ->visible(fn () => $this->getOwnerRecord()->isOpenForPricing() && Gate::allows('update', $this->getOwnerRecord())
                     && Gate::allows('viewAny', Product::class))

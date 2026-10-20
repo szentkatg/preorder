@@ -38,7 +38,17 @@
                         <dl class="pricing-workflow-counts">
                             @foreach (['total' => 'Összes tétel', 'approved' => (in_array($key, ['cost', 'overview']) ? 'Rendben' : 'Jóváhagyott'), 'pending' => 'Függő'] as $count => $label)
                                 <div class="pricing-workflow-count-{{ $count }}">
-                                    <dt>{{ $label }}</dt>
+                                    <dt>
+                                        @if (isset($step['countUrls'][$count]))
+                                            <a href="{{ $step['countUrls'][$count] }}"
+                                                wire:click.prevent="openPricingStep('{{ $key }}', '{{ $count }}')"
+                                                aria-label="{{ $step['title'] }} — {{ $label }}: {{ $step['counts'][$count] }}">
+                                                {{ $label }}
+                                            </a>
+                                        @else
+                                            {{ $label }}
+                                        @endif
+                                    </dt>
                                     <dd data-workflow-count="{{ $count }}">{{ number_format($step['counts'][$count], 0, ',', ' ') }}
                                         @if ($step['counts']['outlet_total'])
                                             <small>({{ number_format($step['counts']['outlet_'.$count], 0, ',', ' ') }} outlet)</small>

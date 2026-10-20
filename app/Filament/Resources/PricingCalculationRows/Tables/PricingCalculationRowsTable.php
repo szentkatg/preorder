@@ -90,8 +90,7 @@ class PricingCalculationRowsTable
                         PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
                         PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
                         PricingCalculationRow::TYPE_OUTLET => 'Outlet',
-                    ])
-                    ->default(PricingCalculationRow::TYPE_COST),
+                    ]),
 
                 SelectFilter::make('status')
                     ->label('Státusz')

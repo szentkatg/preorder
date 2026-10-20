@@ -15,6 +15,8 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 trait HasPricingTablePreferences
 {
+    use HasPricingWorkflowNavigation;
+
     /**
      * @var array<string, int>
      */

@@ -141,3 +141,73 @@ PHP/Livewire/renderelt HTML ellenőrzés történik; nem böngészős vizuális 
 SQLite tesztek ellenőrzik az egyedi adatbáziskulcsot és a tranzakciókat;
 a MySQL párhuzamos kéréseinek helyességét termékzárolás és egyedi kulcs védi,
 élő MySQL konkurenciateszt ebben a fejlesztési környezetben nem történt.
+
+## Terméktörzs tömeges módosítása és árfolyamlista (2026-10-20)
+
+**Products / Termékek → kijelölés → Csoportos műveletek → Termékek tömeges módosítása**.
+A felugró ablak kétlépéses:
+
+1. A módosítandó mező és az új érték megadása. A **További mező** gombbal
+   több mező is megadható. Egy mező csak egyszer szerepelhet. A mezőtípushoz
+   illeszkedő dátum-, szám-, szöveg- vagy törzsválasztó jelenik meg.
+2. A megerősítés mutatja a kijelölt termékek számát és a felülírásokat:
+   „Biztos módosítani kívánsz X db terméket a megadott adatokkal?”
+   A jóváhagyó jelölőnégyzet és az **Igen, módosítom** gomb után történik mentés.
+
+A ProductForm összes szerkeszthető mezője választható; az adatbázis-azonosító,
+időbélyegek és belső előző-szezon-párosítási jelzők nem. Kizárólag a megadott
+mezőket írjuk felül, a többi adat változatlan. Opcionális mezőnél az üres érték
+**törlés**, nem „hagyd változatlanul”. A nullázás és a 0 / Nem érték különbözik.
+Kötelező mezőt nem lehet kiüríteni. A Mégse nem ment semmit.
+
+Az **Update:Product** és **ViewAny:Product** meglévő jogok szükségesek;
+a szolgáltatás minden termék módosítási jogát külön, mentés előtt is ellenőrzi.
+A teljes módosítás egy tranzakció, frissen olvasott és zárolt termékekkel.
+Hiányzó rekord, hibás adat, ütközés, jogosultsági vagy mentési hiba esetén nincs
+részleges módosítás. A szűrt teljes kijelölés és a visszavont kijelölések is
+érvényesek. A modal megnyitásakor rögzített, felhasználóhoz kötött kijelölési
+aláírás megakadályozza, hogy utólag megváltozott kijelölésre történjen mentés.
+
+A művelet nem hozhat létre ismétlődő szezon–modellkód kombinációt. A már
+árprojekthez rendelt termék szezonja nem változtatható az árprojektétől eltérőre;
+előbb a hozzárendelést kell rendezni. A főcsoport/anyagösszetétel változása a
+paraméterfeloldásra hat, ezért a termék nyitott projektjeinek érintett kalkulációi
+felülvizsgálandók lesznek. Árértékek, jóváhagyási státuszok, lezárt kalkulációk,
+publikált árlistatételek és publikációs snapshotok nem íródnak felül.
+Nincs automatikus újrakalkulálás. Modellkód/méretsor változásakor az SKU-kat
+szükség esetén a meglévő **SKU-k szinkronizálása** művelettel kell frissíteni.
+
+**Exchange Rates / Árfolyamok:** a pénznem ID helyett a pénznemkód és a
+fordítási táblán keresztül feloldott pénznév látható. Fordítás hiányában a
+meglévő törzsnév / régi name_hu/name_en érték a tartalék. Többválasztós
+**Szezon** szűrő került a listára; alapértelmezett szezonszűrés nincs.
+
+Ehhez a kiegészítéshez nem kell migráció, Composer install, npm build,
+kézi feltöltés, .env-módosítás vagy új jogosultságobjektum. Telepítés csak
+külön kérésre; utána cache-törlés és újraépítés szükséges.
+
+Ellenőrzés: **53 teszt, 242 ellenőrzés, sikeres** (tömeges módosítás,
+árfolyamlista, terméktörzsimport, admin Excel-export és projekt-termékkijelölés).
+Pint, PHP-szintaxis és `git diff --check` sikeres. A tesztek a tényleges
+Livewire műveletet, dinamikus mezőváltást, megerősítést, kijelölési aláírást,
+jogosultságokat és tranzakciós visszagörgetést is ellenőrzik. Nem történt
+élő böngészős vizuális próba, MySQL konkurenciateszt vagy NAS-telepítés.
+
+Git a pricing worktree-ben (a korábbi, függő szűrő/navigáció módosítások
+külön fájlokban maradnak, ez a lista csak ezt a kiegészítést tartalmazza):
+
+```powershell
+git add -- app/Filament/Resources/ExchangeRates/Tables/ExchangeRatesTable.php app/Filament/Resources/Products/Tables/ProductsTable.php app/Filament/Support/Actions/BulkUpdateProductsAction.php app/Services/ProductBulkUpdateService.php tests/Feature/Admin/ProductBulkUpdateTest.php tests/Feature/Admin/ExchangeRateListTest.php docs/pricing-project-products.md
+git commit -m "Add confirmed product bulk updates and improve exchange rate list"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1 -CheckOnly
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles, külön engedélyezett és az éles ágba integrált kiadás után:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```

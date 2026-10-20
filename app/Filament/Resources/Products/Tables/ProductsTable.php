@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
+use App\Filament\Support\Actions\BulkUpdateProductsAction;
 use App\Services\ProductSkuSyncService;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -94,6 +95,7 @@ class ProductsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkUpdateProductsAction::make(),
                     BulkAction::make('syncSkus')
                         ->label('SKU-k szinkronizálása')
                         ->icon('heroicon-o-cube')

@@ -69,20 +69,32 @@ class PricingWorkflow extends Page
         foreach (self::stepDefinitions() as $key => $definition) {
             $canOpen = $project && $definition['page']::canAccess();
             $steps[$key] = $definition + ['counts' => $summary[$key] ?? null,
-                'url' => $canOpen ? $definition['page']::getUrl() : null];
+                'url' => $canOpen ? $definition['page']::getUrl() : null,
+                'countUrls' => $canOpen ? collect(['total', 'approved', 'pending'])
+                    ->mapWithKeys(fn ($state) => [$state => $this->pricingStepUrl($definition['page'], $state)])->all() : []];
         }
 
         return $steps;
     }
 
-    public function openPricingStep(string $step): void
+    public function openPricingStep(string $step, ?string $state = null): void
     {
         abort_unless(static::canAccess(), 403);
         $definition = self::stepDefinitions()[$step] ?? null;
         abort_unless($definition && $definition['page']::canAccess() && $this->pricingSelectedProject, 403);
+        abort_unless($state === null || in_array($state, ['total', 'approved', 'pending'], true), 422);
         // Re-save on click as another browser tab may have changed the shared context.
         $this->selectPricingProject($this->pricingProjectId);
-        $this->redirect($definition['page']::getUrl(), navigate: true);
+        $this->redirect($state === null ? $definition['page']::getUrl() : $this->pricingStepUrl($definition['page'], $state), navigate: true);
+    }
+
+    protected function pricingStepUrl(string $page, string $state): string
+    {
+        return $page::getUrl([
+            'workflowProject' => $this->pricingProjectId,
+            'workflowArchive' => $this->pricingArchive ? '1' : '0',
+            'tableFilters' => ['workflow_state' => ['value' => $state === 'total' ? '' : $state]],
+        ]);
     }
 
     public function projectDetailsUrl(): ?string

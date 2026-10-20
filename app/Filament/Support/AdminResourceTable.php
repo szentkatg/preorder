@@ -35,6 +35,9 @@ class AdminResourceTable
         bool $withViewAction = true,
     ): Table {
         AdminTableFilters::configure($table, $modelClass);
+        if ($modelClass === PricingCalculationRow::class) {
+            PricingWorkflowFilter::configure($table);
+        }
         self::configureColumnManager($table);
 
         foreach ($table->getColumns() as $column) {

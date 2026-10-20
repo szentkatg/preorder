@@ -64,7 +64,7 @@ class SelectPricingProjectProducts extends Page implements HasTable
                 SelectFilter::make('order_sheet_type_id')->label('Rendelőlap típusa')->relationship('orderSheetType', 'code')->multiple()->searchable()->preload()
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->translate('name') ?: $record->code),
             ])
-            ->defaultSort('model_code')->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500])
+            ->defaultSort('model_code')->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->toolbarActions([
                 BulkAction::make('addSelectedProducts')->label('Kijelölt termékek felvétele')
                     ->icon('heroicon-o-plus')->requiresConfirmation()

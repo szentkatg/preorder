@@ -70,6 +70,63 @@ böngészőbe: csak a kiválasztott projekt számlálói jelennek meg. Kézi Fri
 
 ## Ellenőrzés
 
+### Lista- és számlálónavigációs kiegészítés (2026-10-20)
+
+- Az Árprojektek listában többválasztós **Árprojekt** és **Szezon** szűrő van.
+- Az Árkalkulációs sorok általános menüjében és a projekt kapcsolt listáján
+  nincs alapértelmezett „Bekerülési érték” szűrés. Kézzel továbbra is választható
+  az ártípus. A külön Bekerülési értékek munkalap továbbra is kizárólag költségsorokat mutat.
+- Az Árprojekt termékei kapcsolt listán és a termékválasztó oldalon is
+  **50 / 100 / 250 / 500 / összes** a lapméretválaszték, **100** az alapértelmezett.
+- Mind a hat áttekintő blokkban a teljes számlálóterület kattintható,
+  billentyűzettel is elérhető. Összes tétel: nincs állapotszűrés;
+  Jóváhagyott/Rendben: elfogadható ársorok; Függő: figyelmet igénylő ársorok.
+- A céloldalon az **Áttekintő szerinti állapot** szűrő látható, módosítható
+  és törölhető. A kattintás az árprojektet és az archív módot is megőrzi,
+  másik böngészőfül projektváltásától függetlenül; a meglévő oldaljogok érvényesek.
+  Az explicit URL-szűrők a pénznem/outlet beállítások mount alatti visszatöltése
+  után kerülnek alkalmazásra. A számlálólink nem örököl korábbi, nem kapcsolódó szűrőket.
+- A pénznemválasztós munkalapokon a korábban kiválasztott pénznem marad;
+  a disztribútori lapon a kiválasztott disztribútori árlista. Az áttekintő
+  darabszámai több pénznemet/árlistát is összesíthetnek.
+- A kisker és az outlet egy megjelenített sorban szerepel. Az állapotszűrő
+  megtalálja a sort, ha bármelyik ott megjelenített ár megfelel a kiválasztott
+  állapotnak. Emiatt egy jóváhagyott kisker + függő outlet terméksor mindkét
+  nézetben szerepelhet. A végső áttekintésben viszont csak akkor Rendben egy
+  teljes modell/szín, ha egyik ára sem függő. A disztribútori szűrés a
+  disztribútori célsort, nem a nagyker forrás státuszát vizsgálja.
+
+Ehhez a kiegészítéshez **nem kell migráció, composer install, npm build,
+kézi fájlfeltöltés, új jogosultság vagy .env-módosítás**. A CSS közvetlenül
+a public könyvtárból töltődik, verziózott hivatkozással. Telepítéskor
+`optimize:clear` és `optimize` szükséges.
+
+Ellenőrzés: 61 tesztes lista/grid/teljesítmény regresszió (701 ellenőrzés),
+majd 35 tesztes kibővített navigációs/projektkontextus kör (404 ellenőrzés)
+sikeres. A két kör részben átfed: összesen 78 különböző tesztet fednek le.
+Pint és `git diff --check` sikeres. PHP/Livewire és renderelt HTML ellenőrzés;
+élő böngészős vizuális próba és NAS-telepítés ebben a fejlesztési körben nem történt.
+
+A külön kérhető kihelyezés Git/NAS parancsai a pricing worktree-ben:
+
+```powershell
+git add -- app/Filament/Pages/PricingWorkflow.php app/Filament/Resources/PricingCalculationRows/Tables/PricingCalculationRowsTable.php app/Filament/Resources/PricingProjects/Pages/SelectPricingProjectProducts.php app/Filament/Resources/PricingProjects/RelationManagers/ProductsRelationManager.php app/Filament/Resources/PricingProjects/Tables/PricingProjectsTable.php app/Filament/Support/AdminResourceTable.php app/Filament/Support/Concerns/HasPricingTablePreferences.php app/Filament/Support/Concerns/HasPricingWorkflowNavigation.php app/Filament/Support/PricingWorkflowFilter.php app/Services/Pricing/PricingAttentionQuery.php public/css/admin-table-scroll.css resources/views/filament/pages/pricing-workflow.blade.php tests/Feature/PricingWorkflowTest.php docs/pricing-workflow-and-item-deletion.md
+git commit -m "Add pricing workflow state navigation and improve project list filters"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1 -CheckOnly
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Éles, jóváhagyott és az éles ágba integrált kiadás esetén:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Korábbi alapfunkciók ellenőrzése
+
 Kapcsolódó teljes regresszió: **328 teszt, 2773 ellenőrzés, sikeres**.
 A két korábbról ismert, fix admin-resource darabszámot váró teszt kimaradt;
 azok elvárásait nem módosítottuk. A formázás és a whitespace-ellenőrzés is sikeres.
