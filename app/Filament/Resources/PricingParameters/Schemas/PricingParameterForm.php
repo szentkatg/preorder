@@ -24,27 +24,13 @@ class PricingParameterForm
 
                 Select::make('parameter_type')
                     ->label('Paraméter')
-                    ->options([
-                        PricingParameter::TYPE_SHIPPING_COST_PERCENT => 'Szállítási költség %',
-                        PricingParameter::TYPE_CUSTOMS_PERCENT => 'Vám %',
-                        PricingParameter::TYPE_RETAIL_MULTIPLIER => 'Kisker szorzó',
-                        PricingParameter::TYPE_COUNTRY_MULTIPLIER => 'Ország / pénznem szorzó',
-                        PricingParameter::TYPE_WHOLESALE_MARGIN => 'Nagyker szorzó',
-                        PricingParameter::TYPE_DISTRIBUTOR_DISCOUNT => 'Disztribútor kedvezmény %',
-                        PricingParameter::TYPE_OUTLET_DISCOUNT => 'Outlet minimum kedvezmény %',
-                    ])
+                    ->options(self::parameterTypeOptions())
                     ->live()
                     ->required(),
 
                 Select::make('scope_type')
                     ->label('Szűkítés')
-                    ->options([
-                        PricingParameter::SCOPE_GLOBAL => 'Globális',
-                        PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország',
-                        PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport',
-                        PricingParameter::SCOPE_MATERIAL_COMPOSITION => 'Anyagösszetétel',
-                        PricingParameter::SCOPE_PRODUCT => 'Modell',
-                    ])
+                    ->options(self::scopeTypeOptions())
                     ->default(PricingParameter::SCOPE_GLOBAL)
                     ->live()
                     ->required(),
@@ -106,5 +92,29 @@ class PricingParameterForm
                     ->default(true),
             ])
             ->columns(2);
+    }
+
+    public static function parameterTypeOptions(): array
+    {
+        return [
+            PricingParameter::TYPE_SHIPPING_COST_PERCENT => 'Szállítási költség %',
+            PricingParameter::TYPE_CUSTOMS_PERCENT => 'Vám %',
+            PricingParameter::TYPE_RETAIL_MULTIPLIER => 'Kisker szorzó',
+            PricingParameter::TYPE_COUNTRY_MULTIPLIER => 'Ország / pénznem szorzó',
+            PricingParameter::TYPE_WHOLESALE_MARGIN => 'Nagyker szorzó',
+            PricingParameter::TYPE_DISTRIBUTOR_DISCOUNT => 'Disztribútor kedvezmény %',
+            PricingParameter::TYPE_OUTLET_DISCOUNT => 'Outlet minimum kedvezmény %',
+        ];
+    }
+
+    public static function scopeTypeOptions(): array
+    {
+        return [
+            PricingParameter::SCOPE_GLOBAL => 'Globális',
+            PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország',
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport',
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => 'Anyagösszetétel',
+            PricingParameter::SCOPE_PRODUCT => 'Modell',
+        ];
     }
 }

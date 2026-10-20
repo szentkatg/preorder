@@ -7,6 +7,7 @@ use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
 use App\Filament\Support\Actions\PairPreviousSeasonProductAction;
+use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\ProductPricingNavigation;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\DistributorPriceReviewService;
@@ -173,7 +174,7 @@ trait HasPricingGridInteractions
     {
         unset($this->outletPriceLists);
         unset($this->averageRetailMultiplier, $this->averageCostBasedMultiplier, $this->averageNetNetMultiplier, $this->averageDistributorNetNetMultiplier);
-        $this->resetTable();
+        AdminResourceTable::refreshPreservingState($this);
     }
 
     protected function pricingGridDetails(PricingCalculationRow $source): View

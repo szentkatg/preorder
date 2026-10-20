@@ -69,7 +69,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
         $this->pricingColumnWidths = $this->loadPricingColumnWidths();
         $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
         if ($this->outletPriceLists->isNotEmpty()) {
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
         }
     }
 

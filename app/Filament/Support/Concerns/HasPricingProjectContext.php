@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Concerns;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\AdminUiPreference;
 use App\Models\PricingProject;
 use Illuminate\Database\Eloquent\Builder;
@@ -142,6 +143,7 @@ trait HasPricingProjectContext
         if (method_exists($this, 'averageNetNetMultiplier')) {
             unset($this->averageNetNetMultiplier);
         }
+        AdminResourceTable::forgetPersistedFilters($this);
         $this->tableFilters = [];
         $this->tableColumnSearches = [];
         $this->tableSearch = '';

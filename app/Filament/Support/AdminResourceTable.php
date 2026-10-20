@@ -83,6 +83,20 @@ class AdminResourceTable
         return $table;
     }
 
+    /** Rebuild dynamic columns/queries without Filament resetTable() clearing the filters. */
+    public static function refreshPreservingState(HasTable $livewire): void
+    {
+        $livewire->bootedInteractsWithTable();
+        $livewire->flushCachedTableRecords();
+    }
+
+    /** A deliberate project/currency change must not reload the previous context's filters. */
+    public static function forgetPersistedFilters(HasTable $livewire): void
+    {
+        session()->forget([$livewire->getTableFiltersSessionKey(), $livewire->getTableSearchSessionKey(),
+            $livewire->getTableColumnSearchesSessionKey()]);
+    }
+
     public static function configureColumnManager(Table $table): Table
     {
         return $table->columnManagerColumns(1)

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Actions;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
@@ -65,7 +66,7 @@ class CalculateHufRetailAction
                     ($result['skipped'] > 0 ? $notification->warning() : $notification->success())->send();
 
                     if (method_exists($livewire, 'resetTable')) {
-                        $livewire->resetTable();
+                        AdminResourceTable::refreshPreservingState($livewire);
                     }
                 } catch (DomainException $exception) {
                     Notification::make()->title('A kisker kalkuláció nem indítható')

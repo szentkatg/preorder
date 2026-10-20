@@ -144,18 +144,27 @@ class PricingConfigurationCopyService
             }
             Gate::authorize('view', $sourceProject);
         }
-        $targets = $model::where('pricing_project_id', $targetId)->orderBy('id')
-            ->when($lock, fn ($query) => $query->lockForUpdate())->get()->groupBy(fn ($row) => $this->key($row));
+        $targetRows = $model::where('pricing_project_id', $targetId)->orderBy('id')
+            ->when($lock, fn ($query) => $query->lockForUpdate())->get();
+        $targets = $model === PricingParameter::class ? null : $targetRows->groupBy(fn ($row) => $this->key($row));
         $seen = [];
         $operations = [];
         foreach ($sources as $source) {
             $key = $this->key($source);
-            if (isset($seen[$key])) {
+            $duplicateSource = $source instanceof PricingParameter
+                ? $source->matchingParametersQuery(withinProject: false)->whereKey($sources->modelKeys())->whereKeyNot($source->id)
+                    ->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->first() !== null
+                : isset($seen[$key]);
+            if ($duplicateSource) {
                 throw new DomainException('A kijelölésben több azonos számítási kulcsú forrássor van. Kulcsonként csak egy sort jelölj ki.');
             }
             $seen[$key] = true;
+            $existing = $source instanceof PricingParameter
+                ? $source->matchingParametersQuery(withinProject: false)->whereKey($targetRows->modelKeys())
+                    ->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()
+                : $targets->get($key, collect());
             $operations[] = ['source' => $source, 'attributes' => ['pricing_project_id' => $targetId] + $this->attributes($source),
-                'existing' => $targets->get($key, collect())];
+                'existing' => $existing];
         }
 
         return compact('model', 'projects', 'targetId', 'operations');
@@ -169,10 +178,7 @@ class PricingConfigurationCopyService
                 PricingParameter::SCOPE_ITEM_MAIN_GROUP, PricingParameter::SCOPE_MATERIAL_COMPOSITION, PricingParameter::SCOPE_PRODUCT], true)) {
                 throw new DomainException('Ismeretlen paraméterszűkítés a forrás- vagy célsorban.');
             }
-            $attributes['supplier_country_code'] = $row->scope_type === PricingParameter::SCOPE_SUPPLIER_COUNTRY ? strtoupper(trim((string) $row->supplier_country_code)) : null;
-            $attributes['item_main_group_id'] = $row->scope_type === PricingParameter::SCOPE_ITEM_MAIN_GROUP ? $row->item_main_group_id : null;
-            $attributes['material_composition'] = $row->scope_type === PricingParameter::SCOPE_MATERIAL_COMPOSITION ? $row->material_composition : null;
-            $attributes['product_id'] = $row->scope_type === PricingParameter::SCOPE_PRODUCT ? $row->product_id : null;
+            $attributes = array_replace($attributes, $row->scopeAttributes());
         }
 
         return $attributes;

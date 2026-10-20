@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Filament\Support\AdminTableState;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Facades\FilamentShield;
+use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Table::configureUsing(AdminTableState::configure(...));
         FilamentShield::prohibitDestructiveCommands($this->app->isProduction());
 
         Gate::before(function (mixed $user, string $ability, array $arguments): ?bool {

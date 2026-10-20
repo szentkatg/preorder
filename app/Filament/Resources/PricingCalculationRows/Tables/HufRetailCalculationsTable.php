@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\OutletColumns;
 use App\Filament\Support\PricingGrid;
 use App\Models\PricingCalculationRow;
@@ -128,7 +129,7 @@ class HufRetailCalculationsTable
                     ($result['skipped'] ? $notification->warning() : $notification->success())->send();
                 })
                 ->deselectRecordsAfterCompletion()
-                ->after(fn ($livewire) => $livewire->resetTable()),
+                ->after(fn ($livewire) => AdminResourceTable::refreshPreservingState($livewire)),
             $table->getLivewire()->pricingAcceptBulkAction(),
             $table->getLivewire()->pricingDetailsBulkAction(),
             ...($table->getLivewire()->supportsOutletPricing() ? [

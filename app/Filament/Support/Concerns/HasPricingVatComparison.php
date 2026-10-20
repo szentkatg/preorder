@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Concerns;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\AdminUiPreference;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Locked;
@@ -32,7 +33,7 @@ trait HasPricingVatComparison
         $preference->value = array_replace($preference->value ?? [], ['eur_vat_percent' => $this->eurVatPercent]);
         $preference->save();
         unset($this->averageNetNetMultiplier, $this->averageDistributorNetNetMultiplier);
-        $this->resetTable();
+        AdminResourceTable::refreshPreservingState($this);
     }
 
     public function wholesaleVatPercent(): ?float

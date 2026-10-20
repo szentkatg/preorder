@@ -81,7 +81,7 @@ class SelectPricingProjectProducts extends Page implements HasTable
                         }
                         Notification::make()->title($count.' termék felvéve')->success()->send();
                         $this->deselectAllTableRecords();
-                        $this->resetTable();
+                        AdminResourceTable::refreshPreservingState($this);
                     }),
             ])->emptyStateHeading('Nincs felvehető termék')
             ->emptyStateDescription('A kiválasztott szezon termékei már árprojekthez tartoznak, vagy nem felelnek meg a szűrésnek.');

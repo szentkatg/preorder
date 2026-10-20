@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingCalculationRows\Tables;
 
+use App\Exceptions\PricingParameterConflictException;
 use App\Filament\Support\PricingGrid;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
@@ -219,7 +220,7 @@ class PricingCalculationRowsTable
                         )
                         ->success()
                         ->send();
-                } catch (InvalidArgumentException $exception) {
+                } catch (InvalidArgumentException|PricingParameterConflictException $exception) {
                     Notification::make()
                         ->title('A paraméter nem menthető')
                         ->body($exception->getMessage())

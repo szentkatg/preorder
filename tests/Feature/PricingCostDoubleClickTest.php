@@ -55,6 +55,28 @@ class PricingCostDoubleClickTest extends TestCase
             'shipping_cost_percent' => 8, 'customs_percent' => 12, 'calculated_price' => 120.96]);
     }
 
+    public function test_inline_save_and_cancel_keep_applied_filters_search_and_sort(): void
+    {
+        $page = Livewire::test(PricingCostCalculations::class)
+            ->filterTable('common_item_main_group_id', [(string) $this->cost->product->item_main_group_id])
+            ->searchTable('TEST-COST')->searchTableColumns(['product.model_code' => 'TEST'])
+            ->sortTable('calculated_price', 'desc');
+        $state = fn () => [$page->instance()->tableFilters, $page->instance()->tableSearch,
+            $page->instance()->tableColumnSearches, $page->instance()->tableSort];
+        $before = $state();
+        $page->call('startInlineCostPercentParameterAdjustment', $this->cost->id, 'customs_percent', 15)
+            ->call('cancelPendingParameterAdjustment')->assertHasNoErrors();
+        $this->assertSame($before, $state());
+        $this->assertEquals(12, $this->cost->fresh()->customs_percent);
+        $page->call('startInlineCostPercentParameterAdjustment', $this->cost->id, 'customs_percent', 15)
+            ->set('pendingParameterScope', 'global')->call('confirmPendingParameterAdjustment')->assertHasNoErrors();
+        $this->assertSame($before, $state());
+        $this->assertEquals(15, $this->cost->fresh()->customs_percent);
+        $restored = Livewire::test(PricingCostCalculations::class)->assertCanSeeTableRecords([$this->cost]);
+        $this->assertSame($before, [$restored->instance()->tableFilters, $restored->instance()->tableSearch,
+            $restored->instance()->tableColumnSearches, $restored->instance()->tableSort]);
+    }
+
     public function test_cost_workspace_and_generic_resource_both_use_text_cells_and_operation_menus(): void
     {
         $page = Livewire::test(PricingCostCalculations::class)->assertSuccessful()->assertDontSee('textInputTableColumn', false);

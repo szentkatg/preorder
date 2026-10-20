@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Support\Actions\CalculateForeignRetailAction;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\AdminUiPreference;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\ForeignRetailCalculator;
@@ -36,7 +37,7 @@ class PricingForeignRetailCalculations extends PricingHufRetailCalculations
         unset($this->outletPriceLists);
         if ($this->retailCurrency !== $initialCurrency) {
             $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
         }
     }
 

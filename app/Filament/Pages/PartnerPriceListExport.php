@@ -129,15 +129,14 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
         $this->appliedFilters = null;
         $this->selectedTableRecords = $this->deselectedTableRecords = [];
         $this->isTrackingDeselectedTableRecords = false;
-        $this->resetTable();
+        AdminResourceTable::refreshPreservingState($this);
     }
 
     public function loadProducts(): void
     {
         abort_unless(static::canAccess(), 403);
         $this->appliedFilters = app(PartnerPriceListService::class)->validateConfiguration($this->form->getState());
-        $this->tableSearch = '';
-        $this->resetTable();
+        AdminResourceTable::refreshPreservingState($this);
         $this->selectAllProducts();
     }
 

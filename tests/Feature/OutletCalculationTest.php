@@ -63,6 +63,7 @@ class OutletCalculationTest extends TestCase
         $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'BAG27', 'name_hu' => 'BAGW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => '2027 árprojekt', 'status' => 'active', 'active' => true]);
+        $this->project->products()->attach($product);
         $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
         $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         $this->outlet = PriceList::create(['code' => 'OUTLET_HUF', 'name_hu' => 'Magyar outlet', 'type' => 'outlet', 'currency_id' => $huf->id, 'source_retail_price_list_id' => $this->retail->id, 'active' => true]);

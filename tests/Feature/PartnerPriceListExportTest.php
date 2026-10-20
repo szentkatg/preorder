@@ -99,6 +99,19 @@ class PartnerPriceListExportTest extends TestCase
         $this->assertStringContainsString('if (! error) close()', $table->getColumnManagerApplyAction()->getAlpineClickHandler());
     }
 
+    public function test_preview_refresh_keeps_table_search_and_sort(): void
+    {
+        $page = Livewire::test(PartnerPriceListExport::class)->fillForm($this->configuration)->call('loadProducts')
+            ->searchTable($this->product->model_code)->sortTable('model_code', 'desc');
+        $this->assertTrue($page->instance()->getTable()->persistsSearchInSession());
+        $page->call('clearPreview')->assertSet('appliedFilters', null);
+        $this->assertSame($this->product->model_code, $page->instance()->tableSearch);
+        $sort = $page->instance()->tableSort;
+        $page->call('loadProducts')->assertCanSeeTableRecords([$this->product]);
+        $this->assertSame($this->product->model_code, $page->instance()->tableSearch);
+        $this->assertSame($sort, $page->instance()->tableSort);
+    }
+
     public function test_filters_are_combined_and_do_not_mix_seasons_or_inactive_products(): void
     {
         $other = $this->product->replicate();

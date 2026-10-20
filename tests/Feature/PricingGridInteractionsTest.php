@@ -69,6 +69,25 @@ class PricingGridInteractionsTest extends TestCase
         $this->retail = PricingCalculationRow::where('price_type', 'retail')->firstOrFail();
     }
 
+    public function test_manual_price_edit_and_details_cancel_preserve_list_state(): void
+    {
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->filterTable('common_item_main_group_id', [(string) $this->retail->product->item_main_group_id])
+            ->searchTable('TEST')->searchTableColumns(['product.model_code' => 'TEST'])
+            ->sortTable('final_price', 'desc');
+        $state = fn () => [$page->instance()->tableFilters, $page->instance()->tableSearch,
+            $page->instance()->tableColumnSearches, $page->instance()->tableSort];
+        $before = $state();
+        $page->call('setPricingManualPrice', $this->retail->id, '500')->assertHasNoErrors();
+        $this->assertSame($before, $state());
+        $this->assertEquals(500, $this->retail->fresh()->manual_price);
+        $page->call('openPricingDetails', $this->retail->id)->assertActionMounted('pricingDetails')->call('unmountAction');
+        $this->assertSame($before, $state());
+        $page->mountAction('pricingAccept', ['record_id' => $this->retail->id])->callMountedAction()->assertHasNoErrors();
+        $this->assertSame($before, $state());
+        $this->assertNull($this->retail->fresh()->manual_price);
+    }
+
     public function test_compact_column_manager_is_shared_by_every_pricing_list(): void
     {
         foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class,

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Exceptions\PricingParameterConflictException;
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
@@ -99,7 +100,7 @@ class PricingCostCalculations extends Page implements HasTable
                 ->danger()
                 ->send();
 
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
 
             return;
         }
@@ -113,7 +114,7 @@ class PricingCostCalculations extends Page implements HasTable
                 ->danger()
                 ->send();
 
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
 
             return;
         }
@@ -130,7 +131,7 @@ class PricingCostCalculations extends Page implements HasTable
                 ->danger()
                 ->send();
 
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
 
             return;
         }
@@ -196,7 +197,7 @@ class PricingCostCalculations extends Page implements HasTable
                 ->send();
 
             $this->clearPendingParameterAdjustment();
-            $this->resetTable();
+            AdminResourceTable::refreshPreservingState($this);
 
             return;
         }
@@ -228,8 +229,8 @@ class PricingCostCalculations extends Page implements HasTable
                 ->send();
 
             $this->clearPendingParameterAdjustment();
-            $this->resetTable();
-        } catch (InvalidArgumentException $exception) {
+            AdminResourceTable::refreshPreservingState($this);
+        } catch (InvalidArgumentException|PricingParameterConflictException $exception) {
             Notification::make()
                 ->title('A paraméter nem menthető')
                 ->body($exception->getMessage())
@@ -241,7 +242,7 @@ class PricingCostCalculations extends Page implements HasTable
     public function cancelPendingParameterAdjustment(): void
     {
         $this->clearPendingParameterAdjustment();
-        $this->resetTable();
+        AdminResourceTable::refreshPreservingState($this);
     }
 
     public function openCostDetails(int $recordId): void

@@ -3,6 +3,7 @@
 namespace App\Filament\Support\Actions;
 
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\DistributorPriceReviewService;
 use DomainException;
@@ -68,7 +69,7 @@ class DistributorReviewActions
                 $notice = Notification::make()->title('Disztribútori tömeges jóváhagyás kész')->body($body);
                 (($result['skipped'] + $missing) ? $notice->warning() : $notice->success())->send();
                 unset($livewire->averageDistributorNetNetMultiplier);
-                $livewire->resetTable();
+                AdminResourceTable::refreshPreservingState($livewire);
             })->deselectRecordsAfterCompletion();
     }
 
@@ -89,7 +90,7 @@ class DistributorReviewActions
             Notification::make()->title('A disztribútori kalkuláció nem aktuális')->body($exception->getMessage())->warning()->send();
         } finally {
             unset($livewire->averageDistributorNetNetMultiplier);
-            $livewire->resetTable();
+            AdminResourceTable::refreshPreservingState($livewire);
         }
     }
 }

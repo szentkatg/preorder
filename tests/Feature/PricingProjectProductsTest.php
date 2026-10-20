@@ -94,6 +94,21 @@ class PricingProjectProductsTest extends TestCase
         $this->assertDatabaseCount('pricing_calculation_rows', 0);
     }
 
+    public function test_product_picker_keeps_filters_after_addition_and_when_reopened(): void
+    {
+        $page = Livewire::test(SelectPricingProjectProducts::class, ['record' => $this->project->id])
+            ->filterTable('brand_id', [(string) $this->product->brand_id])->searchTable('product')->sortTable('model_code', 'desc');
+        $before = $page->instance()->tableFilters;
+        $this->assertTrue($page->instance()->getTable()->persistsFiltersInSession());
+        $this->assertSame('await $wire.applyTableFilters(); close()', $page->instance()->getTable()->getFiltersApplyAction()->getAlpineClickHandler());
+        $page->callTableBulkAction('addSelectedProducts', [$this->product])->assertHasNoTableBulkActionErrors()->assertCountTableRecords(0);
+        $this->assertSame($before, $page->instance()->tableFilters);
+        $restored = Livewire::test(SelectPricingProjectProducts::class, ['record' => $this->project->id])->assertCountTableRecords(0);
+        $this->assertSame($before, $restored->instance()->tableFilters);
+        $this->assertSame('product', $restored->instance()->tableSearch);
+        $restored->resetTableFilters()->searchTable('')->assertCanSeeTableRecords([$this->other]);
+    }
+
     public function test_candidates_exclude_other_seasons_and_all_assigned_products_including_closed_projects(): void
     {
         $this->add([$this->product->id]);

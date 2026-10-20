@@ -70,6 +70,7 @@ class PricingProductOverview extends Page implements HasTable
     {
         unset($this->overviewLists);
         $this->pricingDecimalPlaces = $this->loadPricingDecimalPlaces();
+        AdminResourceTable::forgetPersistedFilters($this);
         $this->tableFilters = $this->tableColumnSearches = [];
         $this->tableSearch = '';
         $this->resetTable();

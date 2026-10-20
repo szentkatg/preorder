@@ -32,6 +32,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->profile(isSimple: false)
+            ->resourceCreatePageRedirect('index')
+            ->resourceEditPageRedirect('index')
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
             ->bootUsing(fn () => app()->setLocale('hu'))

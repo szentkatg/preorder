@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Actions;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PricingCalculationRow;
 use App\Models\Product;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
@@ -42,7 +43,7 @@ class PairPreviousSeasonProductAction
                 try {
                     app(PreviousSeasonRetailPriceService::class)->setPair($record->pricingProject, $record->product, $data['mode'], $data['previous_product_id'] ?? null);
                     Notification::make()->title('Párosítás mentve')->success()->send();
-                    $livewire->resetTable();
+                    AdminResourceTable::refreshPreservingState($livewire);
                 } catch (DomainException $exception) {
                     Notification::make()->title('A párosítás nem menthető')->body($exception->getMessage())->danger()->send();
                 }

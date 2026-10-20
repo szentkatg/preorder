@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Actions;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\ForeignRetailCalculationService;
 use App\Services\Pricing\ForeignRetailPriceListResolver;
@@ -42,7 +43,7 @@ class CalculateForeignRetailAction
                             .'Létrehozva: '.$result['created'].', frissítve: '.$result['updated'].', felülvizsgálandó: '.$result['requires_review']
                             .', kihagyott: '.$result['skipped'].'. Részletek a Kalkulációs hibák menüben. Futás: '.$result['run_id']);
                     ($result['skipped'] > 0 ? $notification->warning() : $notification->success())->send();
-                    $livewire->resetTable();
+                    AdminResourceTable::refreshPreservingState($livewire);
                 } catch (DomainException $exception) {
                     Notification::make()->title('A devizás kalkuláció nem indítható')->body($exception->getMessage())->danger()->send();
                 }

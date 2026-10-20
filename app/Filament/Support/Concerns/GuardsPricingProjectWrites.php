@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Concerns;
 
+use App\Exceptions\PricingParameterConflictException;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,11 @@ trait GuardsPricingProjectWrites
                 $this->validateProjectProduct($project, $data['product_id'] ?? null);
             }
 
-            return parent::handleRecordCreation($data);
+            try {
+                return parent::handleRecordCreation($data);
+            } catch (PricingParameterConflictException $exception) {
+                throw ValidationException::withMessages(['data.value' => $exception->getMessage()]);
+            }
         });
     }
 
@@ -36,7 +41,11 @@ trait GuardsPricingProjectWrites
                     $data['product_id'] ?? $stored->product_id);
             }
 
-            return parent::handleRecordUpdate($stored, $data);
+            try {
+                return parent::handleRecordUpdate($stored, $data);
+            } catch (PricingParameterConflictException $exception) {
+                throw ValidationException::withMessages(['data.value' => $exception->getMessage()]);
+            }
         });
     }
 

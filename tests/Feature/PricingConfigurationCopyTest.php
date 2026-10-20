@@ -82,6 +82,15 @@ class PricingConfigurationCopyTest extends TestCase
         return $service->copy($source::class, [$source->id], $this->target->id, $preview['token'], $mode);
     }
 
+    /** Simulate pre-validation database rows; normal saves must no longer create these. */
+    private function legacyRow(string $model, array $extra = []): Model
+    {
+        $row = $this->row($model, array_replace($extra, ['active' => false]));
+        $row->newQuery()->whereKey($row->id)->update(['active' => $extra['active'] ?? true]);
+
+        return $row->fresh();
+    }
+
     #[DataProvider('configurations')]
     public function test_bulk_modal_previews_then_copies_only_selected_rows_and_preserves_source(string $model, string $pageClass): void
     {
@@ -169,7 +178,7 @@ class PricingConfigurationCopyTest extends TestCase
     public function test_source_duplicates_are_rejected_and_target_duplicates_can_only_be_skipped(string $model): void
     {
         $row = $this->row($model);
-        $duplicate = $this->row($model);
+        $duplicate = $this->legacyRow($model);
         $service = app(PricingConfigurationCopyService::class);
         try {
             $service->preview($model, [$row->id, $duplicate->id], $this->target->id);
@@ -178,7 +187,7 @@ class PricingConfigurationCopyTest extends TestCase
             $this->assertStringContainsString('forrássor', $exception->getMessage());
         }
         $this->row($model, ['pricing_project_id' => $this->target->id]);
-        $this->row($model, ['pricing_project_id' => $this->target->id]);
+        $this->legacyRow($model, ['pricing_project_id' => $this->target->id]);
         $preview = $service->preview($model, [$row->id], $this->target->id);
         $this->assertSame(1, $preview['ambiguous']);
         $this->assertFalse($preview['can_overwrite']);

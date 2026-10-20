@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support\Actions;
 
+use App\Filament\Support\AdminResourceTable;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\WholesaleCalculationService;
@@ -52,7 +53,7 @@ class CalculateWholesaleAction
                         .'. Létrehozva: '.$result['created'].', frissítve: '.$result['updated'].', felülvizsgálandó: '.$result['requires_review']
                         .', kihagyott: '.$result['skipped'].'. Futás: '.$result['run_id'].'. Részletek a Kalkulációs hibák menüben.');
                     ($result['skipped'] ? $notice->warning() : $notice->success())->send();
-                    $livewire->resetTable();
+                    AdminResourceTable::refreshPreservingState($livewire);
                 } catch (DomainException $exception) {
                     Notification::make()->title('A nagyker kalkuláció nem indítható')->body($exception->getMessage())->danger()->send();
                 }

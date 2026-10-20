@@ -27,6 +27,7 @@ use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -155,7 +156,8 @@ class WholesaleCalculationTest extends TestCase
         $this->parameter->update(['active' => false]);
         $this->assertSame(2, $this->calculate()['skipped']);
         $this->parameter->update(['active' => true]);
-        $this->parameter->replicate()->save();
+        // Legacy data can still contain duplicates; normal saves now reject these.
+        DB::table('pricing_parameters')->insert($this->parameter->replicate()->getAttributes());
         $this->assertSame(2, $this->calculate()['skipped']);
         $this->assertSame(0, PricingCalculationRow::where('price_type', 'wholesale')->count());
         $this->assertDatabaseCount('pricing_calculation_errors', 4);
