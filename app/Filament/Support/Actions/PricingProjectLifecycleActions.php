@@ -4,15 +4,16 @@ namespace App\Filament\Support\Actions;
 
 use App\Exports\ErpPricingExport;
 use App\Filament\Resources\PricingProjects\PricingProjectResource;
+use App\Filament\Support\Schemas\ErpPricingExportForm;
 use App\Models\PricingProject;
 use App\Services\Pricing\ErpPricingExportService;
 use App\Services\Pricing\PricingProjectPublicationService;
 use DomainException;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PricingProjectLifecycleActions
@@ -52,24 +53,18 @@ class PricingProjectLifecycleActions
         return Action::make('exportErpPrices')->label('ERP árexport (Excel)')->icon('heroicon-o-arrow-down-tray')
             ->visible(fn (PricingProject $record) => Gate::allows('exportErp', $record) && Gate::allows('view', $record) && $record->publications()->exists())
             ->authorize(fn (PricingProject $record) => Gate::allows('exportErp', $record) && Gate::allows('view', $record))
-            ->modalDescription('A legutóbb publikált árakból, az ERP fix oszlopsorrendjével. Az Eredeti és Lista ár azonos; nincs átváltás. A nem használt árszintek üresek.')
-            ->schema([
-                DatePicker::make('start_date')->label('Kezdő dátum')->default(today())->required(),
-                ...collect(ErpPricingExportService::SLOTS)->map(fn ($slot, $key) => Select::make('mapping.'.$key)->label($slot[0].' '.$slot[2])
-                    ->options(fn (PricingProject $record) => app(ErpPricingExportService::class)->options($record, $key))
-                    ->default(function (PricingProject $record) use ($key) {
-                        $options = app(ErpPricingExportService::class)->options($record, $key);
-
-                        return count($options) === 1 ? array_key_first($options) : null;
-                    })
-                    ->required(fn (PricingProject $record) => count(app(ErpPricingExportService::class)->options($record, $key)) > 0)
-                    ->searchable())->all(),
-            ])
-            ->action(function (PricingProject $record, array $data) {
+            ->modalWidth(Width::SevenExtraLarge)
+            ->modalDescription('A legutóbb publikált árakból, fix 30 oszloppal. Forrásként árlista vagy építőelemekből összeállított képlet választható. Az Eredeti és Lista ár azonos. A képleteredmény 2 tizedesre kerekítve kerül az Excelbe; az árlistákat nem módosítjuk.')
+            ->schema(fn (PricingProject $record): array => ErpPricingExportForm::make($record))
+            ->action(function (PricingProject $record, array $data, Action $action) {
                 try {
-                    $rows = app(ErpPricingExportService::class)->rows($record, $data['mapping'] ?? [], $data['start_date']);
+                    $rows = app(ErpPricingExportService::class)->rows($record, $data['mapping'] ?? [], $data['start_date'], $data['formulas'] ?? []);
 
                     return Excel::download(new ErpPricingExport($rows), 'ERP-arak-'.$record->id.'-'.now()->format('Ymd-His').'.xlsx');
+                } catch (ValidationException $exception) {
+                    $prefix = 'mountedActions.'.$action->getNestingIndex().'.data.';
+                    throw ValidationException::withMessages(collect($exception->errors())
+                        ->mapWithKeys(fn ($messages, $field) => [$prefix.$field => $messages])->all());
                 } catch (DomainException $exception) {
                     Notification::make()->danger()->title('Nem készíthető ERP export')->body($exception->getMessage())->send();
 
