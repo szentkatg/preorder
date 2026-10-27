@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Pricing\HufRetailCalculationService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -59,10 +60,17 @@ class PricingPayloadPerformanceTest extends TestCase
         $page->call('savePricingColumnWidths', ['final-price' => 110]);
         $this->assertArrayNotHasKey('html', $page->effects);
         $this->assertLessThan(20000, strlen($this->payload($page)));
+        $manualQueries = [];
+        DB::listen(function ($query) use (&$manualQueries): void {
+            $manualQueries[] = strtolower($query->sql);
+        });
         $page->call('updateTableColumnState', 'manual_price', (string) $row->id, '1490');
-        $this->assertArrayHasKey('html', $page->effects);
+        $this->assertEmpty(array_filter($manualQueries, fn ($sql) => str_contains($sql, 'pricing_calculation_rows') && str_contains($sql, 'limit 100')));
+        $this->assertArrayNotHasKey('html', $page->effects);
+        $this->assertNotEmpty($page->effects['partials']);
+        $this->assertLessThan(100000, strlen($this->payload($page)));
         $this->assertSame('1490.0000', $row->fresh()->final_price);
-        $this->assertCompressionRoundTrip($this->payload($page));
+        $this->assertSame($this->payload($page), gzdecode(gzencode($this->payload($page), 5)));
         $page->sortTable('final_price', 'asc')->assertHasNoErrors();
         $this->assertArrayHasKey('html', $page->effects);
         $this->assertSame($row->id, $page->instance()->getTableRecords()->first()->id);

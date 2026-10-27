@@ -88,6 +88,22 @@ class PricingGridInteractionsTest extends TestCase
         $this->assertNull($this->retail->fresh()->manual_price);
     }
 
+    public function test_cell_refresh_keeps_existing_list_and_update_permissions_without_requiring_detail_view_permission(): void
+    {
+        $user = User::factory()->create();
+        foreach (['View:PricingHufRetailCalculations', 'ViewAny:PricingCalculationRow',
+            'Update:PricingCalculationRow', 'Update:PricingProject'] as $permission) {
+            $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($user);
+        $this->assertFalse($user->can('view', $this->retail));
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->call('setPricingManualPrice', $this->retail->id, '500')->assertHasNoErrors();
+        $this->assertArrayNotHasKey('html', $page->effects);
+        $this->assertNotEmpty($page->effects['partials']);
+        $this->assertEquals(500, $this->retail->fresh()->manual_price);
+    }
+
     public function test_compact_column_manager_is_shared_by_every_pricing_list(): void
     {
         foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class,

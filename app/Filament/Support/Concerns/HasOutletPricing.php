@@ -46,7 +46,7 @@ trait HasOutletPricing
         $source->unsetRelation('outletRows');
         $row = $this->outletRow($source, (int) $listId);
         abort_unless($row, 404);
-        $this->performPricingGridChange(fn () => app(OutletPriceReviewService::class)->setManualPrice($row, $value));
+        $this->performPricingGridChange(fn () => app(OutletPriceReviewService::class)->setManualPrice($row, $value), [$source->id]);
     }
 
     public function calculateOutletAction(): Action

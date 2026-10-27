@@ -632,7 +632,7 @@ class ForeignRetailCalculationTest extends TestCase
         $page = Livewire::test(PricingForeignRetailCalculations::class);
         $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, '3.95')->assertHasNoErrors();
         $this->assertEqualsWithDelta(3.95 * 400 / 460, $page->instance()->averageCostBasedMultiplier, 0.0000001);
-        $page->assertSee('data-pricing-average-multiplier="Átlag: 3,43"', false);
+        $page->assertDispatched('pricing-grid-refreshed', fn ($name, $data) => $data['headers']['cost_based_multiplier']['data-pricing-average-multiplier'] === 'Átlag: 3,43');
         $this->assertTrue(Livewire::test(PricingHufRetailCalculations::class)->instance()->getTable()->getColumn('cost_based_multiplier')->isHidden());
     }
 

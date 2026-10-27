@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PricingCalculationRows\Pages;
 
 use App\Filament\Resources\PricingCalculationRows\PricingCalculationRowResource;
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
+use App\Filament\Support\Concerns\HasIncrementalPricingGrid;
 use App\Filament\Support\Concerns\HasProductPricingEditor;
 use App\Filament\Support\ProductPricingNavigation;
 use App\Models\PricingCalculationRow;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 
 class ListPricingCalculationRows extends ListRecords
 {
+    use HasIncrementalPricingGrid;
     use HasProductPricingEditor;
 
     protected static string $resource = PricingCalculationRowResource::class;

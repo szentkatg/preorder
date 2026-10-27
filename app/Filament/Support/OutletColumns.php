@@ -3,11 +3,29 @@
 namespace App\Filament\Support;
 
 use App\Models\PricingCalculationRow;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Support\Facades\Gate;
 
 class OutletColumns
 {
+    public static function targetPriceTooltip(PricingCalculationRow $source, int $listId): ?string
+    {
+        $row = self::row($source, $listId);
+        if (! $row || $row->outlet_discount_percent === null || $source->final_price === null) {
+            return null;
+        }
+        $target = BigDecimal::of($source->final_price)->multipliedBy(
+            BigDecimal::one()->minus(BigDecimal::of($row->outlet_discount_percent)->dividedBy(100, 8, RoundingMode::HALF_UP)),
+        );
+        $format = fn ($value) => rtrim(rtrim(number_format((float) (string) $value, 4, ',', ' '), '0'), ',');
+
+        return 'Elvárt outlet ár kerekítés nélkül: '.$format($target).' '.($source->currency?->code ?? '')
+            .' (kisker ár: '.$format($source->final_price).', kedvezmény: '.$format($row->outlet_discount_percent).'%).'
+            .($row->requires_review ? ' Az outlet kalkuláció felülvizsgálandó; az érték az aktuális kisker árból számolt tájékoztatás.' : '');
+    }
+
     public static function row(PricingCalculationRow $source, int $listId): ?PricingCalculationRow
     {
         return $source->outletRows->first(fn ($row) => $row->price_list_id == $listId
@@ -48,6 +66,12 @@ class OutletColumns
                 if (! in_array($field, ['requires_review', 'status'], true)) {
                     $column->numeric()->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, $name, 2));
                 }
+                if (in_array($field, ['discount_percent', 'actual_discount', 'manual_price'], true)) {
+                    $column->tooltip(fn (PricingCalculationRow $record) => self::targetPriceTooltip($record, $id))
+                        ->extraCellAttributes(fn (PricingCalculationRow $record) => [
+                            'title' => self::targetPriceTooltip($record, $id),
+                        ], merge: true);
+                }
                 if ($field === 'requires_review') {
                     $column->color(fn ($state) => $state ? 'danger' : 'success');
                 }
@@ -57,7 +81,7 @@ class OutletColumns
                         'data-pricing-record-id' => $record->id, 'data-pricing-outlet-list-id' => $id,
                         'data-pricing-value' => PricingGrid::inputValue(self::row($record, $id)?->manual_price),
                         'data-pricing-label' => $list->code.' manuális ár', 'tabindex' => 0,
-                        'title' => 'Dupla kattintás vagy Enter/F2: szerkesztés. Üres érték: manuális ár törlése.',
+                        'title' => (self::targetPriceTooltip($record, $id) ?? '').' Dupla kattintás vagy Enter/F2: szerkesztés. Üres érték: manuális ár törlése.',
                     ]);
                 }
                 $columns[] = $column;

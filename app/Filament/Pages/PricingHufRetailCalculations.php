@@ -14,6 +14,7 @@ use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use App\Services\Pricing\PricingMultiplierAverage;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -92,7 +93,9 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
-        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction()];
+        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction(),
+            Action::make('priceDistribution')->label('Áreloszlás főcsoportonként')->icon('heroicon-o-chart-bar')
+                ->url(fn () => PricingHufRetailPriceDistribution::getUrl())];
     }
 
     public function updateTableColumnState(string $column, string $record, mixed $input): mixed

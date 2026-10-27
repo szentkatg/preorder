@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Exceptions\PricingParameterConflictException;
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasIncrementalPricingGrid;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
 use App\Filament\Support\Concerns\HasPricingTablePreferences;
 use App\Filament\Support\Concerns\HasProductPricingEditor;
@@ -18,6 +19,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
+use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -27,6 +29,7 @@ use InvalidArgumentException;
 
 class PricingCostCalculations extends Page implements HasTable
 {
+    use HasIncrementalPricingGrid;
     use HasPageShield {
         canAccess as protected canAccessUsingPagePermission;
     }
@@ -155,6 +158,8 @@ class PricingCostCalculations extends Page implements HasTable
 
         $this->pendingParameterScope = self::defaultParameterScope($scopeOptions);
 
+        $this->renderPricingAdjustmentPanel();
+
         Notification::make()
             ->title('Válaszd ki a szűkítést')
             ->body('Az érték még nincs mentve. A táblázat felett válaszd ki, milyen szinten legyen érvényes, majd indítsd az újraszámítást.')
@@ -213,8 +218,7 @@ class PricingCostCalculations extends Page implements HasTable
                     (float) $this->pendingParameterAdjustment['value'],
                 );
 
-            $result = app(CostCalculationService::class)
-                ->recalculate($record->pricingProject);
+            $result = app(CostCalculationService::class)->recalculateForParameter($parameter);
 
             Notification::make()
                 ->title('Paraméter mentve és újraszámolva')
@@ -229,7 +233,8 @@ class PricingCostCalculations extends Page implements HasTable
                 ->send();
 
             $this->clearPendingParameterAdjustment();
-            AdminResourceTable::refreshPreservingState($this);
+            $this->refreshPricingRows(productIds: $result['product_ids']);
+            $this->renderPricingAdjustmentPanel();
         } catch (InvalidArgumentException|PricingParameterConflictException $exception) {
             Notification::make()
                 ->title('A paraméter nem menthető')
@@ -242,7 +247,19 @@ class PricingCostCalculations extends Page implements HasTable
     public function cancelPendingParameterAdjustment(): void
     {
         $this->clearPendingParameterAdjustment();
-        AdminResourceTable::refreshPreservingState($this);
+        $this->renderPricingAdjustmentPanel();
+    }
+
+    public function updatedPendingParameterScope(): void
+    {
+        $this->renderPricingAdjustmentPanel();
+    }
+
+    private function renderPricingAdjustmentPanel(): void
+    {
+        app(PartialsComponentHook::class)->renderPartial($this, fn (): array => [
+            'pricing-cost-adjustment' => view('filament.pricing.cost-adjustment-panel'),
+        ]);
     }
 
     public function openCostDetails(int $recordId): void
@@ -409,8 +426,9 @@ class PricingCostCalculations extends Page implements HasTable
         match ($scopeType) {
             PricingParameter::SCOPE_GLOBAL => null,
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => $query->whereHas(
-                'supplier',
-                fn ($supplierQuery) => $supplierQuery->where('country_code', $record->supplier?->country_code)
+                'product.purchasePrices',
+                fn ($prices) => $prices->where('active', true)->whereHas('supplier',
+                    fn ($supplierQuery) => $supplierQuery->where('country_code', $record->supplier?->country_code))
             ),
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => $query->whereHas(
                 'product',
@@ -430,6 +448,10 @@ class PricingCostCalculations extends Page implements HasTable
      */
     private static function defaultParameterScope(array $options): string
     {
+        if (array_key_exists(PricingParameter::SCOPE_PRODUCT, $options)) {
+            return PricingParameter::SCOPE_PRODUCT;
+        }
+
         return array_key_exists(PricingParameter::SCOPE_SUPPLIER_COUNTRY, $options)
             ? PricingParameter::SCOPE_SUPPLIER_COUNTRY
             : PricingParameter::SCOPE_GLOBAL;

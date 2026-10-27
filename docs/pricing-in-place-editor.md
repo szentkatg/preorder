@@ -21,6 +21,11 @@ Az általános **Árkalkulációs sorok** lista:
 - Dupla kattintás / Enter: csak az engedélyezett bekerülési sorok százalékai szerkeszthetők.
 - A bevitel lezárásakor szűkítési szintet kérő modal nyílik, a megadott érték előtöltésével.
   A lehetőségek mellett megmarad az érintett sorok száma. Mégse esetén nincs mentés.
+- A szállítási költség és vám módosításának szűkítésválasztója alapból **Modell**
+  szintre áll, a bekerülési értékek gyorsszerkesztőjében és az árkalkulációs sorok
+  modaljában is (dupla kattintásból és a műveletek menüből egyaránt).
+  Minden új megnyitás modellszintről indul; a felhasználó más elérhető szintet is
+  választhat. A paramétertörzsben meglévő rekordok szűkítése ettől nem változik.
 - A sor más celláján dupla kattintás az ártípusnak megfelelő részletezést mutatja
   (bekerülési, kisker/outlet, nagyker, disztribútor).
 - A korábbi Részletek, Szállítás %, Vám %, Szerkesztés és a termékár-kezelő

@@ -9,6 +9,8 @@ use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Filament\Resources\PriceLists\Pages\CreatePriceList;
 use App\Filament\Resources\PricingCalculationRows\Pages\EditPricingCalculationRow;
 use App\Filament\Resources\PricingParameters\Pages\CreatePricingParameter;
+use App\Filament\Support\OutletColumns;
+use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
@@ -88,6 +90,45 @@ class OutletCalculationTest extends TestCase
     private function calculate(): array
     {
         return app(OutletCalculationService::class)->recalculate($this->project, 'HUF');
+    }
+
+    public function test_target_tooltips_use_the_unrounded_discount_price_on_both_edit_and_discount_columns(): void
+    {
+        $this->calculate();
+        $page = Livewire::test(PricingHufRetailCalculations::class);
+        $source = $page->instance()->getTableRecords()->first();
+        foreach (['discount_percent', 'actual_discount', 'manual_price'] as $field) {
+            $column = $page->instance()->getTable()->getColumn('outlet_'.$this->outlet->id.'_'.$field)->record($source);
+            $this->assertStringContainsString('1 592 HUF', $column->getTooltip());
+        }
+        $source->final_price = '2490';
+        $this->assertStringContainsString('1 992 HUF', OutletColumns::targetPriceTooltip($source, $this->outlet->id));
+    }
+
+    public function test_outlet_edit_returns_only_its_source_cells_and_preserves_display_positions_and_selection(): void
+    {
+        $cost = PricingCalculationRow::where('price_type', 'cost')->firstOrFail();
+        $otherCost = $cost->replicate();
+        $otherCost->color_id = Color::create(['product_id' => $cost->product_id, 'code' => 'BLUE', 'name_hu' => 'Kék', 'active' => true])->id;
+        $otherCost->save();
+        app(HufRetailCalculationService::class)->recalculate($this->project, $this->retail);
+        $this->calculate();
+        $source = $this->source();
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->sortTable('outlet_'.$this->outlet->id.'_actual_discount', 'asc')->selectTableRecords([$source]);
+        $positions = $page->instance()->pricingVisibleRowIds;
+        $this->assertCount(2, $positions);
+        $page->call('setOutletManualPrice', $source->id, $this->outlet->id, '1890')->assertHasNoErrors();
+        $this->assertArrayNotHasKey('html', $page->effects);
+        $this->assertSame($positions, $page->instance()->pricingVisibleRowIds);
+        $page->assertSet('selectedTableRecords', [(string) $source->id]);
+        foreach (array_keys($page->effects['partials']) as $key) {
+            $this->assertStringStartsWith('pricing-cell-'.$source->id.'-', $key);
+        }
+        $html = implode('', $page->effects['partials']);
+        $this->assertStringContainsString('1 592 HUF', $html);
+        $this->assertStringContainsString('1890', $html);
+        $this->assertEquals(1890, $this->row()->final_price);
     }
 
     public function test_row_warning_includes_outlet_approval_and_clears_after_combined_approval(): void

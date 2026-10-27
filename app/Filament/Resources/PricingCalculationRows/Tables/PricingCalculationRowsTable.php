@@ -205,9 +205,8 @@ class PricingCalculationRowsTable
                             (float) $data['value'],
                         );
 
-                    $result = app(CostCalculationService::class)
-                        ->recalculate($record->pricingProject);
-                    $livewire->flushCachedTableRecords();
+                    $result = app(CostCalculationService::class)->recalculateForParameter($parameter);
+                    $livewire->refreshPricingRows(productIds: $result['product_ids']);
 
                     Notification::make()
                         ->title('Paraméter mentve és újraszámolva')
@@ -312,8 +311,9 @@ class PricingCalculationRowsTable
         match ($scopeType) {
             PricingParameter::SCOPE_GLOBAL => null,
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => $query->whereHas(
-                'supplier',
-                fn ($supplierQuery) => $supplierQuery->where('country_code', $record->supplier?->country_code)
+                'product.purchasePrices',
+                fn ($prices) => $prices->where('active', true)->whereHas('supplier',
+                    fn ($supplierQuery) => $supplierQuery->where('country_code', $record->supplier?->country_code))
             ),
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => $query->whereHas(
                 'product',
@@ -331,6 +331,10 @@ class PricingCalculationRowsTable
     private static function defaultParameterScope(PricingCalculationRow $record): string
     {
         $options = self::parameterScopeOptions($record);
+
+        if (array_key_exists(PricingParameter::SCOPE_PRODUCT, $options)) {
+            return PricingParameter::SCOPE_PRODUCT;
+        }
 
         return array_key_exists(PricingParameter::SCOPE_SUPPLIER_COUNTRY, $options)
             ? PricingParameter::SCOPE_SUPPLIER_COUNTRY

@@ -329,7 +329,7 @@ class HufRetailCalculationTest extends TestCase
             $this->assertSame($color, $column->getColor($row->effective_multiplier));
             $this->assertSame($color, $column->getIconColor($row->effective_multiplier));
             $this->assertSame($direction === null ? null : 'heroicon-o-arrow-'.$direction, $column->getIcon($row->effective_multiplier));
-            $this->assertStringContainsString('pricing-retail-manual-'.($direction ?? 'equal'), $page->html());
+            $this->assertStringContainsString('pricing-retail-manual-'.($direction ?? 'equal'), implode('', $page->effects['partials']));
         }
 
         $page->call('updateTableColumnState', 'manual_price', (string) $this->retail()->id, null)->assertHasNoErrors();
@@ -1055,7 +1055,8 @@ class HufRetailCalculationTest extends TestCase
             ['method' => 'savePricingColumnWidths', 'params' => [['final-price' => 110]]],
             ['method' => 'updateTableColumnState', 'params' => ['manual_price', (string) $this->retail()->id, '1490']],
         ])->assertHasNoErrors();
-        $this->assertArrayHasKey('html', $page->effects);
+        $this->assertArrayNotHasKey('html', $page->effects);
+        $this->assertNotEmpty($page->effects['partials']);
         $this->assertSame('1490.0000', $this->retail()->final_price);
         $this->assertEqualsWithDelta(1490 / 460, $page->instance()->averageRetailMultiplier, 0.0000001);
         $this->assertSame(['final-price' => 110], $page->instance()->pricingColumnWidths);

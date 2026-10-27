@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PricingRoundingRules\Tables;
 
+use App\Filament\Resources\PricingRoundingRules\Schemas\PricingRoundingRuleForm;
 use App\Filament\Support\Actions\CopyPricingConfigurationAction;
 use App\Models\PricingRoundingRule;
 use Filament\Actions\BulkActionGroup;
@@ -9,6 +10,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class PricingRoundingRulesTable
@@ -26,6 +28,14 @@ class PricingRoundingRulesTable
                 TextColumn::make('decimal_places')->label('Tizedes'),
                 TextColumn::make('adjustment')->label('Korrekció'),
                 IconColumn::make('active')->label('Aktív')->boolean(),
+            ])
+            ->filters([
+                SelectFilter::make('pricing_project_id')->label('Árprojekt')->relationship('pricingProject', 'name')
+                    ->multiple()->searchable()->preload(),
+                SelectFilter::make('price_type')->label('Ártípus')->options(PricingRoundingRuleForm::priceTypeOptions())
+                    ->multiple()->searchable(),
+                SelectFilter::make('price_list_id')->label('Árlista')->relationship('priceList', 'code')
+                    ->multiple()->searchable()->preload(),
             ])
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])

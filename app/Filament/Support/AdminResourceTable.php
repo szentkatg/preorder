@@ -44,6 +44,22 @@ class AdminResourceTable
             self::configureColumn($column, $modelClass);
         }
 
+        if ($modelClass === PricingCalculationRow::class && method_exists($table->getLivewire(), 'capturePricingVisibleRows')) {
+            $table->extraAttributes(function ($livewire): array {
+                $livewire->capturePricingVisibleRows();
+
+                return [];
+            }, merge: true);
+            foreach ($table->getColumns() as $column) {
+                $name = $column->getName();
+                $column->extraHeaderAttributes(['data-pricing-column' => $name], merge: true)
+                    ->extraCellAttributes(fn (PricingCalculationRow $record, $livewire): array => [
+                        'wire:partial' => $livewire->pricingCellPartialName($record->id, $name),
+                        'data-pricing-column' => $name,
+                    ], merge: true);
+            }
+        }
+
         if ($withViewAction && (! $table->hasAction('view'))) {
             $table->recordActions([
                 ViewAction::make(),

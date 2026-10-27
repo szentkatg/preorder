@@ -5,9 +5,11 @@ namespace App\Services\Pricing;
 use App\Models\Currency;
 use App\Models\PricingCalculationError;
 use App\Models\PricingCalculationRow;
+use App\Models\PricingParameter;
 use App\Models\PricingProject;
 use App\Models\Product;
 use App\Models\ProductPurchasePrice;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -27,10 +29,11 @@ class CostCalculationService
      *     skipped: int,
      *     candidate_groups: int,
      *     products_without_active_purchase_price: int,
+     *     product_ids: array<int, int>,
      *     errors: array<int, string>
      * }
      */
-    public function recalculate(PricingProject $project, ?int $productId = null): array
+    public function recalculate(PricingProject $project, ?int $productId = null, ?array $productIds = null): array
     {
         CostCalculationAuthorization::authorizeRecalculation($project);
         $project->loadMissing('season');
@@ -47,6 +50,7 @@ class CostCalculationService
         $productsWithoutActivePurchasePrice = Product::query()
             ->forPricingProject($project->id)
             ->when($productId !== null, fn ($query) => $query->whereKey($productId))
+            ->when($productIds !== null, fn ($query) => $query->whereIn('id', $productIds))
             ->where('season_id', $project->season_id)
             ->where('active', true)
             ->whereDoesntHave(
@@ -58,6 +62,7 @@ class CostCalculationService
 
         $purchasePrices = ProductPurchasePrice::query()
             ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
+            ->when($productIds !== null, fn ($query) => $query->whereIn('product_id', $productIds))
             ->where('active', true)
             ->whereHas('product', function ($query) use ($project): void {
                 $query
@@ -90,10 +95,12 @@ class CostCalculationService
             'errors' => [],
         ];
 
-        DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $productId, $hufCurrency, $runId, &$result): void {
+        $changedProductIds = [];
+        DB::transaction(function () use ($purchasePriceGroups, $productsWithoutActivePurchasePrice, $project, $productId, $productIds, $hufCurrency, $runId, &$result, &$changedProductIds): void {
             $lockedProject = PricingProject::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
             CostCalculationAuthorization::authorizeRecalculation($lockedProject);
-            $memberIds = $lockedProject->products()->when($productId !== null, fn ($query) => $query->whereKey($productId))->pluck('products.id')->all();
+            $memberIds = $lockedProject->products()->when($productId !== null, fn ($query) => $query->whereKey($productId))
+                ->when($productIds !== null, fn ($query) => $query->whereIn('products.id', $productIds))->pluck('products.id')->all();
             $productsWithoutActivePurchasePrice = $productsWithoutActivePurchasePrice->whereIn('id', $memberIds);
             $purchasePriceGroups = $purchasePriceGroups->filter(fn ($prices) => in_array($prices->first()->product_id, $memberIds));
             $result['candidate_groups'] = $purchasePriceGroups->count();
@@ -216,14 +223,20 @@ class CostCalculationService
                 $row->customs_percent = $selectedCalculation['customs_percent'];
                 $row->candidate_count = count($candidates);
                 $row->calculated_price = $selectedCalculation['landed_cost_huf'];
-                $row->calculation_snapshot = $this->snapshot(
+                $snapshot = $this->snapshot(
                     $project,
                     $selectedPurchasePrice,
                     $selectedCalculation,
                     $candidates
                 );
 
+                if ($productIds !== null && ! $wasRecentlyCreated && ! $row->isDirty()
+                    && Arr::except($snapshot, ['calculated_at']) == Arr::except($row->calculation_snapshot ?? [], ['calculated_at'])) {
+                    continue;
+                }
+                $row->calculation_snapshot = $snapshot;
                 $row->save();
+                $changedProductIds[] = $row->product_id;
 
                 if ($wasRecentlyCreated) {
                     $result['created']++;
@@ -233,7 +246,28 @@ class CostCalculationService
             }
         });
 
-        return $result;
+        return $result + ['product_ids' => array_values(array_unique($changedProductIds))];
+    }
+
+    /** Include alternative suppliers: changing a candidate can change the cheapest supplier. */
+    public function recalculateForParameter(PricingParameter $parameter): array
+    {
+        $project = $parameter->pricingProject;
+        CostCalculationAuthorization::authorizeRecalculation($project);
+        $products = Product::query()->forPricingProject($project->id)
+            ->where('season_id', $project->season_id)->where('active', true);
+        match ($parameter->scope_type) {
+            PricingParameter::SCOPE_GLOBAL => null,
+            PricingParameter::SCOPE_PRODUCT => $products->whereKey($parameter->product_id),
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP => $products->where('item_main_group_id', $parameter->item_main_group_id),
+            PricingParameter::SCOPE_MATERIAL_COMPOSITION => $products->where('material_composition', $parameter->material_composition),
+            PricingParameter::SCOPE_SUPPLIER_COUNTRY => $products->whereHas('purchasePrices', fn ($query) => $query
+                ->where('active', true)->whereHas('supplier', fn ($supplier) => $supplier->where('country_code', $parameter->supplier_country_code))),
+            default => throw new \InvalidArgumentException('Ismeretlen paraméterszűkítés.'),
+        };
+        $productIds = $products->pluck('id')->all();
+
+        return $this->recalculate($project, productIds: $productIds);
     }
 
     /**

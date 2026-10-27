@@ -34,6 +34,37 @@
     const grids = '[data-pricing-cost-grid],[data-pricing-price-grid]';
     const blocked = 'input,textarea,select,button,a,label,[role="checkbox"],[data-pricing-column-resizer]';
 
+    window.addEventListener('pricing-grid-refreshed', event => {
+        const { componentId, rows = [], headers = {} } = event.detail;
+        const root = document.querySelector('[wire\\:id="' + CSS.escape(componentId) + '"]');
+        if (!root) return;
+        for (const row of rows) {
+            root.querySelector('[wire\\:partial="' + row.anchor + '"]')?.closest('tr')
+                ?.classList.toggle('pricing-needs-attention', row.attention);
+        }
+        for (const [name, attributes] of Object.entries(headers)) {
+            const header = Array.from(root.querySelectorAll('th[data-pricing-column]'))
+                .find(element => element.dataset.pricingColumn === name);
+            if (header) for (const [attribute, value] of Object.entries(attributes)) header.setAttribute(attribute, value);
+        }
+        // Filament cell partials morph after the response. Keep user-resized widths too.
+        requestAnimationFrame(() => {
+            for (const row of rows) {
+                const element = root.querySelector('[wire\\:partial="' + row.anchor + '"]')?.closest('tr');
+                if (!element) continue;
+                for (const cell of element.querySelectorAll('td[data-pricing-column]')) {
+                    const header = Array.from(cell.closest('table').querySelectorAll('th[data-pricing-column]'))
+                        .find(item => item.dataset.pricingColumn === cell.dataset.pricingColumn);
+                    const width = Number(header?.dataset.pricingColumnWidth);
+                    if (Number.isFinite(width) && width > 0) {
+                        cell.style.width = cell.style.minWidth = cell.style.maxWidth = width + 'px';
+                        cell.dataset.pricingColumnWidth = String(width);
+                    }
+                }
+            }
+        });
+    });
+
     function wireFor(grid) {
         let component = grid;
         while (component && !component.hasAttribute('wire:id')) component = component.parentElement;

@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Gate;
 
 trait HasPricingGridInteractions
 {
+    use HasIncrementalPricingGrid;
+
     public function pricingEditableRow(PricingCalculationRow $record): ?PricingCalculationRow
     {
         abort_unless(static::canAccess(), 403);
@@ -105,7 +107,7 @@ trait HasPricingGridInteractions
         abort_unless($value === null || (is_numeric($value) && is_finite((float) $value)
             && (float) $value > 0 && round((float) $value, 4) > 0 && (float) $value <= 99999999999.9999), 422);
         $source = $this->pricingGridRecord($recordId, write: true);
-        $this->performPricingGridChange(fn () => $this->pricingReviewService()->setManualPrice($this->pricingEditableRow($source), $value));
+        $this->performPricingGridChange(fn () => $this->pricingReviewService()->setManualPrice($this->pricingEditableRow($source), $value), [$source->id]);
     }
 
     public function openPricingDetails(mixed $recordId): void
@@ -155,7 +157,7 @@ trait HasPricingGridInteractions
                 && Gate::allows($write ? 'update' : 'view', $this->pricingEditableRow($record)));
     }
 
-    protected function performPricingGridChange(\Closure $change): void
+    protected function performPricingGridChange(\Closure $change, ?array $rowIds = null): void
     {
         try {
             $change();
@@ -166,7 +168,11 @@ trait HasPricingGridInteractions
                 default => 'A kisker kalkuláció nem aktuális',
             })->body($exception->getMessage())->warning()->send();
         } finally {
-            $this->refreshPricingGrid();
+            if ($rowIds === null) {
+                $this->refreshPricingGrid();
+            } else {
+                $this->refreshPricingRows(rowIds: $rowIds);
+            }
         }
     }
 

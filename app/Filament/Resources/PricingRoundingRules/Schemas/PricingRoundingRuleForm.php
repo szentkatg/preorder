@@ -30,13 +30,7 @@ class PricingRoundingRuleForm
 
                 Select::make('price_type')
                     ->label('Ártípus')
-                    ->options([
-                        PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
-                        PricingCalculationRow::TYPE_RETAIL => 'Kisker',
-                        PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
-                        PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
-                        PricingCalculationRow::TYPE_OUTLET => 'Outlet',
-                    ])
+                    ->options(self::priceTypeOptions())
                     ->live()
                     ->required(),
 
@@ -86,5 +80,16 @@ class PricingRoundingRuleForm
                     ->default(true),
             ])
             ->columns(2);
+    }
+
+    public static function priceTypeOptions(): array
+    {
+        return [
+            PricingCalculationRow::TYPE_COST => 'Bekerülési érték',
+            PricingCalculationRow::TYPE_RETAIL => 'Kisker',
+            PricingCalculationRow::TYPE_WHOLESALE => 'Nagyker',
+            PricingCalculationRow::TYPE_DISTRIBUTOR => 'Disztribútor',
+            PricingCalculationRow::TYPE_OUTLET => 'Outlet',
+        ];
     }
 }

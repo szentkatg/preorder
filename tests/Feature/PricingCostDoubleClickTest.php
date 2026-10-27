@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exports\AdminTableExport;
 use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Resources\PricingCalculationRows\Pages\ListPricingCalculationRows;
 use App\Filament\Resources\PricingCalculationRows\Tables\PricingCalculationRowsTable;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
@@ -20,6 +21,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -75,6 +77,70 @@ class PricingCostDoubleClickTest extends TestCase
         $restored = Livewire::test(PricingCostCalculations::class)->assertCanSeeTableRecords([$this->cost]);
         $this->assertSame($before, [$restored->instance()->tableFilters, $restored->instance()->tableSearch,
             $restored->instance()->tableColumnSearches, $restored->instance()->tableSort]);
+    }
+
+    public static function parameterScopeCases(): array
+    {
+        return [
+            'shipping with country' => [PricingParameter::TYPE_SHIPPING_COST_PERCENT, 'updateShippingCostPercent', true],
+            'shipping without country' => [PricingParameter::TYPE_SHIPPING_COST_PERCENT, 'updateShippingCostPercent', false],
+            'customs with country' => [PricingParameter::TYPE_CUSTOMS_PERCENT, 'updateCustomsPercent', true],
+            'customs without country' => [PricingParameter::TYPE_CUSTOMS_PERCENT, 'updateCustomsPercent', false],
+        ];
+    }
+
+    #[DataProvider('parameterScopeCases')]
+    public function test_cost_page_defaults_to_model_for_each_new_parameter_adjustment(string $parameterType, string $action, bool $hasCountry): void
+    {
+        $this->cost->product->update(['material_composition' => 'POLYESTER']);
+        if (! $hasCountry) {
+            $this->cost->supplier->update(['country_code' => null]);
+        }
+
+        $page = Livewire::test(PricingCostCalculations::class)
+            ->call('startInlineCostPercentParameterAdjustment', $this->cost->id, $parameterType, 15)
+            ->assertSet('pendingParameterScope', PricingParameter::SCOPE_PRODUCT)
+            ->assertSet('pendingParameterAdjustment.scope_counts.product', 1);
+        $options = $page->instance()->pendingParameterAdjustment['scope_options'];
+        foreach (['global', 'item_main_group', 'material_composition', 'product'] as $scope) {
+            $this->assertArrayHasKey($scope, $options);
+        }
+        $this->assertSame($hasCountry, array_key_exists('supplier_country', $options));
+        $page->set('pendingParameterScope', PricingParameter::SCOPE_GLOBAL)->call('cancelPendingParameterAdjustment');
+        $this->assertDatabaseCount('pricing_parameters', 0);
+        $page->call('startInlineCostPercentParameterAdjustment', $this->cost->id, $parameterType, 16)
+            ->assertSet('pendingParameterScope', PricingParameter::SCOPE_PRODUCT)
+            ->call('confirmPendingParameterAdjustment')->assertHasNoErrors();
+        $parameter = PricingParameter::sole();
+        $this->assertSame(PricingParameter::SCOPE_PRODUCT, $parameter->scope_type);
+        $this->assertEquals($this->cost->product_id, $parameter->product_id);
+        $this->assertEquals(16, $parameter->value);
+        $this->assertNull($parameter->supplier_country_code);
+        $this->assertNull($parameter->item_main_group_id);
+        $this->assertNull($parameter->material_composition);
+    }
+
+    #[DataProvider('parameterScopeCases')]
+    public function test_general_list_defaults_to_model_from_both_inline_edit_and_operations_menu(string $parameterType, string $action, bool $hasCountry): void
+    {
+        $this->cost->product->update(['material_composition' => 'POLYESTER']);
+        if (! $hasCountry) {
+            $this->cost->supplier->update(['country_code' => null]);
+        }
+
+        $page = Livewire::test(ListPricingCalculationRows::class)
+            ->call('startInlineCostPercentParameterAdjustment', $this->cost->id, $parameterType, 15)
+            ->assertActionMounted($action)
+            ->assertSchemaStateSet(['scope_type' => PricingParameter::SCOPE_PRODUCT, 'value' => 15]);
+        $page->fillForm(['scope_type' => PricingParameter::SCOPE_GLOBAL])->call('unmountAction');
+        $this->assertDatabaseCount('pricing_parameters', 0);
+        $page->mountAction($action, ['record_id' => $this->cost->id])
+            ->assertActionMounted($action)->assertSchemaStateSet(['scope_type' => PricingParameter::SCOPE_PRODUCT])
+            ->fillForm(['value' => 16])->callMountedAction()->assertHasNoErrors();
+        $parameter = PricingParameter::sole();
+        $this->assertSame(PricingParameter::SCOPE_PRODUCT, $parameter->scope_type);
+        $this->assertEquals($this->cost->product_id, $parameter->product_id);
+        $this->assertEquals(16, $parameter->value);
     }
 
     public function test_cost_workspace_and_generic_resource_both_use_text_cells_and_operation_menus(): void
