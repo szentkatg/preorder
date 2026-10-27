@@ -36,6 +36,35 @@ class PricingGridInteractionsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_every_resizable_workspace_has_the_shared_full_filtered_list_autofit(): void
+    {
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class, PricingForeignRetailCalculations::class,
+            PricingWholesaleCalculations::class, PricingDistributorCalculations::class, PricingProductOverview::class,
+            PricingProductWorkspace::class] as $class) {
+            $page = Livewire::test($class)->assertSee('data-pricing-column-width-fit', false)
+                ->call('pricingColumnFitContent')->assertHasNoErrors();
+            $this->assertArrayNotHasKey('html', $page->effects);
+            $this->assertIsArray($page->effects['returns'][0]);
+        }
+    }
+
+    public function test_autofit_uses_formatted_prices_and_leaves_calculations_and_visible_row_ids_unchanged(): void
+    {
+        $this->retail->update(['manual_price' => '1234.5']);
+        $before = $this->retail->fresh()->getAttributes();
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->call('savePricingDecimalPlaces', ['final_price' => 2]);
+        $ids = $page->instance()->pricingVisibleRowIds;
+        $page->call('pricingColumnFitContent');
+        $content = $page->effects['returns'][0];
+        $this->assertSame(['1234,5'], $content['manual-price']['texts']);
+        $this->assertSame(['1 234,50'], $content['final-price']['texts']);
+        $this->assertTrue($content['manual-price']['icon']);
+        $this->assertSame($ids, $page->instance()->pricingVisibleRowIds);
+        $this->assertSame($before, $this->retail->fresh()->getAttributes());
+        $this->assertArrayNotHasKey('html', $page->effects);
+    }
+
     private PricingProject $project;
 
     private PricingCalculationRow $cost;

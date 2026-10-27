@@ -67,3 +67,19 @@ Migráció, új jogosultság generálása, Composer install, npm build, kézi fe
 és .env-módosítás nem kell. A megfelelő célág Git-frissítése után a szokásos
 artisan optimize:clear és artisan optimize szükséges.
 Az éles rendszerre nem szabad a teljes fejlesztői ágat célzott kiadás nélkül áthúzni.
+
+## Árprojekt-konfigurációs listák oszlopelrendezése
+
+Az Árprojektek, Árképzési paraméterek és Árkerekítési szabályok listáin az oszlopfejléc jobb szélét húzva állítható a szélesség. Az oszlopválasztóban húzással módosítható a sorrend, illetve minden adatoszlop elrejthető/megjeleníthető. Sikeres alkalmazás után az oszlopválasztó bezáródik.
+
+A szélességeket, sorrendet és láthatóságot felhasználónként és listánként külön az `admin_ui_preferences` tárolja. Oldalváltás, munkamenetváltás, szűrés és oszlopbe-/kikapcsolás nem törli a mentett szélességeket. Az „Oszlopszélességek alaphelyzetbe” csak a méretezést törli; az oszlopválasztó alaphelyzetbe állítása csak a sorrendet és láthatóságot.
+
+A méretező JavaScript és CSS, valamint az elrendezést mentő PHP trait közös a meglévő kalkulációs oldalakkal. Nincs új migráció, Composer-függőség vagy Vite-build bemenet.
+
+### Oszlopszélességek tartalomhoz igazítása
+
+A közös gomb minden állítható oszlopszélességű árképzési listán elérhető, nem csak a három konfigurációs oldalon. Minden látható adatoszlopot a teljes szűrt találati halmaz megjelenített értékeihez igazít; a lapozás nem korlátozza a vizsgálatot. A fejléc, a szorzóátlag, az ikonok, a jelvények és a cellák belső térközei is beleszámítanak. A kliens a tényleges betűtípussal méri a szövegek szélességét, így nem pusztán a karakterek számából becsül.
+
+A szerver 200 soros adagokban olvas, és oszloponként csak az egyedi, formázott szövegeket küldi el. Nem küld teljes modelleket, snapshotokat vagy új táblázat-HTML-t, és nem változtatja meg a sorok sorrendjét, a kijelölést, a szűrőket vagy az árakat. A láthatatlan oszlopok korábbi szélessége megmarad. A meglévő méretező 72–2000 képpontos korlátai érvényesek; a százalékos szerkeszthető mezők legalább a bevitelhez szükséges helyet megtartják. Üres listánál a fejléchez igazítunk.
+
+Az eredmény listánként és felhasználónként mentődik. Ha igazítás közben másik projektet/pénznemet, szűrést vagy oszlopelrendezést választanak, a régi válasz nem írhatja át az új nézet szélességeit.

@@ -100,7 +100,7 @@ class PricingPayloadPerformanceTest extends TestCase
 
     public function test_header_wrapping_does_not_override_livewire_loading_indicator_visibility(): void
     {
-        $view = file_get_contents(resource_path('views/filament/pages/pricing-cost-calculations.blade.php'));
+        $view = file_get_contents(resource_path('views/filament/pricing/resizable-columns-styles.blade.php'));
         $this->assertStringContainsString('.fi-ta-header-cell-sort-btn > svg:not(.fi-loading-indicator)', $view);
         $this->assertStringNotContainsString('.fi-ta-header-cell-sort-btn > svg {', $view);
         $this->assertStringNotContainsString('.fi-loading-indicator {', $view);

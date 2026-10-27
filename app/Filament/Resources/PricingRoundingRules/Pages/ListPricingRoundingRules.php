@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\PricingRoundingRules\Pages;
 
 use App\Filament\Resources\PricingRoundingRules\PricingRoundingRuleResource;
+use App\Filament\Support\PricingConfigurationListRecords;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
 
-class ListPricingRoundingRules extends ListRecords
+class ListPricingRoundingRules extends PricingConfigurationListRecords
 {
     protected static string $resource = PricingRoundingRuleResource::class;
 

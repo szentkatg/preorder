@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\PricingParameters\Pages;
 
 use App\Filament\Resources\PricingParameters\PricingParameterResource;
+use App\Filament\Support\PricingConfigurationListRecords;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
 
-class ListPricingParameters extends ListRecords
+class ListPricingParameters extends PricingConfigurationListRecords
 {
     protected static string $resource = PricingParameterResource::class;
 
