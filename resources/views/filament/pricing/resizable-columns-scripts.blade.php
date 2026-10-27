@@ -33,8 +33,8 @@
             return width;
         }
 
-        function measuredTextWidth(context, texts, element, pseudo = null) {
-            const style = getComputedStyle(element, pseudo);
+        function measuredTextWidth(context, texts, element) {
+            const style = getComputedStyle(element);
             context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
             const spacing = parseFloat(style.letterSpacing) || 0;
             let widest = 0;
@@ -77,23 +77,17 @@
                         if (! header.classList.contains('fi-ta-header-cell')) return;
                         const key = columnKey(header, index);
                         const data = content[key];
-                        const heading = header.querySelector('.fi-ta-header-cell-sort-btn') || header;
-                        const label = heading.cloneNode(true);
-                        label.querySelectorAll('svg,[data-pricing-column-resizer]').forEach(node => node.remove());
-                        let headerWidth = measuredTextWidth(context, [label.textContent], heading)
-                            + horizontalInsets(heading, header) + (heading.querySelector('svg') ? 24 : 0);
-                        if (header.dataset.pricingAverageMultiplier) {
-                            headerWidth = Math.max(headerWidth,
-                                measuredTextWidth(context, [header.dataset.pricingAverageMultiplier], header, '::before') + 32);
-                        }
                         const cell = table.querySelector('tbody tr')?.cells[index];
-                        const sample = cell?.querySelector('.fi-badge') || cell?.querySelector('.fi-ta-text-item')
+                        const badge = cell?.querySelector('.fi-badge');
+                        const sample = badge || cell?.querySelector('.fi-ta-text-item')
                             || cell?.querySelector('.fi-ta-text') || cell || header;
                         const texts = data?.texts || [cell?.innerText || ''];
                         const padding = cell ? horizontalInsets(sample, cell) : 24;
                         const bodyWidth = measuredTextWidth(context, texts, sample) + Math.max(24, padding)
-                            + (data?.icon ? 24 : 0) + (data?.badge ? 16 : 0);
-                        widths[key] = Math.min(2000, Math.ceil(Math.max(minimumColumnWidth(header), headerWidth, bodyWidth) + 8));
+                            + (data?.icon ? 24 : 0) + (data?.badge && !badge ? 16 : 0);
+                        // Headers and their average badges wrap; only body content
+                        // may enlarge a column beyond the existing usable minimum.
+                        widths[key] = Math.min(2000, Math.ceil(Math.max(minimumColumnWidth(header), bodyWidth + 8)));
                     });
                 });
                 // Persist once, without a table rerender or re-sorting any edited rows.

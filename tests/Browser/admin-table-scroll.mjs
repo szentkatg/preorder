@@ -84,6 +84,19 @@ export function runAdminTableScrollTests() {
     first.container.scrollLeft = 400; first.container.emit('scroll');
     assert.equal(first.bar().scrollLeft, 400);
 
+    const initialHeight = first.container.clientHeight;
+    const initialBarTop = first.bar().getBoundingClientRect().top;
+    // At the inner list boundary the browser starts scrolling the outer page.
+    // The old capture listener resized the list on each tick, cancelling movement.
+    first.container.top -= 60;
+    listeners.get('scroll')?.({ target: document });
+    flush();
+    assert.equal(first.container.clientHeight, initialHeight, 'Outer scrolling must not grow the inner list');
+    assert.equal(first.bar().getBoundingClientRect().top, initialBarTop - 60, 'The table/footer/bar must follow the full outer scroll delta');
+    first.container.top += 60;
+    first.container.emit('scroll'); flush();
+    assert.equal(first.container.clientHeight, initialHeight, 'Inner scrolling must not resize the list either');
+
     first.container.naturalHeight = 100; resizeCallbacks.forEach(callback => callback()); flush();
     assert.ok(first.bar().classList.contains('is-visible'), 'A short list must keep its bar, even when the native bottom is in view');
     assert.equal(first.bar().getBoundingClientRect().top, first.container.getBoundingClientRect().bottom + 60);
@@ -128,8 +141,11 @@ export function runAdminTableScrollTests() {
     assert.equal(second.bar().classList.contains('is-visible'), true);
     assert.match(css, /\.admin-table-scrollbar\s*\{\s*position: relative;/);
     assert.match(css, /overflow-x: scroll;/);
+    assert.match(css, /overscroll-behavior-y: auto;/);
+    assert.doesNotMatch(source, /(?:document|window)\.addEventListener\(['"](?:scroll|wheel)['"]/,
+        'Scroll handlers may synchronize the two bars but must not be installed on the outer document/window');
     assert.match(css, /\.fi-ta-content-ctn\[data-admin-table-scroll-enhanced="true"\]:has\(\.fi-ta-table > thead\)/,
         'Adaptive max-height must have higher specificity than the original sticky-table rule');
     assert.doesNotMatch(source, /nativeScrollbarIsVisible|position: fixed|floatingScrollbar/);
-    return { status: 'passed', cases: 12, verification: 'deterministic DOM geometry, not a browser screenshot' };
+    return { status: 'passed', cases: 14, verification: 'deterministic DOM geometry, not a browser screenshot' };
 }

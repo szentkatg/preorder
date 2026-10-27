@@ -134,10 +134,10 @@
         if (changed) scheduleUpdate(true);
     }).observe(document.body, { childList: true, subtree: true });
 
-    // Capture includes independently scrolling modal bodies and relation managers.
-    document.addEventListener('scroll', event => {
-        if (!tables.has(event.target) && !event.target.closest?.('.admin-table-scrollbar')) scheduleUpdate();
-    }, { passive: true, capture: true });
+    // The bar is in normal flow, so it already moves with its table. Resizing
+    // the inner list on outer scrolling makes it grow against the user's wheel
+    // movement and delays the native hand-off at the list's top/bottom edge.
+    // Recalculate only for actual layout/data/viewport changes, never scrolling.
     window.addEventListener('resize', () => scheduleUpdate(true), { passive: true });
     window.visualViewport?.addEventListener('resize', () => scheduleUpdate(), { passive: true });
     document.addEventListener('livewire:navigated', () => scheduleUpdate(true));

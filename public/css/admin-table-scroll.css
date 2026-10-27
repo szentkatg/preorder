@@ -23,6 +23,8 @@
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-gutter: stable;
+    overscroll-behavior-y: auto;
+    scroll-behavior: auto;
 }
 
 .admin-table-scrollbar {

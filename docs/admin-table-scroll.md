@@ -8,6 +8,8 @@ A külön sáv addig látható, amíg vízszintes túlnyúlás van. Nem tűnik e
 
 Oszlopméretezés, oldalsáv-összecsukás, ablakméret-változás, szűrés, lapozás és Livewire-újrarajzolás után újraméretez. Az eltűnt táblázatokhoz tartozó sávokat eltávolítja; táblázatonként egy sávot tart fenn. A táblázat saját, tartalomfüggő magasságát nem kezeli újabb korlátozó nézetmagasságként, így nincs folyamatos zsugorodási ciklus.
 
+Sima belső/külső függőleges görgetéskor NEM méretez újra. A régi külső `scroll`-figyelő minden képkockán az új képernyőpozícióból számolt magasságot, ezért a lista részben a görgetéssel ellentétesen nőtt, és lassította a lista aljáról a külső oldalra történő átmenetet. A sáv normál elrendezési elemként magától együtt mozog a listával; nincs szükség külső görgetésfigyelőre vagy mesterséges egérgörgő-átirányításra. Az adatlista natív függőleges scroll chaining beállítása `auto`.
+
 ## Ellenőrzés
 
 - `tests/Browser/admin-table-scroll.mjs`: determinisztikus DOM-geometriás teszt a produkciós JS-en. Lapozó utáni hely, elférés, stabil magasság, kétirányú szinkron, rövid lista, átméretezés, Livewire-morph/újrarajzolás, több táblázat, eltávolítás, modális nézet és rejtett fülek. Ez nem valódi böngészős képernyőkép-ellenőrzés.
