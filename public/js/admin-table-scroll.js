@@ -1,181 +1,148 @@
 (() => {
-    if (window.__adminTableScrollEnhancer) {
-        return;
-    }
-
+    if (window.__adminTableScrollEnhancer) return;
     window.__adminTableScrollEnhancer = true;
 
-    const state = {
-        activeContainer: null,
-        containers: [],
-        frame: null,
-        syncingFromFloatingBar: false,
-    };
-
-    const floatingScrollbar = document.createElement('div');
-    floatingScrollbar.className = 'admin-table-floating-scrollbar';
-    floatingScrollbar.setAttribute('aria-hidden', 'true');
-
-    const floatingContent = document.createElement('div');
-    floatingContent.className = 'admin-table-floating-scrollbar__content';
-    floatingScrollbar.append(floatingContent);
-    document.body.append(floatingScrollbar);
-
+    const tables = new Map();
+    let frame = null;
+    let needsRescan = false;
+    let livewireHookRegistered = false;
     const resizeObserver = new ResizeObserver(() => scheduleUpdate());
 
-    const mutationObserver = new MutationObserver((mutations) => {
-        const hasTableMutation = mutations.some(
-            (mutation) => ! floatingScrollbar.contains(mutation.target),
-        );
-
-        if (hasTableMutation) {
-            scheduleUpdate(true);
-        }
-    });
-
-    function isWide(container) {
-        return container.scrollWidth > container.clientWidth + 1;
+    function setStyle(element, property, value) {
+        if (element.style.getPropertyValue(property) !== value) element.style.setProperty(property, value);
     }
 
-    function isInViewport(container) {
-        const rect = container.getBoundingClientRect();
-
-        return rect.bottom > 0 && rect.top < window.innerHeight;
-    }
-
-    function visibleHeight(container) {
-        const rect = container.getBoundingClientRect();
-        const top = Math.max(rect.top, 0);
-        const bottom = Math.min(rect.bottom, window.innerHeight);
-
-        return Math.max(0, bottom - top);
-    }
-
-    function registerContainer(container) {
-        if (container.dataset.adminTableScrollEnhanced === 'true') {
-            return;
-        }
-
+    function register(container) {
+        const host = container.closest('.fi-ta-main') || container.parentElement;
+        const scrollbar = document.createElement('div');
+        scrollbar.className = 'admin-table-scrollbar';
+        scrollbar.setAttribute('wire:ignore', '');
+        scrollbar.setAttribute('role', 'region');
+        scrollbar.setAttribute('aria-label', 'Táblázat vízszintes görgetése');
+        scrollbar.tabIndex = 0;
+        const content = document.createElement('div');
+        content.className = 'admin-table-scrollbar__content';
+        scrollbar.append(content);
+        // A real flow item AFTER pagination/filters: it can never cover the last row.
+        host.append(scrollbar);
         container.dataset.adminTableScrollEnhanced = 'true';
+        const entry = { container, host, scrollbar, content, syncing: false };
+        tables.set(container, entry);
 
-        const activate = () => {
-            state.activeContainer = container;
-            scheduleUpdate();
-        };
-
-        container.addEventListener('pointerenter', activate);
-        container.addEventListener('focusin', activate);
         container.addEventListener('scroll', () => {
-            if (! state.syncingFromFloatingBar && state.activeContainer === container) {
-                floatingScrollbar.scrollLeft = container.scrollLeft;
-            }
-
-            scheduleUpdate();
+            if (!entry.syncing) scrollbar.scrollLeft = container.scrollLeft;
         }, { passive: true });
+        scrollbar.addEventListener('scroll', () => {
+            entry.syncing = true;
+            container.scrollLeft = scrollbar.scrollLeft;
+            entry.syncing = false;
+        }, { passive: true });
+        return entry;
     }
 
     function scanContainers() {
-        const containers = Array.from(
-            document.querySelectorAll('.fi-ta-content-ctn'),
-        ).filter((container) => container.querySelector('.fi-ta-table > thead'));
-
+        const containers = Array.from(document.querySelectorAll('.fi-ta-content-ctn'))
+            .filter(container => container.querySelector('.fi-ta-table > thead'));
+        for (const [container, entry] of tables) {
+            if (!containers.includes(container)) {
+                entry.scrollbar.remove();
+                tables.delete(container);
+            }
+        }
         resizeObserver.disconnect();
-
-        containers.forEach((container) => {
-            registerContainer(container);
+        for (const container of containers) {
+            const entry = tables.get(container) || register(container);
+            // Morphing may strip client-added attributes without replacing the node.
+            container.dataset.adminTableScrollEnhanced = 'true';
+            // Livewire may remove the injected node or add pagination after it.
+            if (entry.scrollbar.parentElement !== entry.host || entry.host.lastElementChild !== entry.scrollbar) {
+                entry.host.append(entry.scrollbar);
+            }
             resizeObserver.observe(container);
-        });
-
-        state.containers = containers;
-
-        if (! containers.includes(state.activeContainer)) {
-            state.activeContainer = null;
+            resizeObserver.observe(container.querySelector('.fi-ta-table'));
+            for (const child of entry.host.children) {
+                if (child !== container && child !== entry.scrollbar) resizeObserver.observe(child);
+            }
         }
     }
 
-    function selectActiveContainer() {
-        const candidates = state.containers.filter(
-            (container) => isWide(container) && isInViewport(container),
-        );
-
-        if (candidates.includes(state.activeContainer)) {
-            return state.activeContainer;
+    function viewportBounds(container) {
+        let top = 0;
+        let bottom = window.visualViewport?.height || window.innerHeight;
+        // A relation table can be clipped by a modal's independently scrolling body.
+        for (let parent = container.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+            // Do not use the table card's own content-dependent height as a
+            // constraint: that would shrink it again on every ResizeObserver tick.
+            if (!parent.matches('.fi-modal-content')) continue;
+            const rect = parent.getBoundingClientRect();
+            top = Math.max(top, rect.top);
+            bottom = Math.min(bottom, rect.bottom);
         }
-
-        return candidates.sort(
-            (first, second) => visibleHeight(second) - visibleHeight(first),
-        )[0] ?? null;
+        return { top, bottom };
     }
 
-    function hideFloatingScrollbar() {
-        floatingScrollbar.classList.remove('is-visible');
-    }
-
-    function updateFloatingScrollbar() {
-        state.frame = null;
-
-        const container = selectActiveContainer();
-        state.activeContainer = container;
-
-        if (! container || window.innerWidth < 768) {
-            hideFloatingScrollbar();
-
+    function updateTable(entry) {
+        const { container, scrollbar, content } = entry;
+        // Hidden tabs/modals must not contribute zero-width measurements.
+        if (!container.getClientRects().length) {
+            scrollbar.classList.remove('is-visible');
             return;
         }
+        const wide = container.scrollWidth > container.clientWidth + 1;
+        scrollbar.classList.toggle('is-visible', wide);
 
         const rect = container.getBoundingClientRect();
-        const visibleLeft = Math.max(0, rect.left);
-        const visibleRight = Math.min(window.innerWidth, rect.right);
-        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
-        const nativeScrollbarIsVisible = rect.bottom > 0 && rect.bottom <= window.innerHeight;
+        const bounds = viewportBounds(container);
+        const barRect = scrollbar.getBoundingClientRect();
+        const footerHeight = Math.max(0, (wide ? barRect.top : entry.host.getBoundingClientRect().bottom) - rect.bottom);
+        const barHeight = wide ? barRect.height : 0;
+        const headHeight = container.querySelector('thead')?.getBoundingClientRect().height || 0;
+        const minimumHeight = Math.max(64, headHeight + 28);
+        const maximumHeight = Math.max(minimumHeight, bounds.bottom - bounds.top - 160);
+        const availableHeight = bounds.bottom - Math.max(bounds.top, rect.top) - footerHeight - barHeight - 8;
+        setStyle(container, '--admin-table-content-max-height', Math.floor(Math.max(minimumHeight, Math.min(maximumHeight, availableHeight))) + 'px');
 
-        if (visibleWidth <= 0 || nativeScrollbarIsVisible) {
-            hideFloatingScrollbar();
-
-            return;
+        if (wide) {
+            // Equal scroll ranges, even with a vertical scrollbar consuming table width.
+            setStyle(content, 'width', (scrollbar.clientWidth + Math.max(0, container.scrollWidth - container.clientWidth)) + 'px');
+            if (!entry.syncing) scrollbar.scrollLeft = container.scrollLeft;
         }
-
-        floatingContent.style.width = `${container.scrollWidth}px`;
-        floatingScrollbar.style.left = `${visibleLeft}px`;
-        floatingScrollbar.style.width = `${visibleWidth}px`;
-
-        if (! state.syncingFromFloatingBar) {
-            floatingScrollbar.scrollLeft = container.scrollLeft;
-        }
-
-        floatingScrollbar.classList.add('is-visible');
     }
 
     function scheduleUpdate(rescan = false) {
-        if (rescan) {
-            scanContainers();
-        }
-
-        if (state.frame !== null) {
-            return;
-        }
-
-        state.frame = window.requestAnimationFrame(updateFloatingScrollbar);
+        needsRescan ||= rescan;
+        if (frame !== null) return;
+        frame = window.requestAnimationFrame(() => {
+            frame = null;
+            if (needsRescan) {
+                needsRescan = false;
+                scanContainers();
+            }
+            for (const entry of tables.values()) updateTable(entry);
+        });
     }
 
-    floatingScrollbar.addEventListener('scroll', () => {
-        if (! state.activeContainer) {
-            return;
-        }
+    function registerLivewireHook() {
+        if (!window.Livewire || livewireHookRegistered) return;
+        livewireHookRegistered = true;
+        window.Livewire.hook('morphed', () => scheduleUpdate(true));
+    }
 
-        state.syncingFromFloatingBar = true;
-        state.activeContainer.scrollLeft = floatingScrollbar.scrollLeft;
-        state.syncingFromFloatingBar = false;
-    }, { passive: true });
+    new MutationObserver(mutations => {
+        const changed = mutations.some(mutation => !mutation.target.closest?.('.admin-table-scrollbar')
+            && [...mutation.addedNodes, ...mutation.removedNodes].some(node => node.nodeType !== 1 || !node.matches('.admin-table-scrollbar')));
+        if (changed) scheduleUpdate(true);
+    }).observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('scroll', () => scheduleUpdate(), { passive: true });
+    // Capture includes independently scrolling modal bodies and relation managers.
+    document.addEventListener('scroll', event => {
+        if (!tables.has(event.target) && !event.target.closest?.('.admin-table-scrollbar')) scheduleUpdate();
+    }, { passive: true, capture: true });
     window.addEventListener('resize', () => scheduleUpdate(true), { passive: true });
+    window.visualViewport?.addEventListener('resize', () => scheduleUpdate(), { passive: true });
     document.addEventListener('livewire:navigated', () => scheduleUpdate(true));
-
-    mutationObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-    });
+    document.addEventListener('livewire:init', registerLivewireHook);
+    registerLivewireHook();
 
     scanContainers();
     scheduleUpdate();

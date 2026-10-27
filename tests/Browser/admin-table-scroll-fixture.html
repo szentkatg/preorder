@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="hu">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Táblázat gördítősáv — elrendezési ellenőrzés</title>
+<link rel="stylesheet" href="../../public/css/admin-table-scroll.css">
+<style>
+    * { box-sizing:border-box }
+    body { font:14px/1.4 system-ui,sans-serif;margin:0;background:#f3f4f6;color:#111827 }
+    header { padding:16px 24px;background:#111827;color:white }
+    main { margin:20px 24px }
+    button { padding:5px 10px;margin:3px;border:1px solid #9ca3af;border-radius:5px;background:white;color:#111827 }
+    .fi-ta-ctn { border:1px solid #9ca3af;border-radius:8px;overflow:hidden;background:white }
+    .fi-ta-main { display:grid;min-width:0 }
+    .toolbar { padding:12px;border-bottom:1px solid #d1d5db }
+    .filters { height:130px;background:#e0e7ff;padding:10px }
+    .filters[hidden] { display:none }
+    .fi-ta-content-ctn { overflow:auto;min-width:0 }
+    .fi-ta-table { border-collapse:collapse;width:2400px }
+    .fi-ta-table th,.fi-ta-table td { padding:5px 14px;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap }
+    .fi-ta-table tbody tr:last-child { background:#dcfce7;font-weight:bold }
+    .fi-pagination { display:flex;justify-content:space-between;align-items:center;min-height:58px;padding:10px 14px;background:#e5e7eb }
+    .fi-modal-content { max-height:75vh;overflow-y:auto }
+    pre { font-size:12px;white-space:pre-wrap }
+</style>
+<header><strong>Gördítősáv-ellenőrzés — az utolsó sor és a lapozó is a gördítősáv felett marad</strong></header>
+<main>
+    <button id="last">Utolsó sor</button><button id="short">Rövid lista</button><button id="long">Hosszú lista</button>
+    <button id="filters">Szűrőpanel</button><button id="redraw">Újrarajzolás</button><button id="check">Elrendezés ellenőrzése</button>
+    <div class="fi-ta-ctn"><div class="fi-ta-main">
+        <div class="toolbar">Aktív szűrők, oszlopválasztó és kereső <div class="filters" hidden>Megnyitott szűrőpanel</div></div>
+        <div class="fi-ta-content-ctn"><table class="fi-ta-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+        <nav class="fi-pagination"><span>1–100 / 100 találat — lapozás</span><button>100 sor oldalanként</button></nav>
+    </div></div>
+    <pre id="qa"></pre>
+</main>
+<script src="../../public/js/admin-table-scroll.js"></script>
+<script>
+    const host = document.querySelector('.fi-ta-main');
+    const container = document.querySelector('.fi-ta-content-ctn');
+    document.querySelector('thead tr').innerHTML = Array.from({length:14},(_,i)=>`<th>${i+1}. oszlop — fejléc</th>`).join('');
+    function rows(count) {
+        document.querySelector('tbody').innerHTML = Array.from({length:count},(_,r)=>'<tr>'+Array.from({length:14},(_,c)=>`<td>${r===count-1?'UTOLSÓ SOR — ':''}${r+1}. sor / ${c+1}. oszlop</td>`).join('')+'</tr>').join('');
+    }
+    rows(100);
+    document.querySelector('#last').onclick=()=>{container.scrollTop=container.scrollHeight};
+    document.querySelector('#short').onclick=()=>rows(3);
+    document.querySelector('#long').onclick=()=>rows(100);
+    document.querySelector('#filters').onclick=()=>{document.querySelector('.filters').hidden=!document.querySelector('.filters').hidden};
+    document.querySelector('#redraw').onclick=()=>{document.querySelector('.fi-pagination').replaceWith(document.querySelector('.fi-pagination').cloneNode(true));rows(40)};
+    document.querySelector('#check').onclick=()=>{
+        const bar=host.querySelector('.admin-table-scrollbar'), b=bar.getBoundingClientRect(), f=host.querySelector('.fi-pagination').getBoundingClientRect();
+        document.querySelector('#qa').textContent=JSON.stringify({barCount:host.querySelectorAll('.admin-table-scrollbar').length,
+            afterFooter:b.top>=f.bottom-1,insideViewport:b.bottom<=innerHeight,contentHeight:container.clientHeight,
+            footerBottom:f.bottom,scrollbarTop:b.top,scrollbarBottom:b.bottom,viewportHeight:innerHeight,
+            matchingScrollRange:Math.abs((container.scrollWidth-container.clientWidth)-(bar.scrollWidth-bar.clientWidth))<=1},null,2);
+    };
+</script>
+</html>

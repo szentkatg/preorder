@@ -18,48 +18,79 @@
     }
 }
 
-.admin-table-floating-scrollbar {
-    position: fixed;
-    bottom: 0;
-    z-index: 20;
-    display: none;
-    height: 18px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    background: rgb(249 250 251);
-    border: 1px solid rgb(209 213 219);
-    border-bottom: 0;
-    border-radius: 6px 6px 0 0;
-    box-shadow: 0 -3px 8px rgb(0 0 0 / 10%);
+.fi-ta-content-ctn[data-admin-table-scroll-enhanced="true"]:has(.fi-ta-table > thead) {
+    max-height: var(--admin-table-content-max-height, max(12rem, calc(100dvh - 12rem)));
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
 }
 
-.admin-table-floating-scrollbar.is-visible {
+.admin-table-scrollbar {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+    display: none;
+    height: 20px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: auto;
+    scrollbar-color: rgb(107 114 128) rgb(229 231 235);
+    background: rgb(249 250 251);
+    border-top: 1px solid rgb(209 213 219);
+}
+
+.admin-table-scrollbar.is-visible {
     display: block;
 }
 
-.admin-table-floating-scrollbar__content {
+.admin-table-scrollbar__content {
     height: 1px;
 }
 
-.dark .admin-table-floating-scrollbar {
+.admin-table-scrollbar::-webkit-scrollbar {
+    height: 16px;
+}
+
+.admin-table-scrollbar::-webkit-scrollbar-track {
+    background: rgb(229 231 235);
+}
+
+.admin-table-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(107 114 128);
+    border: 3px solid rgb(229 231 235);
+    border-radius: 8px;
+}
+
+.admin-table-scrollbar:focus-visible {
+    outline: 2px solid rgb(59 130 246);
+    outline-offset: -2px;
+}
+
+.dark .admin-table-scrollbar {
     background: rgb(17 24 39);
     border-color: rgb(75 85 99);
     color-scheme: dark;
+    scrollbar-color: rgb(156 163 175) rgb(31 41 55);
 }
 
-@media (max-width: 767px) {
-    .admin-table-floating-scrollbar {
-        display: none !important;
-    }
+.dark .admin-table-scrollbar::-webkit-scrollbar-track {
+    background: rgb(31 41 55);
+}
+
+.dark .admin-table-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(156 163 175);
+    border-color: rgb(31 41 55);
 }
 
 @media print {
-    .fi-ta-content-ctn:has(.fi-ta-table > thead) {
+    .fi-ta-content-ctn:has(.fi-ta-table > thead),
+    .fi-ta-content-ctn[data-admin-table-scroll-enhanced="true"]:has(.fi-ta-table > thead) {
         max-height: none;
         overflow: visible;
     }
 
-    .admin-table-floating-scrollbar {
+    .admin-table-scrollbar {
         display: none !important;
     }
 }
