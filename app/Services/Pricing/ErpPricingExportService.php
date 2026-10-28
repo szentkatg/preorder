@@ -74,7 +74,7 @@ class ErpPricingExportService
             'currencies' => $currencies];
     }
 
-    public function rows(PricingProject $project, array $mapping, string $startDate, array $formulas = []): array
+    public function rows(PricingProject $project, array $mapping, string $startDate, array $formulas = [], array $rounding = []): array
     {
         $snapshot = $this->publication($project)->snapshot;
         if (! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $startDate)) {
@@ -98,6 +98,7 @@ class ErpPricingExportService
         $headers[1][5] = 'Elokalkulált beszerzési ár';
         $headers[2][5] = 'Lista ár';
         $selected = [];
+        $rounders = [];
         $publishedLists = collect($snapshot['lists'])->keyBy('id');
         $currencies = in_array(self::FORMULA, $mapping, true) ? Currency::where('active', true)->get()->keyBy('id') : collect();
         foreach (self::SLOTS as $slot => [$currency, $type, $label, $columns]) {
@@ -111,6 +112,12 @@ class ErpPricingExportService
                     $selected[$slot] = ErpPriceFormula::compile($formulas[$slot], $publishedLists->keys()->all(), $currencies->keys()->all());
                 } catch (DomainException $exception) {
                     throw ValidationException::withMessages(['formulas.'.$slot => $currency.' '.$label.': '.$exception->getMessage()]);
+                }
+                try {
+                    $rounders[$slot] = ErpFormulaRounding::from($rounding[$slot] ?? []);
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages(collect($exception->errors())
+                        ->mapWithKeys(fn ($messages, $field) => ['rounding.'.$slot.'.'.$field => $messages])->all());
                 }
             } elseif ($options->isNotEmpty() && (! is_scalar($id) || ! $options->has((string) $id))) {
                 throw ValidationException::withMessages(['mapping.'.$slot => 'Válaszd ki a publikált '.$currency.' '.$label.' árlistát.']);
@@ -171,8 +178,7 @@ class ErpPricingExportService
                                 throw new DomainException('Hiányzó publikált ár: '.$publishedLists->get($listId)['code'].'.');
                             }
                         }
-                        $value = $selection->evaluate($productPrices->pluck('price', 'price_list_id')->all(), $rates)
-                            ->toScale(2, RoundingMode::HALF_UP);
+                        $value = $rounders[$slot]->apply($selection->evaluate($productPrices->pluck('price', 'price_list_id')->all(), $rates));
                         if ($value->isLessThanOrEqualTo(0) || $value->isGreaterThan('99999999999.99')) {
                             throw new DomainException('A képlet eredménye két tizedesre kerekítve csak pozitív, legfeljebb 99 999 999 999,99 ár lehet.');
                         }

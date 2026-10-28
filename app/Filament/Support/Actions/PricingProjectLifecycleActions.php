@@ -54,11 +54,11 @@ class PricingProjectLifecycleActions
             ->visible(fn (PricingProject $record) => Gate::allows('exportErp', $record) && Gate::allows('view', $record) && $record->publications()->exists())
             ->authorize(fn (PricingProject $record) => Gate::allows('exportErp', $record) && Gate::allows('view', $record))
             ->modalWidth(Width::SevenExtraLarge)
-            ->modalDescription('A legutóbb publikált árakból, fix 30 oszloppal. Forrásként árlista vagy építőelemekből összeállított képlet választható. Az Eredeti és Lista ár azonos. A képleteredmény 2 tizedesre kerekítve kerül az Excelbe; az árlistákat nem módosítjuk.')
+            ->modalDescription('A legutóbb publikált árakból, fix 30 oszloppal. Forrásként árlista vagy kerekíthető képlet választható. Az Eredeti és Lista ár azonos; az árlistákat nem módosítjuk. A beállításokat felhasználónként, árprojektenként megjegyezzük, a Mégsem gombbal bezáráskor is. A kezdő dátum mindig a mai nap.')
             ->schema(fn (PricingProject $record): array => ErpPricingExportForm::make($record))
             ->action(function (PricingProject $record, array $data, Action $action) {
                 try {
-                    $rows = app(ErpPricingExportService::class)->rows($record, $data['mapping'] ?? [], $data['start_date'], $data['formulas'] ?? []);
+                    $rows = app(ErpPricingExportService::class)->rows($record, $data['mapping'] ?? [], $data['start_date'], $data['formulas'] ?? [], $data['rounding'] ?? []);
 
                     return Excel::download(new ErpPricingExport($rows), 'ERP-arak-'.$record->id.'-'.now()->format('Ymd-His').'.xlsx');
                 } catch (ValidationException $exception) {
