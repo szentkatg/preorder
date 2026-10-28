@@ -88,14 +88,17 @@ class BulkUpdateProductsAction
         $input = match ($definition['type']) {
             'relation' => Select::make('value')->options(fn () => ProductBulkUpdateService::options($field))->searchable()->preload(),
             'boolean' => Select::make('value')->options([1 => 'Igen', 0 => 'Nem']),
-            'date' => DatePicker::make('value')->native(false)->displayFormat('Y.m.d.'),
+            'date' => DatePicker::make('value')->native(false)->displayFormat('Y.m.d.')->format('Y-m-d'),
             'textarea' => Textarea::make('value')->rows(3)->maxLength(16000),
             'integer' => TextInput::make('value')->integer(),
             default => TextInput::make('value')->maxLength(255),
         };
 
+        // A non-native DatePicker validates its raw Y-m-d H:i:s state first,
+        // then casts to Y-m-d for dehydration. Keep its built-in date rule here;
+        // the service strictly validates the resulting date-only value on save.
         return $input->label('Új érték')->required($definition['required'] ?? false)
-            ->rules(ProductBulkUpdateService::valueRules($field));
+            ->rules($definition['type'] === 'date' ? [] : ProductBulkUpdateService::valueRules($field));
     }
 
     private static function summary(array $changes): string

@@ -18,6 +18,8 @@ use App\Models\User;
 use App\Services\ProductBulkUpdateService;
 use DomainException;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
+use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Schema;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +28,7 @@ use Illuminate\Support\ViewErrorBag;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Livewire\Mechanisms\ExtendBlade\ExtendBlade;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -128,6 +131,81 @@ class ProductBulkUpdateTest extends TestCase
         $this->assertSame('2027-10-01', $this->first->fresh()->promised_delivery_date);
     }
 
+    #[DataProvider('calendarDateStates')]
+    public function test_calendar_internal_date_passes_next_step_and_saves_only_the_date(?string $rawState, ?string $expected): void
+    {
+        $this->first->update(['promised_delivery_date' => '2026-12-01']);
+        $this->second->update(['promised_delivery_date' => '2026-12-01']);
+        $untouched = $this->untouched->fresh()->getAttributes();
+        $page = Livewire::test(ListProducts::class)->mountTableBulkAction('bulkUpdateProducts', [$this->first, $this->second]);
+        $key = array_key_first($page->instance()->mountedActions[0]['data']['changes']);
+        $path = 'mountedActions.0.data.changes.'.$key;
+        // The non-native calendar displays Y.m.d. but sends Y-m-d H:i:s.
+        // setTableBulkActionData() alone bypasses this raw browser-state difference.
+        $page->set($path.'.field', 'promised_delivery_date')->set($path.'.value', $rawState);
+        $schema = $page->instance()->getSchema('mountedActionSchema0');
+        $picker = collect($schema->getFlatFields())->first(fn ($field) => $field instanceof DatePicker);
+        $this->assertInstanceOf(DatePicker::class, $picker);
+        $this->assertSame('Y.m.d.', $picker->getDisplayFormat());
+        $this->assertSame('Y-m-d H:i:s', $picker->getInternalFormat());
+        $this->assertSame('Y-m-d', $picker->getFormat());
+        $wizard = collect($schema->getFlatComponents())->first(fn ($component) => $component instanceof Wizard);
+        $this->assertInstanceOf(Wizard::class, $wizard);
+        $page->call('callSchemaComponentMethod', $wizard->getKey(), 'nextStep', [0])
+            ->assertHasNoErrors()->assertDispatched('next-wizard-step');
+        $this->assertSame('2026-12-01', $this->first->fresh()->promised_delivery_date);
+        $page->set('mountedActions.0.data.confirmed', true);
+        $data = $page->instance()->getSchema('mountedActionSchema0')->getState();
+        $this->assertSame($expected, array_values($data['changes'])[0]['value']);
+        $page->callMountedTableBulkAction()
+            ->assertHasNoTableBulkActionErrors()->assertSet('mountedActions', []);
+        $this->assertSame($expected, $this->first->fresh()->promised_delivery_date);
+        $this->assertSame($expected, $this->second->fresh()->promised_delivery_date);
+        $this->assertSame($untouched, $this->untouched->fresh()->getAttributes());
+    }
+
+    public static function calendarDateStates(): array
+    {
+        return [
+            'calendar midnight' => ['2027-09-30 00:00:00', '2027-09-30'],
+            'calendar time component' => ['2027-09-30 23:59:59', '2027-09-30'],
+            'leap day' => ['2028-02-29 00:00:00', '2028-02-29'],
+            'ISO date' => ['2027-09-30', '2027-09-30'],
+            'clear date' => [null, null],
+        ];
+    }
+
+    #[DataProvider('invalidCalendarDates')]
+    public function test_invalid_calendar_date_is_rejected_before_confirmation_and_save(string $rawState): void
+    {
+        $before = Product::orderBy('id')->get()->map->getAttributes()->all();
+        $page = Livewire::test(ListProducts::class)->mountTableBulkAction('bulkUpdateProducts', [$this->first, $this->second]);
+        $key = array_key_first($page->instance()->mountedActions[0]['data']['changes']);
+        $path = 'mountedActions.0.data.changes.'.$key;
+        $page->set($path.'.field', 'promised_delivery_date')->set($path.'.value', $rawState);
+        $wizard = collect($page->instance()->getSchema('mountedActionSchema0')->getFlatComponents())
+            ->first(fn ($component) => $component instanceof Wizard);
+        $page->call('callSchemaComponentMethod', $wizard->getKey(), 'nextStep', [0])
+            ->assertHasErrors([$path.'.value' => 'date'])->assertNotDispatched('next-wizard-step');
+        $page->set('mountedActions.0.data.confirmed', true)->callMountedTableBulkAction()
+            ->assertHasTableBulkActionErrors(['changes.'.$key.'.value' => 'date']);
+        $this->assertSame($before, Product::orderBy('id')->get()->map->getAttributes()->all());
+    }
+
+    public static function invalidCalendarDates(): array
+    {
+        return [
+            ['2027-02-30 00:00:00'],
+            ['2027-02-29 00:00:00'],
+        ];
+    }
+
+    public function test_service_still_requires_a_canonical_date_after_calendar_dehydration(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->update([['field' => 'promised_delivery_date', 'value' => '2027-09-30 00:00:00']]);
+    }
+
     public function test_changing_field_clears_previous_value_and_relation_choices_are_validated(): void
     {
         $brand = Brand::create(['code' => 'NEW', 'name' => 'Másik márka', 'active' => true]);
@@ -219,6 +297,7 @@ class ProductBulkUpdateTest extends TestCase
     public function test_invalid_date_and_missing_related_record_are_rejected(): void
     {
         foreach ([['field' => 'promised_delivery_date', 'value' => '2027-02-30'],
+            ['field' => 'promised_delivery_date', 'value' => 'not-a-date'],
             ['field' => 'brand_id', 'value' => 98765], ['field' => 'name_hu', 'value' => ''],
             ['field' => 'active', 'value' => 'not-a-bool'], ['field' => 'catalog_sort', 'value' => -1]] as $change) {
             try {

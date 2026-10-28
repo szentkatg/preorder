@@ -177,6 +177,35 @@ publikált árlistatételek és publikációs snapshotok nem íródnak felül.
 Nincs automatikus újrakalkulálás. Modellkód/méretsor változásakor az SKU-kat
 szükség esetén a meglévő **SKU-k szinkronizálása** művelettel kell frissíteni.
 
+### Tömeges dátummódosítás javítása (2026-10-28)
+
+A nem natív dátumválasztó pontozott `Y.m.d.` dátumot jelenít meg, belül viszont
+`Y-m-d H:i:s` állapotot küld. A korábbi, további `date_format:Y-m-d` mezőszabály
+ezt már a **Tovább** gombnál elutasította. Nem a Windows dátumbeállítása okozta.
+
+A dátumválasztó most a saját `date` szabályával ellenőrzi a belső állapotát,
+majd explicit `Y-m-d` formátumban adja át az értéket mentéshez. A szolgáltatás
+szigorú `Y-m-d` ellenőrzése változatlan; lehetetlen dátum nem menthető.
+A kijelölés, megerősítés, jogosultság és tranzakciós mentés működése megmarad.
+Az üres dátum továbbra is a kijelölt termékek dátumának törlését jelenti.
+
+A regressziós tesztek a naptár valódi belső dátum/idő állapotát küldik,
+ellenőrzik a varázsló Tovább lépését, a dátumra alakítást, a szökőnapot,
+a törlést, a hibás dátum elutasítását és a nem kijelölt termék változatlanságát.
+Élő böngészős vizuális ellenőrzést ez nem helyettesít.
+
+Ehhez a javításhoz sincs migráció, Composer-/npm-változás vagy kézi feltöltés.
+A javítás telepítése külön kérésre történik:
+
+```powershell
+git add -- app/Filament/Support/Actions/BulkUpdateProductsAction.php tests/Feature/Admin/ProductBulkUpdateTest.php docs/pricing-project-products.md
+git commit -m "Fix calendar date validation in product bulk updates"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File .\infrastructure\scripts\deploy-nas.ps1
+```
+
+Az éles rendszerre csak külön jóváhagyott és integrált kiadás részeként kerülhet.
+
 **Exchange Rates / Árfolyamok:** a pénznem ID helyett a pénznemkód és a
 fordítási táblán keresztül feloldott pénznév látható. Fordítás hiányában a
 meglévő törzsnév / régi name_hu/name_en érték a tartalék. Többválasztós
