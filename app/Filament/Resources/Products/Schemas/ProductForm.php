@@ -14,6 +14,8 @@ class ProductForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
+            ->dense()
             ->components([
                 Select::make('season_id')
                     ->label('Szezon')
@@ -21,7 +23,7 @@ class ProductForm
                     ->required(),
 
                 Select::make('item_main_group_id')
-                    ->label('ItemMainGroup')
+                    ->label('Főcsoport')
                     ->relationship('itemMainGroup', 'name')
                     ->required(),
 
@@ -39,8 +41,7 @@ class ProductForm
                     ->required(),
                 Textarea::make('material_composition')
                     ->label('Anyagösszetétel')
-                    ->rows(3)
-                    ->columnSpanFull(),
+                    ->rows(1),
 
                 Select::make('brand_id')
                     ->label('Márka')

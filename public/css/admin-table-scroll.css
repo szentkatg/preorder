@@ -27,6 +27,15 @@
     scroll-behavior: auto;
 }
 
+/* Product colors follow normal page scrolling. A table below a tall form must
+   not stay clamped to the few pixels left at its initial viewport position. */
+[data-product-colors-natural-scroll] .fi-ta-content-ctn:has(.fi-ta-table > thead),
+[data-product-colors-natural-scroll] .fi-ta-content-ctn[data-admin-table-scroll-enhanced="true"]:has(.fi-ta-table > thead) {
+    max-height: none;
+    overflow-y: hidden;
+    scrollbar-gutter: auto;
+}
+
 .admin-table-scrollbar {
     position: relative;
     flex: 0 0 auto;

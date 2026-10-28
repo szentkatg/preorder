@@ -10,11 +10,18 @@ Oszlopméretezés, oldalsáv-összecsukás, ablakméret-változás, szűrés, la
 
 Sima belső/külső függőleges görgetéskor NEM méretez újra. A régi külső `scroll`-figyelő minden képkockán az új képernyőpozícióból számolt magasságot, ezért a lista részben a görgetéssel ellentétesen nőtt, és lassította a lista aljáról a külső oldalra történő átmenetet. A sáv normál elrendezési elemként magától együtt mozog a listával; nincs szükség külső görgetésfigyelőre vagy mesterséges egérgörgő-átirányításra. Az adatlista natív függőleges scroll chaining beállítása `auto`.
 
+## Termékűrlap alatti Színek lista
+
+A termék létrehozása, szerkesztése és megtekintése kompakt űrlapot használ: kis képernyőn egy, közepes képernyőn két, széles képernyőn négy oszlopot, kisebb mezőközökkel. Az anyagösszetétel szövegterülete kezdetben egysoros; továbbra is több sor és hosszú szöveg menthető bele.
+
+A termék Színek kapcsolt listáján a `data-product-colors-natural-scroll` jelző kikapcsolja a közös belső magasságkorlátot. A lista az aktuális lap összes sorához szükséges magasságot kapja, és az oldal görgetésével együtt mozog. Így a termékadatok kifuthatnak a képből, és a lista nem szorul a kezdeti képernyőpozícióján megmaradt egy-két sorba. A lapozás és az esetleg szükséges külön vízszintes gördítősáv megmarad. A többi listára nem vonatkozik ez a kivétel; új külső görgetésfigyelő nem került be.
+
 ## Ellenőrzés
 
 - `tests/Browser/admin-table-scroll.mjs`: determinisztikus DOM-geometriás teszt a produkciós JS-en. Lapozó utáni hely, elférés, stabil magasság, kétirányú szinkron, rövid lista, átméretezés, Livewire-morph/újrarajzolás, több táblázat, eltávolítás, modális nézet és rejtett fülek. Ez nem valódi böngészős képernyőkép-ellenőrzés.
 - `tests/Browser/admin-table-scroll-fixture.html`: helyben megnyitható, fiktív adatos vizuális tesztlap, a valódi közös CSS/JS használatával. Az „Utolsó sor” és az „Elrendezés ellenőrzése” gombbal a lapozó/sáv helye ellenőrizhető. Rövid/hosszú lista, szűrőpanel és újrarajzolás külön kipróbálható. Nem kapcsolódik adatbázishoz.
 - Az admin jogosultsági és termékenkénti árkezelési regressziós tesztek ellenőrzik a közös assetek és az érintetlen modális elrendezés betöltését.
+- `tests/Feature/Admin/ProductEditorLayoutTest.php`: létrehozó/szerkesztő/megtekintő űrlap sűrűsége, reszponzív oszlopszáma, valamennyi mező megőrzése; teljes anyagösszetétel és dátum mentése; kapcsolt színek szerkesztése, exportja, lapozása és a CSS-kivétel hatóköre. Ezek nem valódi böngészős görgetési vagy képernyőképes tesztek.
 
 ## Kiadás
 

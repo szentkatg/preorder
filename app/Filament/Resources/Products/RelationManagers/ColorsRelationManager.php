@@ -21,6 +21,8 @@ class ColorsRelationManager extends RelationManager
 {
     protected static string $relationship = 'colors';
 
+    protected static ?string $title = 'Színek';
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -48,6 +50,7 @@ class ColorsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         $table = $table
+            ->extraAttributes(['data-product-colors-natural-scroll' => 'true'], merge: true)
             ->columns([
                 TextColumn::make('code')
                     ->label('Kód')
@@ -66,7 +69,7 @@ class ColorsRelationManager extends RelationManager
                     ->boolean(),
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()->label('Új szín'),
             ])
             ->recordActions([
                 EditAction::make(),
