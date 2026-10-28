@@ -65,8 +65,8 @@ class PricingCalculationErrorsTest extends TestCase
         $this->signInWith(['DeleteAny:PricingCalculationError']);
         $selected = collect([$this->error('cost'), $this->error('distributor')]);
         $other = $this->error('retail');
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $this->project->season_id, 'item_main_group_id' => $group->id,
             'model_code' => 'BAG27', 'name_hu' => 'Táska', 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id,

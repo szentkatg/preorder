@@ -42,8 +42,8 @@ class PricingCostDoubleClickTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Teszt', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'SUPPLIER', 'name' => 'Teszt beszállító', 'country_code' => 'CN', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST-COST', 'name_hu' => 'Teszt modell', 'active' => true]);

@@ -45,13 +45,13 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->user = $this->superAdmin();
         $this->actingAs($this->user);
         $season = Season::create(['code' => 'DEC', 'name' => 'Tizedes teszt', 'active' => true]);
-        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollar', 'name_hu' => 'Dollár', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'DEC', 'name_hu' => 'Teszt', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollar', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'DEC', 'name' => 'Teszt', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'DEC-001', 'name_hu' => 'Tizedes termék', 'active' => true]);
         $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Tizedes teszt', 'status' => 'active', 'active' => true]);
-        $list = PriceList::create(['code' => 'DEC-HUF', 'name_hu' => 'Kisker teszt', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $list = PriceList::create(['code' => 'DEC-HUF', 'name' => 'Kisker teszt', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $project->id, 'product_id' => $product->id,
             'currency_id' => $huf->id, 'purchase_currency_id' => $usd->id, 'price_type' => 'cost',
             'purchase_price' => '8.8', 'exchange_rate' => '380.123456', 'calculated_price' => '123.4567',

@@ -52,15 +52,15 @@ class PricingProjectProductsTest extends TestCase
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Első ütem', 'status' => 'draft', 'active' => true]);
         foreach (['product', 'other'] as $key) {
             $brand = Brand::create(['code' => $key, 'name' => $key, 'active' => true]);
-            $sheet = OrderSheetType::create(['code' => $key, 'name_hu' => $key, 'active' => true]);
+            $sheet = OrderSheetType::create(['code' => $key, 'name' => $key, 'active' => true]);
             $this->{$key} = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
                 'model_code' => $key, 'name_hu' => $key, 'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id, 'active' => true]);
         }
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'SUP', 'name' => 'Szállító', 'short_name' => 'Szállító', 'active' => true]);
         foreach ([$this->product, $this->other] as $product) {
             ProductPurchasePrice::create(['product_id' => $product->id, 'supplier_id' => $supplier->getKey(),

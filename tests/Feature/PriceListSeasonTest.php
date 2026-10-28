@@ -49,8 +49,8 @@ class PriceListSeasonTest extends TestCase
         config(['app.key' => 'base64:'.base64_encode(str_repeat('test', 8))]);
         $this->firstSeason = Season::create(['code' => 'S27', 'name' => '2027', 'active' => true, 'visible_to_partners' => true]);
         $this->secondSeason = Season::create(['code' => 'S28', 'name' => '2028', 'active' => true, 'visible_to_partners' => true]);
-        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $this->firstSeason->id,
             'item_main_group_id' => $group->id, 'model_code' => 'B10024W27', 'name_hu' => 'Teszt termék', 'active' => true]);
         $this->list = PriceList::create($this->formData('Retail_HU'));
@@ -82,17 +82,17 @@ class PriceListSeasonTest extends TestCase
             ->assertSee('Ez az árlistakód már létezik.');
 
         $this->assertSame(1, PriceList::count());
-        $this->assertSame('Magyar kisker', $this->list->fresh()->name_hu);
+        $this->assertSame('Magyar kisker', $this->list->fresh()->name);
     }
 
     public function test_edit_can_keep_its_code_but_cannot_use_another_lists_code(): void
     {
         Livewire::test(EditPriceList::class, ['record' => $this->list->getRouteKey()])
             ->assertFormFieldDoesNotExist('season_id')
-            ->fillForm(['name_hu' => 'Frissített név'])
+            ->fillForm(['name' => 'Frissített név'])
             ->call('save')
             ->assertHasNoFormErrors();
-        $this->assertSame('Frissített név', $this->list->fresh()->name_hu);
+        $this->assertSame('Frissített név', $this->list->fresh()->name);
 
         PriceList::create($this->formData('Retail_OTHER'));
         Livewire::test(EditPriceList::class, ['record' => $this->list->getRouteKey()])
@@ -180,7 +180,7 @@ class PriceListSeasonTest extends TestCase
 
     private function formData(string $code): array
     {
-        return ['code' => $code, 'name_hu' => 'Magyar kisker', 'name_en' => 'Hungarian retail',
+        return ['code' => $code, 'name' => 'Magyar kisker',
             'type' => 'retail', 'currency_id' => $this->currency->id, 'active' => true];
     }
 

@@ -366,7 +366,7 @@ class PricingCostCalculations extends Page implements HasTable
         if (filled($record->product?->item_main_group_id)) {
             $options[PricingParameter::SCOPE_ITEM_MAIN_GROUP] =
                 'Főcsoport - '.(
-                    $record->product->itemMainGroup?->name_hu
+                    $record->product->itemMainGroup?->name
                     ?: $record->product->itemMainGroup?->code
                     ?: $record->product->item_main_group_id
                 );

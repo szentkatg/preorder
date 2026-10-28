@@ -11,9 +11,9 @@ Az admin felületen: **Árképzés → Partner árlista készítése**.
    külön feltüntetjük a saját pénznemüket, outletnél az outlet megnevezést is.
 3. Magyar vagy angol nyelv és Excel/PDF formátum kiválasztása.
 4. Márkák, főcsoportok és katalóguscsoportok szűrése. Mindhárom kereshető,
-   kompakt, egymás alatti, függőlegesen görgethető jelölőnégyzetes lista,
-   **Mindent kijelöl / Kijelölés visszavonása**
-   lehetőséggel. Több érték kipipálható; üresen az összeset jelenti.
+   többválasztós legördülő; üresen az összeset jelenti. A választható elemek
+   csak a legördülő megnyitásakor jelennek meg. Sok kijelölt érték esetén
+   a címkék függőlegesen görgethetők, nem növelik korlátlanul az űrlapot.
    A különböző szűrők együtt érvényesülnek. A katalóguscsoport-választó a
    többi termékszűrőt is követi: bővítéskor megőrzi az érvényes jelöléseket,
    szűkítéskor csak a már nem elérhető csoportok kijelölését törli.
@@ -22,6 +22,12 @@ Az admin felületen: **Árképzés → Partner árlista készítése**.
 5. **Terméklista betöltése**: minden találat alapból kijelölt, az összes
    oldalon, nem csak a megjelenített 100 sor. A soronkénti jelölők,
    **Mindent kijelöl** és **Kijelölés visszavonása** módosítják a kijelölést.
+   Sikeres betöltés után a beállításpanel összecsukódik. Fent rövid összefoglaló
+   mutatja az alkalmazott feltételeket; a **Beállítások módosítása** gombbal
+   újranyitható, az értékek és kijelölések elvesztése nélkül. Hibás kitöltésnél
+   a panel nyitva marad. Széles képernyőn a nyolc beállítás két sorban látszik.
+   A részletes magyarázatok információikonok és az exportlista alatti
+   **Tudnivalók az exportálásról** mögé kerültek.
 6. **Árlista készítése** letölti a kiválasztott termékeket. A táblázatban
    további keresés/rendezés használható; a fájl a jelenlegi szűrésen belül
    kijelölt termékekből, katalógussorrendben készül. Az űrlap feltételeinek
@@ -44,8 +50,9 @@ exportot nem korlátozza. Egy fájl legfeljebb 10 000 terméket tartalmazhat.
 - Fejlécek: `lang/hu/price_list.php`, `lang/en/price_list.php`.
 - Márka, főcsoport, rendelőlaptípus és szezon neve: `translations`, a
   meglévő névmezőkre való visszaeséssel. Terméknév és katalóguscsoport:
-  `name_hu/name_en`, illetve `catalog_group_name_hu/catalog_group_name_en`.
-  Hiányzó megfelelő nyelvű névnél a másik nyelvű név látszik.
+  a közös `name_hu`, illetve `catalog_group_name_hu` érték minden exportnyelven.
+  Ezek nem fordítható adatok; az export nyelve csak a fejléceket és a fordítható
+  törzsneveket változtatja meg.
 - Az exportnyelv az admin felület locale-ját nem változtatja meg.
 
 ## Fájlok
@@ -169,6 +176,33 @@ powershell.exe -NoProfile -File infrastructure/scripts/deploy-nas.ps1
 ```
 
 Éles/WePanel kihelyezés csak külön jóváhagyott éles kiadás részeként:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+### Kompakt, összecsukható beállításpanel (2026-10-28)
+
+A három termékszűrő kereshető többválasztós legördülő. Betöltés után a
+beállítások automatikusan összecsukódnak; a kiválasztás/export eszköztár közvetlenül
+a táblázat fölött marad. Az összefoglaló az alkalmazott, nem a még be nem töltött
+feltételeket mutatja. Nyitás/zárás nem változtatja meg a termékkijelölést,
+keresést vagy rendezést. Feltételmódosítás továbbra is új betöltést igényel.
+A panel nyitásakor/zárásakor a lista görgethető magassága újramérődik.
+
+Ehhez **nincs migráció, Composer install, npm build, manuális fájlfeltöltés vagy
+további üzemeltetői beállítás**. Kihelyezés csak külön kérésre:
+
+```powershell
+git add -- app/Filament/Pages/PartnerPriceListExport.php resources/views/filament/pages/partner-price-list-export.blade.php tests/Feature/PartnerPriceListExportTest.php docs/partner-price-list-export.md
+git commit -m "Compact partner price list settings and collapse loaded filters"
+git push origin feature/pricing-module
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-nas.ps1
+```
+
+Éles/WePanel kihelyezés kizárólag a külön jóváhagyott éles kiadás részeként:
 
 ```bash
 git pull --ff-only

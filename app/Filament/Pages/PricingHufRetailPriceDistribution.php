@@ -51,7 +51,7 @@ class PricingHufRetailPriceDistribution extends Page implements HasTable
                 TextColumn::make('pricingProject.name')->label('Árprojekt'),
                 TextColumn::make('priceList.code')->label('Árlista'),
                 TextColumn::make('itemMainGroup.code')->label('Főcsoport kód'),
-                TextColumn::make('itemMainGroup.name_hu')->label('Főcsoport név'),
+                TextColumn::make('itemMainGroup.name')->label('Főcsoport név'),
                 TextColumn::make('final_price')->label('Végleges kisker HUF')->numeric()
                     ->formatStateUsing(fn ($state) => rtrim(rtrim(number_format((float) $state, 4, ',', ' '), '0'), ',')),
                 TextColumn::make('model_count')->label('Modellek száma')->numeric(decimalPlaces: 0),
@@ -61,7 +61,7 @@ class PricingHufRetailPriceDistribution extends Page implements HasTable
                 SelectFilter::make('price_list_id')->label('Árlista')->relationship('priceList', 'code',
                     fn (Builder $query) => $query->where('type', 'retail')->whereHas('currency', fn ($currency) => $currency->where('code', 'HUF')))
                     ->multiple()->searchable()->preload(),
-                SelectFilter::make('item_main_group_id')->label('Főcsoport')->relationship('itemMainGroup', 'name_hu')
+                SelectFilter::make('item_main_group_id')->label('Főcsoport')->relationship('itemMainGroup', 'name')
                     ->multiple()->searchable()->preload(),
             ])
             ->defaultSort('final_price')->recordActions([])->recordAction(null)->recordUrl(null)

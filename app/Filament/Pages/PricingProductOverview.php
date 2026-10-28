@@ -112,7 +112,7 @@ class PricingProductOverview extends Page implements HasTable
             ->whereHas('product', fn ($q) => $q->where('active', true))->with(['product.itemMainGroup', 'product.brand', 'color', 'supplier', 'purchaseCurrency', 'pricingProject']))
             ->select('pricing_calculation_rows.*');
         $columns = [TextColumn::make('product.model_code')->label('Modell kód'), TextColumn::make('product.name_hu')->label('Modell név'),
-            TextColumn::make('product.itemMainGroup.name_hu')->label('Főcsoport'), TextColumn::make('product.catalog_group_name_hu')->label('Katalóguscsoport'),
+            TextColumn::make('product.itemMainGroup.name')->label('Főcsoport'), TextColumn::make('product.catalog_group_name_hu')->label('Katalóguscsoport'),
             TextColumn::make('product.brand.name')->label('Márka'), TextColumn::make('color.name_hu')->label('Szín'),
             TextColumn::make('supplier.erp_partner_code')->label('Beszállító kód'), TextColumn::make('supplier.name')->label('Beszállító'),
             TextColumn::make('purchaseCurrency.code')->label('Beszerzési pénznem')];

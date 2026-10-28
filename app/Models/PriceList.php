@@ -3,15 +3,17 @@
 namespace App\Models;
 
 use App\Services\Pricing\RetailCalculationDependencyService;
+use App\Traits\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 class PriceList extends Model
 {
+    use HasTranslations;
+
     protected $fillable = [
         'code',
-        'name_hu',
-        'name_en',
+        'name',
         'type',
         'currency_id',
         'retail_price_list_id',
@@ -94,6 +96,6 @@ class PriceList extends Model
 
     public function __toString(): string
     {
-        return $this->code.' - '.$this->name_hu;
+        return $this->code.' - '.$this->translate('name');
     }
 }

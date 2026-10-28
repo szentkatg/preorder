@@ -7,35 +7,50 @@ use App\Models\PriceListItem;
 use App\Models\Product;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithPreCalculateFormulas;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Style\Protection;
-use Maatwebsite\Excel\Concerns\WithPreCalculateFormulas;
 
-class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements FromArray, WithEvents, ShouldAutoSize, WithCustomValueBinder, WithPreCalculateFormulas
+class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithPreCalculateFormulas
 {
     protected array $unavailableCells = [];
+
     protected array $editableCells = [];
+
     protected array $headerRows = [];
+
     protected array $groupTitleRows = [];
+
     protected array $blockRanges = [];
+
     protected array $totalQuantityCells = [];
+
     protected array $wholesaleValueCells = [];
+
     protected array $retailValueCells = [];
+
     protected array $headerRanges = [];
+
     protected array $blockLabelRanges = [];
+
     protected array $mergedBlockLabelRanges = [];
+
     protected array $hiddenColumnRanges = [];
+
     protected array $integerQuantityRanges = [];
+
     protected array $blockBoundaryRanges = [];
+
     protected array $sizeHeaderRanges = [];
 
     protected $orders;
@@ -113,7 +128,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $this->integerQuantityRanges = [];
         $this->blockBoundaryRanges = [];
         $this->sizeHeaderRanges = [];
-        
+
         $rows = [];
 
         $this->orders = $this->orders->load([
@@ -148,7 +163,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
             ->groupBy('sku_id')
             ->map(fn ($items) => (int) $items->sum('quantity'))
             ->toArray();
-        
+
         $allowAssortmentOrder = $this->orders
             ->flatMap(fn (Order $order) => $order->items)
             ->contains(fn ($item): bool => $item->sku?->assortmentComponents?->isNotEmpty());
@@ -170,7 +185,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $rows[] = [
             '',
             __('partner.price_list'),
-            $order->priceList?->name_hu,
+            $order->priceList?->translate('name', $this->translationLanguageId($order)),
             __('partner.currency'),
             $order->priceList?->currency?->code,
         ];
@@ -212,27 +227,27 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
 
                 $this->groupTitleRows[] = $groupTitleRow;
 
-            $sizes = $matrixProducts
-                ->pluck('sizeRange')
-                ->filter()
-                ->flatMap(fn ($sizeRange) => $sizeRange->items)
-                ->filter(fn ($item) => $item->size)
-                ->map(fn ($item) => [
-                    'id' => (int) $item->size->id,
-                    'code' => (string) $item->size->code,
-                    'sort_order' => (int) (
-                        $item->size->order
-                        ?? $item->size->sort_order
-                        ?? $item->sort_order
-                        ?? 0
-                    ),
+                $sizes = $matrixProducts
+                    ->pluck('sizeRange')
+                    ->filter()
+                    ->flatMap(fn ($sizeRange) => $sizeRange->items)
+                    ->filter(fn ($item) => $item->size)
+                    ->map(fn ($item) => [
+                        'id' => (int) $item->size->id,
+                        'code' => (string) $item->size->code,
+                        'sort_order' => (int) (
+                            $item->size->order
+                            ?? $item->size->sort_order
+                            ?? $item->sort_order
+                            ?? 0
+                        ),
+                    ])
+                    ->unique('id')
+                    ->sortBy([
+                        fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
+                        fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
                 ])
-                ->unique('id')
-                ->sortBy([
-                    fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
-                    fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
-                ])
-                ->values();
+                    ->values();
 
                 $fixedHeaderColumns = [
                     'import_meta_json',
@@ -262,7 +277,6 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                     $headerRow[] = $this->formatSizeCode($size['code']);
                 }
                 $manualEndColumn = count($headerRow);
-
 
                 $assortmentStartColumn = null;
                 $assortmentEndColumn = null;
@@ -397,7 +411,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                         $order->price_list_id,
                         $order->season_id
                     );
-                
+
                     $retailPrice = $retailPriceListId
                         ? $this->getProductPrice(
                             $product->id,
@@ -497,7 +511,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
 
                                 if ($assortmentSkuId && $assortmentColumnLetter && $assortmentContentStartColumn) {
                                     $contentColumnLetter = Coordinate::stringFromColumnIndex($assortmentContentStartColumn + $sizeIndex);
-                                    $row[] = '=IF(' . $assortmentColumnLetter . $rowNumber . '="-",0,' . $assortmentColumnLetter . $rowNumber . ')*' . $contentColumnLetter . $rowNumber;
+                                    $row[] = '=IF('.$assortmentColumnLetter.$rowNumber.'="-",0,'.$assortmentColumnLetter.$rowNumber.')*'.$contentColumnLetter.$rowNumber;
                                 } else {
                                     $row[] = 0;
                                 }
@@ -514,9 +528,9 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                                 $assortmentCell = $assortmentSizeCells[$size['id']] ?? null;
 
                                 if ($manualCell && $assortmentCell) {
-                                    $row[] = '=IF(' . $manualCell . '="-",0,' . $manualCell . ')+' . $assortmentCell;
+                                    $row[] = '=IF('.$manualCell.'="-",0,'.$manualCell.')+'.$assortmentCell;
                                 } elseif ($manualCell) {
-                                    $row[] = '=IF(' . $manualCell . '="-",0,' . $manualCell . ')';
+                                    $row[] = '=IF('.$manualCell.'="-",0,'.$manualCell.')';
                                 } else {
                                     $row[] = 0;
                                 }
@@ -538,7 +552,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                         }
 
                         $totalFormula = $totalSizeCells
-                            ? '=SUM(' . implode(',', $totalSizeCells) . ')'
+                            ? '=SUM('.implode(',', $totalSizeCells).')'
                             : 0;
 
                         $row[$totalQuantityColumn - 1] = $totalFormula;
@@ -563,17 +577,17 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
 
                 if ($blockEndRow >= $headerRowNumber + 1) {
                     if ($allowAssortmentOrder) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex(9) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex(9) . $blockEndRow;
+                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex(9).($headerRowNumber + 1).':'.Coordinate::stringFromColumnIndex(9).$blockEndRow;
                     }
 
-                    $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($manualSizeStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($manualEndColumn) . $blockEndRow;
+                    $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($manualSizeStartColumn).($headerRowNumber + 1).':'.Coordinate::stringFromColumnIndex($manualEndColumn).$blockEndRow;
 
                     if ($assortmentStartColumn && $assortmentEndColumn) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($assortmentStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($assortmentEndColumn) . $blockEndRow;
+                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($assortmentStartColumn).($headerRowNumber + 1).':'.Coordinate::stringFromColumnIndex($assortmentEndColumn).$blockEndRow;
                     }
 
                     if ($totalStartColumn && $totalEndColumn) {
-                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($totalStartColumn) . ($headerRowNumber + 1) . ':' . Coordinate::stringFromColumnIndex($totalEndColumn) . $blockEndRow;
+                        $this->integerQuantityRanges[] = Coordinate::stringFromColumnIndex($totalStartColumn).($headerRowNumber + 1).':'.Coordinate::stringFromColumnIndex($totalEndColumn).$blockEndRow;
                     }
                 }
 
@@ -592,15 +606,15 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         }
 
         $rows[9][2] = $this->totalQuantityCells
-            ? '=' . implode('+', $this->totalQuantityCells)
+            ? '='.implode('+', $this->totalQuantityCells)
             : 0;
 
         $rows[10][2] = $this->wholesaleValueCells
-            ? '=' . implode('+', $this->wholesaleValueCells)
+            ? '='.implode('+', $this->wholesaleValueCells)
             : 0;
 
         $rows[11][2] = $this->retailValueCells
-            ? '=' . implode('+', $this->retailValueCells)
+            ? '='.implode('+', $this->retailValueCells)
             : 0;
 
         return $rows;
@@ -672,7 +686,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         if (! $priceListId || ! $seasonId) {
             return 0;
         }
-    
+
         return (float) (
             PriceListItem::query()
                 ->where('price_list_id', $priceListId)
@@ -705,7 +719,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $city = $address?->city ?? '';
         $street = $address?->street ?? $address?->address ?? '';
 
-        return trim($country . '-' . $zip . ' ' . $city . ', ' . $street, " -,");
+        return trim($country.'-'.$zip.' '.$city.', '.$street, ' -,');
     }
 
     public function filename(): string
@@ -816,25 +830,25 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                     $sheet->getStyle("A{$row}:{$endColumn}{$row}")
                         ->getAlignment()
                         ->setWrapText(true)
-                        ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 }
 
                 foreach ($this->mergedBlockLabelRanges as $range) {
                     $sheet->mergeCells("{$range['start_column']}{$range['row']}:{$range['end_column']}{$range['row']}");
                     $sheet->getStyle("{$range['start_column']}{$range['row']}:{$range['end_column']}{$range['row']}")
                         ->getAlignment()
-                        ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
-                        ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                        ->setVertical(Alignment::VERTICAL_CENTER);
                 }
 
                 foreach ($this->headerRanges as $range) {
                     $row = $range['row'];
                     $endColumn = $range['end_column'];
-                
+
                     $sheet->getStyle("A{$row}:{$endColumn}{$row}")
                         ->getFont()
                         ->setBold(true);
-                
+
                     $sheet->getStyle("A{$row}:{$endColumn}{$row}")
                         ->getFill()
                         ->setFillType(Fill::FILL_SOLID)
@@ -844,7 +858,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                     $sheet->getStyle("A{$row}:{$endColumn}{$row}")
                         ->getAlignment()
                         ->setWrapText(true)
-                        ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                        ->setVertical(Alignment::VERTICAL_CENTER);
 
                     $sheet->getRowDimension($row)->setRowHeight(30);
 
@@ -936,7 +950,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                         $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setVisible(true);
                     }
                 }
-                $sheet->getStyle('C1:C3')->getProtection()->setLocked(\PhpOffice\PhpSpreadsheet\Style\Protection::PROTECTION_UNPROTECTED);
+                $sheet->getStyle('C1:C3')->getProtection()->setLocked(Protection::PROTECTION_UNPROTECTED);
                 $sheet->getColumnDimension('A')->setVisible(false);
                 $sheet->getColumnDimension('A')->setWidth(12);
                 $sheet->getColumnDimension('B')->setWidth(20);
@@ -953,7 +967,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                 $sheet->getColumnDimension('M')->setWidth(16);
                 $sheet->freezePane('F13');
                 $sheet->setSelectedCell('F13');
-                
+
             },
         ];
     }

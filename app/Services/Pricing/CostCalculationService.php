@@ -116,7 +116,7 @@ class CostCalculationService
                     'context' => [
                         'model_code' => $product->model_code,
                         'product_name' => $product->name_hu,
-                        'item_main_group' => $product->itemMainGroup?->name_hu,
+                        'item_main_group' => $product->itemMainGroup?->name,
                     ],
                 ]);
             }
@@ -311,7 +311,7 @@ class CostCalculationService
                 'model_code' => $product?->model_code,
                 'name_hu' => $product?->name_hu,
                 'item_main_group_id' => $product?->item_main_group_id,
-                'item_main_group' => $product?->itemMainGroup?->name_hu,
+                'item_main_group' => $product?->itemMainGroup?->name,
                 'material_composition' => $product?->material_composition,
             ],
             'color' => [

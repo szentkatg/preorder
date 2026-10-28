@@ -18,7 +18,6 @@ use App\Models\Translation;
 use App\Models\User;
 use App\Services\PartnerPriceListService;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Support\Enums\Width;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,21 +60,21 @@ class PartnerPriceListExportTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
-        $this->hu = Language::create(['code' => 'HU', 'name_hu' => 'Magyar', 'active' => true]);
-        $this->en = Language::create(['code' => 'EN', 'name_hu' => 'Angol', 'active' => true]);
+        $this->hu = Language::create(['code' => 'HU', 'name' => 'Magyar', 'active' => true]);
+        $this->en = Language::create(['code' => 'EN', 'name' => 'Angol', 'active' => true]);
         $this->season = Season::create(['code' => 'S27', 'name' => '2027 Nyár', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $usd = Currency::create(['code' => 'USD', 'name_hu' => 'Dollár', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollár', 'active' => true]);
         ExchangeRate::create(['season_id' => $this->season->id, 'currency_id' => $usd->id, 'rate_to_huf' => 380, 'active' => true]);
         $brand = Brand::create(['code' => 'HT', 'name' => 'Heavy Tools', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'name_en' => 'Bag', 'active' => true]);
-        $type = OrderSheetType::create(['code' => 'BAGS', 'name_hu' => 'Táskák', 'name_en' => 'Bags', 'active' => true]);
-        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Kisker', 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
-        $this->net = PriceList::create(['code' => 'WHOLE_HU', 'name_hu' => 'Nagyker', 'type' => 'wholesale', 'currency_id' => $currency->id,
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
+        $type = OrderSheetType::create(['code' => 'BAGS', 'name' => 'Táskák', 'active' => true]);
+        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name' => 'Kisker', 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
+        $this->net = PriceList::create(['code' => 'WHOLE_HU', 'name' => 'Nagyker', 'type' => 'wholesale', 'currency_id' => $currency->id,
             'retail_price_list_id' => $this->retail->id, 'active' => true]);
         $this->product = Product::create(['season_id' => $this->season->id, 'brand_id' => $brand->id, 'item_main_group_id' => $group->id,
-            'order_sheet_type_id' => $type->id, 'model_code' => 'B13-019S27', 'name_hu' => 'Őszi táska', 'name_en' => 'Autumn bag',
-            'catalog_group_name_hu' => 'Hátizsák', 'catalog_group_name_en' => 'Daypack', 'catalog_page' => 7,
+            'order_sheet_type_id' => $type->id, 'model_code' => 'B13-019S27', 'name_hu' => 'Őszi táska',
+            'catalog_group_name_hu' => 'Hátizsák', 'catalog_page' => 7,
             'promised_delivery_date' => '2027-04-01', 'active' => true]);
         foreach ([$this->net->id => 7200.5, $this->retail->id => 15990] as $listId => $price) {
             PriceListItem::create(['price_list_id' => $listId, 'season_id' => $this->season->id, 'product_id' => $this->product->id, 'net_price' => $price]);
@@ -145,9 +144,9 @@ class PartnerPriceListExportTest extends TestCase
         $config = array_replace($this->configuration, ['language_id' => $this->en->id]);
         Translation::create(['entity' => 'item_main_group', 'entity_code' => 'BAG', 'field' => 'name', 'language_id' => $this->en->id, 'value' => 'Translated bags']);
         $doc = app(PartnerPriceListService::class)->document($config, [$this->product->id]);
-        $this->assertSame('Autumn bag', $doc['sections'][0]['rows'][0]['name']);
+        $this->assertSame('Őszi táska', $doc['sections'][0]['rows'][0]['name']);
         $this->assertSame('Translated bags', $doc['sections'][0]['rows'][0]['main_group']);
-        $this->assertSame('Daypack', $doc['sections'][0]['rows'][0]['catalog_group']);
+        $this->assertSame('Hátizsák', $doc['sections'][0]['rows'][0]['catalog_group']);
         $path = tempnam(sys_get_temp_dir(), 'partner-price-');
         $binder = Cell::getValueBinder();
         try {
@@ -163,7 +162,7 @@ class PartnerPriceListExportTest extends TestCase
             $this->assertSame('Expected arrival', $sheet->getCell('E5')->getValue());
             $this->assertSame('Catalogue page', $sheet->getCell('F5')->getValue());
             $this->assertSame(7, $sheet->getCell('F7')->getValue());
-            $this->assertSame('Daypack', $sheet->getCell('A6')->getValue());
+            $this->assertSame('Hátizsák', $sheet->getCell('A6')->getValue());
             $this->assertSame('F', $sheet->getHighestDataColumn());
             $this->assertSame('portrait', $sheet->getPageSetup()->getOrientation());
             $lastRow = $sheet->getHighestDataRow();
@@ -223,9 +222,9 @@ class PartnerPriceListExportTest extends TestCase
 
     public function test_cross_currency_retail_and_outlet_lists_keep_their_own_prices_and_currency(): void
     {
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
-        $retail = PriceList::create(['code' => 'RETAIL_EUR', 'name_hu' => 'EUR kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
-        $outlet = PriceList::create(['code' => 'OUTLET_EUR', 'name_hu' => 'EUR outlet', 'type' => 'outlet', 'currency_id' => $eur->id, 'source_retail_price_list_id' => $retail->id, 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
+        $retail = PriceList::create(['code' => 'RETAIL_EUR', 'name' => 'EUR kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        $outlet = PriceList::create(['code' => 'OUTLET_EUR', 'name' => 'EUR outlet', 'type' => 'outlet', 'currency_id' => $eur->id, 'source_retail_price_list_id' => $retail->id, 'active' => true]);
         foreach ([$retail, $outlet] as $list) {
             PriceListItem::create(['price_list_id' => $list->id, 'season_id' => $this->season->id, 'product_id' => $this->product->id, 'net_price' => 29.95]);
             Livewire::test(PartnerPriceListExport::class)->fillForm($this->configuration)
@@ -377,6 +376,7 @@ class PartnerPriceListExportTest extends TestCase
         }
         ExchangeRate::query()->delete();
         $page->call('exportPriceList')->assertHasErrors('data.season_id')->assertNoFileDownloaded();
+        $page->assertSet('settingsOpen', true);
     }
 
     public function test_catalogue_group_is_a_single_heading_not_a_repeated_product_column(): void
@@ -416,7 +416,7 @@ class PartnerPriceListExportTest extends TestCase
     public function test_multiple_brands_main_groups_and_catalogue_groups_match_with_or_inside_each_filter(): void
     {
         $brand = Brand::create(['code' => 'SECOND', 'name' => 'Másik márka', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'SECOND', 'name_hu' => 'Másik főcsoport', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'SECOND', 'name' => 'Másik főcsoport', 'active' => true]);
         $other = $this->product->replicate();
         $other->model_code = 'SECOND';
         $other->brand_id = $brand->id;
@@ -433,16 +433,59 @@ class PartnerPriceListExportTest extends TestCase
         $this->assertSame($config['catalog_groups'], $page->instance()->appliedFilters['catalog_groups']);
     }
 
-    public function test_product_filters_are_searchable_checkbox_lists_without_changing_single_value_export_settings(): void
+    public function test_product_filters_are_compact_searchable_multi_selects_without_changing_single_value_export_settings(): void
     {
         $page = Livewire::test(PartnerPriceListExport::class)->assertSuccessful();
         foreach (['brand_ids', 'item_main_group_ids', 'catalog_groups'] as $name) {
-            $page->assertFormFieldExists($name, fn ($field) => $field instanceof CheckboxList
-                && $field->isSearchable() && $field->isBulkToggleable());
+            $page->assertFormFieldExists($name, fn ($field) => $field instanceof Select
+                && $field->isMultiple() && $field->isSearchable() && $field->isPreloaded()
+                && $field->getPlaceholder() === 'Mindegyik');
         }
         foreach (['season_id', 'price_list_id', 'retail_price_list_id', 'language_id', 'format'] as $name) {
             $page->assertFormFieldExists($name, fn ($field) => $field instanceof Select && ! $field->isMultiple());
         }
+    }
+
+    public function test_settings_collapse_after_loading_and_toggling_preserves_preview_selection_and_table_state(): void
+    {
+        $page = Livewire::test(PartnerPriceListExport::class)->assertSet('settingsOpen', true)
+            ->fillForm($this->configuration)->call('loadProducts')->assertSet('settingsOpen', false)
+            ->set('tableSearch', 'B13')->sortTable('model_code', 'desc');
+        $filters = $page->instance()->appliedFilters;
+        $page->set('settingsOpen', true)->set('settingsOpen', false)
+            ->assertSet('appliedFilters', $filters)
+            ->assertSet('selectedTableRecords', [(string) $this->product->id])
+            ->assertSet('tableSearch', 'B13')->assertSet('tableSort', 'model_code:desc')
+            ->assertCanSeeTableRecords([$this->product]);
+        $page->set('data.format', 'pdf')->assertSet('settingsOpen', true)
+            ->assertSet('appliedFilters', null)->assertSet('selectedTableRecords', [])
+            ->call('loadProducts')->assertHasNoFormErrors()->assertSet('settingsOpen', false);
+    }
+
+    public function test_invalid_configuration_keeps_settings_open_and_does_not_select_products(): void
+    {
+        Livewire::test(PartnerPriceListExport::class)->set('settingsOpen', false)
+            ->call('loadProducts')->assertHasErrors(['data.season_id', 'data.price_list_id'])
+            ->assertSet('settingsOpen', true)->assertSet('appliedFilters', null)
+            ->assertSet('selectedTableRecords', []);
+    }
+
+    public function test_collapsed_summary_describes_applied_configuration_and_escapes_labels(): void
+    {
+        $this->net->update(['code' => '<b>WHOLE</b>']);
+        $page = Livewire::test(PartnerPriceListExport::class)->fillForm(array_replace($this->configuration, [
+            'brand_ids' => [$this->product->brand_id], 'catalog_groups' => ['Hátizsák'],
+        ]))->call('loadProducts');
+        $this->assertSame([
+            'Szezon' => 'S27', 'Nettó' => '<b>WHOLE</b> (HUF)', 'Kisker / outlet' => 'RETAIL_HU (HUF)',
+            'Fájl' => 'HU / XLSX', 'Márka' => 1, 'Főcsoport' => 'Mindegyik', 'Katalóguscsoport' => 1,
+        ], $page->instance()->appliedSummary);
+        $page->assertSee('&lt;b&gt;WHOLE&lt;/b&gt; (HUF)', false)
+            ->assertDontSee('<strong><b>WHOLE</b>', false)
+            ->assertSee('x-show="settingsOpen"', false)
+            ->assertSee('aria-controls="partner-price-list-settings-form"', false);
+        $page->set('data.retail_price_list_id', null)->call('loadProducts');
+        $this->assertSame('Nincs', $page->instance()->appliedSummary['Kisker / outlet']);
     }
 
     public function test_adding_filter_values_keeps_valid_catalogue_selections_and_removes_only_invalid_ones(): void

@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\DatePicker;
 
 class ProductForm
 {
@@ -35,11 +35,8 @@ class ProductForm
                     ->required(),
 
                 TextInput::make('name_hu')
-                    ->label('Név HU')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
                 Textarea::make('material_composition')
                     ->label('Anyagösszetétel')
                     ->rows(3)
@@ -51,7 +48,7 @@ class ProductForm
                     ->searchable()
                     ->preload()
                     ->required(),
-                
+
                 Select::make('order_sheet_type_id')
                     ->label('Rendelőlap típus')
                     ->relationship('orderSheetType', 'name')
@@ -70,10 +67,7 @@ class ProductForm
                     ->native(false),
 
                 TextInput::make('catalog_group_name_hu')
-                    ->label('Katalógus csoport HU'),
-
-                TextInput::make('catalog_group_name_en')
-                    ->label('Katalógus csoport EN'),
+                    ->label('Katalóguscsoport'),
 
                 TextInput::make('catalog_group_sort')
                     ->label('Katalógus csoport sorrend')
@@ -83,7 +77,7 @@ class ProductForm
                 TextInput::make('catalog_sort')
                     ->label('Katalógus sorrend')
                     ->numeric(),
-    
+
                 TextInput::make('catalog_page')
                     ->label('Katalógus oldal')
                     ->numeric(),

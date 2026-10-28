@@ -26,8 +26,8 @@ class ExchangeRateListTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
-        $currency = Currency::create(['code' => 'USD', 'name_hu' => 'Régi dollárnév', 'active' => true]);
-        $language = Language::firstOrCreate(['code' => 'HU'], ['name' => 'Magyar', 'name_hu' => 'Magyar', 'active' => true]);
+        $currency = Currency::create(['code' => 'USD', 'name' => 'Régi dollárnév', 'active' => true]);
+        $language = Language::firstOrCreate(['code' => 'HU'], ['name' => 'Magyar', 'active' => true]);
         Translation::create(['entity' => 'currency', 'entity_code' => 'USD', 'field' => 'name', 'language_id' => $language->id, 'value' => 'Amerikai dollár']);
         $first = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
         $second = Season::create(['code' => 'S27', 'name' => 'Nyár', 'active' => true]);

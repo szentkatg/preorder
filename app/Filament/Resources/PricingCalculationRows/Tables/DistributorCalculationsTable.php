@@ -21,7 +21,7 @@ class DistributorCalculationsTable
 
         return PricingGrid::rows($table)->columns([
             $columns['pricingProject.name'], $columns['product.catalog_group_name_hu'],
-            $columns['product.itemMainGroup.name_hu'], $columns['product.model_code'], $columns['product.name_hu'], $columns['color.name_hu'],
+            $columns['product.itemMainGroup.name'], $columns['product.model_code'], $columns['product.name_hu'], $columns['color.name_hu'],
             $columns['supplier.erp_partner_code'], $columns['supplier.name'],
             $columns['priceList.code']->label('Forrás nagyker árlista'),
             $columns['base_price']->label('Bruttó kisker EUR')->toggleable(isToggledHiddenByDefault: true),

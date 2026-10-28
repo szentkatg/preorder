@@ -76,7 +76,7 @@ class ForeignRetailCalculator
                 'source_retail_price_list' => ['id' => $source->price_list_id, 'code' => $source->priceList?->code],
                 'source_cost_row_id' => $source->calculation_snapshot['source_cost_row_id'] ?? null,
                 'source_cost_inputs' => $source->calculation_snapshot['source_cost_inputs'] ?? [],
-                'price_list' => ['id' => $list->id, 'code' => $list->code, 'name' => $list->name_hu],
+                'price_list' => ['id' => $list->id, 'code' => $list->code, 'name' => $list->name],
                 'currency' => $list->currency->code,
                 'inputs' => ['source_retail_price' => (float) $source->final_price,
                     'retail_exchange_rate' => (float) $rate->rate_to_huf, 'base_price' => $base->toFloat(),

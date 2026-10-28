@@ -43,7 +43,7 @@ class PricingParameterForm
 
                 Select::make('item_main_group_id')
                     ->label('Főcsoport')
-                    ->relationship('itemMainGroup', 'name_hu')
+                    ->relationship('itemMainGroup', 'name')
                     ->searchable()
                     ->preload()
                     ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP)

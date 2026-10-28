@@ -21,7 +21,7 @@ class WholesaleCalculationsTable
 
         return $table->columns([
             $shared['pricingProject.name'], $shared['priceList.code'], $shared['product.catalog_group_name_hu'],
-            $shared['product.itemMainGroup.name_hu'], $shared['product.model_code'], $shared['product.name_hu'], $shared['color.name_hu'],
+            $shared['product.itemMainGroup.name'], $shared['product.model_code'], $shared['product.name_hu'], $shared['color.name_hu'],
             $shared['supplier.erp_partner_code'], $shared['supplier.name'],
             TextColumn::make('sourceRetailRow.priceList.code')->label('Forrás kisker árlista')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('base_price')->label('Bruttó kisker '.$currency)->numeric()

@@ -58,16 +58,16 @@ class WholesaleCalculationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => '2027 tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'BAG27', 'name_hu' => 'BAGW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => '2027 árprojekt', 'status' => 'active', 'active' => false]);
         $this->project->products()->attach($product);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
-        $this->retailHuf = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
-        $this->retailEur = PriceList::create(['code' => 'RETAIL_EU', 'name_hu' => 'Euró kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
-        $this->huf = PriceList::create(['code' => 'WHOLE_HU', 'name_hu' => 'Magyar nagyker', 'type' => 'wholesale', 'currency_id' => $huf->id, 'retail_price_list_id' => $this->retailHuf->id, 'active' => true]);
-        $this->eur = PriceList::create(['code' => 'WHOLE_EU', 'name_hu' => 'Euró nagyker', 'type' => 'wholesale', 'currency_id' => $eur->id, 'retail_price_list_id' => $this->retailEur->id, 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
+        $this->retailHuf = PriceList::create(['code' => 'RETAIL_HU', 'name' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $this->retailEur = PriceList::create(['code' => 'RETAIL_EU', 'name' => 'Euró kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        $this->huf = PriceList::create(['code' => 'WHOLE_HU', 'name' => 'Magyar nagyker', 'type' => 'wholesale', 'currency_id' => $huf->id, 'retail_price_list_id' => $this->retailHuf->id, 'active' => true]);
+        $this->eur = PriceList::create(['code' => 'WHOLE_EU', 'name' => 'Euró nagyker', 'type' => 'wholesale', 'currency_id' => $eur->id, 'retail_price_list_id' => $this->retailEur->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460]);
         ExchangeRate::create(['season_id' => $season->id, 'currency_id' => $eur->id, 'rate_to_huf' => 400, 'active' => true]);
         foreach (['retail_multiplier' => 4.7, 'country_multiplier' => 1.1, 'wholesale_margin' => 2.5] as $type => $value) {

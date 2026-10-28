@@ -14,7 +14,8 @@ class PriceListItemForm
             ->components([
                 Select::make('price_list_id')
                     ->label('Árlista')
-                    ->relationship('priceList', 'name_hu')
+                    ->relationship('priceList', 'name')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->translate('name'))
                     ->searchable()
                     ->preload()
                     ->required(),

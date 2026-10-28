@@ -25,12 +25,9 @@ class PriceListForm
                         'unique' => 'Ez az árlistakód már létezik. Használd a meglévő árlistát, vagy adj meg másik kódot.',
                     ]),
 
-                TextInput::make('name_hu')
-                    ->label('Név HU')
+                TextInput::make('name')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
 
                 Select::make('type')
                     ->label('Árlista típusa')
@@ -75,7 +72,7 @@ class PriceListForm
                                 fn ($query) => $query->whereKeyNot($record->id)
                             )
                             ->orderBy('code')
-                            ->pluck('name_hu', 'id');
+                            ->get()->mapWithKeys(fn (PriceList $list) => [$list->id => $list->translate('name')]);
                     })
                     ->searchable()
                     ->preload()

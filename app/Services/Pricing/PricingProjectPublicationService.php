@@ -103,7 +103,7 @@ class PricingProjectPublicationService
             $groups[$key] ??= ['product_id' => $row->product_id, 'price_list_id' => $list->id, 'price' => $row->final_price, 'calculation_row_ids' => []];
             $groups[$key]['calculation_row_ids'][] = $row->id;
             $snapshot['lists'][$list->id] = $list->only(['id', 'code', 'type', 'currency_id']) + ['currency' => $list->currency->code];
-            $snapshot['products'][$row->product_id] = $row->product->only(['id', 'model_code', 'name_hu', 'name_en']);
+            $snapshot['products'][$row->product_id] = $row->product->only(['id', 'model_code', 'name_hu']);
         }
         if ($groups === []) {
             throw new DomainException('Nincs publikálható ár az árprojektben.');

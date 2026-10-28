@@ -52,13 +52,13 @@ class ErpPricingFormulaExportTest extends TestCase
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
         foreach (['HUF', 'EUR', 'CZK'] as $code) {
-            $this->currencies[$code] = Currency::create(['code' => $code, 'name_hu' => $code, 'active' => true]);
+            $this->currencies[$code] = Currency::create(['code' => $code, 'name' => $code, 'active' => true]);
         }
         foreach (['HUF' => 'retail', 'EUR' => 'wholesale'] as $code => $type) {
-            $this->lists[$code] = PriceList::create(['code' => $type.'_'.$code, 'name_hu' => $code,
+            $this->lists[$code] = PriceList::create(['code' => $type.'_'.$code, 'name' => $code,
                 'type' => $type, 'currency_id' => $this->currencies[$code]->id, 'active' => true]);
         }
-        $group = ItemMainGroup::create(['code' => 'B', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'B', 'name' => 'Táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Képletteszt', 'status' => 'closed', 'active' => true]);
         $products = [];
         $prices = [];
@@ -66,7 +66,7 @@ class ErpPricingFormulaExportTest extends TestCase
             $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
                 'model_code' => $code.'W27', 'name_hu' => $code, 'active' => true]);
             $products[$product->id] = ['id' => $product->id, 'model_code' => $product->model_code,
-                'name_hu' => $code, 'name_en' => $code, 'cost' => '460.125'];
+                'name_hu' => $code, 'cost' => '460.125'];
             foreach ($this->lists as $currency => $list) {
                 $prices[] = ['product_id' => $product->id, 'price_list_id' => $list->id,
                     'price' => $currency === 'HUF' ? '9990.00' : ($index === 0 ? '19.99' : '39.99')];
@@ -93,6 +93,21 @@ class ErpPricingFormulaExportTest extends TestCase
     {
         return app(ErpPricingExportService::class)->rows($this->project,
             [$slot => ErpPricingExportService::FORMULA], '2026-10-27', [$slot => $formula]);
+    }
+
+    public function test_historical_publication_with_legacy_name_keys_still_exports_the_shared_names(): void
+    {
+        $snapshot = $this->publication->snapshot;
+        foreach ($snapshot['products'] as &$product) {
+            $product['name_en'] = $product['name_hu'];
+        }
+        unset($product);
+        $this->publication->update(['snapshot' => $snapshot]);
+        $before = $this->publication->fresh()->getAttributes();
+        $rows = $this->export([$this->token('number', 25)]);
+        $this->assertSame('A', $rows[3][1]);
+        $this->assertSame('B', $rows[4][1]);
+        $this->assertSame($before, $this->publication->fresh()->getAttributes());
     }
 
     public function test_foreign_conversion_uses_published_prices_and_publication_season_rates_without_writes(): void

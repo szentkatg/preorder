@@ -41,7 +41,7 @@ class PricingParameterValidationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST', 'name_hu' => 'Teszt', 'material_composition' => 'PU', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
@@ -102,8 +102,8 @@ class PricingParameterValidationTest extends TestCase
         $this->parameter(['scope_type' => 'item_main_group', 'item_main_group_id' => $this->product->item_main_group_id]);
         $material = $this->parameter(['scope_type' => 'material_composition', 'material_composition' => 'PU', 'value' => 9.7]);
         $this->parameter(['scope_type' => 'material_composition', 'material_composition' => 'Nylon']);
-        $currency = Currency::create(['code' => 'USD', 'name_hu' => 'Dollár', 'active' => true]);
-        $list = PriceList::create(['code' => 'TEST', 'name_hu' => 'Teszt', 'currency_id' => $currency->id, 'type' => 'retail', 'active' => true]);
+        $currency = Currency::create(['code' => 'USD', 'name' => 'Dollár', 'active' => true]);
+        $list = PriceList::create(['code' => 'TEST', 'name' => 'Teszt', 'currency_id' => $currency->id, 'type' => 'retail', 'active' => true]);
         $this->parameter(['currency_id' => $currency->id]);
         $this->parameter(['price_list_id' => $list->id]);
         $this->parameter(['price_list_id' => $list->id, 'currency_id' => $currency->id]);
@@ -163,7 +163,7 @@ class PricingParameterValidationTest extends TestCase
         $existing = $this->parameter();
         $legacy = $this->parameter(['active' => false]);
         $legacy->newQuery()->whereKey($legacy->id)->update(['active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $this->project->products()->attach($this->product);
         $row = PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
             'price_type' => 'cost', 'currency_id' => $currency->id, 'calculated_price' => 100]);

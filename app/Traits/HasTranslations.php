@@ -78,25 +78,6 @@ trait HasTranslations
             return $value;
         }
 
-        /*
-         * Átmeneti kompatibilitás a régi name_hu/name_en,
-         * catalog_group_name_hu/catalog_group_name_en stb. mezőkkel.
-         *
-         * Ezek a régi oszlopok az átállás befejezése után eltávolíthatók.
-         */
-        foreach ([
-            "{$fallbackColumn}_hu",
-            "{$fallbackColumn}_en",
-        ] as $legacyColumn) {
-            $value = $this->normalizedTranslationValue(
-                $this->getAttribute($legacyColumn)
-            );
-
-            if ($value !== null) {
-                return $value;
-            }
-        }
-
         return null;
     }
 

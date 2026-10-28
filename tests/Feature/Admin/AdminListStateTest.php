@@ -49,7 +49,7 @@ class AdminListStateTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST', 'name_hu' => 'Teszt', 'material_composition' => 'PU', 'active' => true]);
         $this->first = PricingProject::create(['season_id' => $season->id, 'name' => 'Első', 'status' => 'active', 'active' => true]);

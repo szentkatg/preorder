@@ -22,10 +22,7 @@ class ColorsTable
                     ->label('Színkód'),
 
                 TextColumn::make('name_hu')
-                    ->label('Név HU'),
-
-                TextColumn::make('name_en')
-                    ->label('Név EN'),
+                    ->label('Név'),
 
                 TextColumn::make('sort_order')
                     ->label('Sorrend'),

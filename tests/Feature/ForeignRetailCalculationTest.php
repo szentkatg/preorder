@@ -54,13 +54,13 @@ class ForeignRetailCalculationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél 2027', 'active' => false]);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'TEST', 'name_hu' => 'Teszt', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'TEST', 'name' => 'Teszt', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'MODEL27', 'name_hu' => 'NACKW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Tél', 'status' => 'active', 'active' => false]);
         $this->project->products()->attach($product);
-        $this->hufList = PriceList::create(['code' => 'HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $this->hufList = PriceList::create(['code' => 'HU', 'name' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);
         PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => 'HUF', 'price_type' => 'retail', 'round_to' => 1000, 'mode' => 'nearest', 'adjustment' => -10, 'active' => true]);
@@ -705,8 +705,8 @@ class ForeignRetailCalculationTest extends TestCase
 
     private function makeList(string $code, float $rate): PriceList
     {
-        $currency = Currency::create(['code' => $code, 'name_hu' => $code, 'active' => true]);
-        $list = PriceList::create(['code' => 'RETAIL-'.$code, 'name_hu' => $code.' kisker', 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
+        $currency = Currency::create(['code' => $code, 'name' => $code, 'active' => true]);
+        $list = PriceList::create(['code' => 'RETAIL-'.$code, 'name' => $code.' kisker', 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
         ExchangeRate::create(['season_id' => $this->project->season_id, 'currency_id' => $currency->id, 'rate_to_huf' => $rate, 'active' => true]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'country_multiplier', 'scope_type' => 'global',
             'price_list_id' => $list->id, 'currency_id' => $currency->id, 'value' => 1.1, 'active' => true]);

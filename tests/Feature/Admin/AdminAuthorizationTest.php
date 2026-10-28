@@ -264,7 +264,6 @@ class AdminAuthorizationTest extends TestCase
         $itemMainGroupId = DB::table('item_main_groups')->insertGetId([
             'code' => 'TST',
             'name' => 'Teszt főcsoport',
-            'name_hu' => 'Teszt főcsoport',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -458,7 +457,6 @@ class AdminAuthorizationTest extends TestCase
         $itemMainGroupId = DB::table('item_main_groups')->insertGetId([
             'code' => 'TST',
             'name' => 'Teszt főcsoport',
-            'name_hu' => 'Teszt főcsoport',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

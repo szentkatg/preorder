@@ -54,7 +54,7 @@ class PricingWorkflowTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'WF', 'name_hu' => 'Teszt', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'WF', 'name' => 'Teszt', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'WF-1', 'name_hu' => 'Teszt', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Első projekt', 'status' => 'active', 'active' => true]);
@@ -76,9 +76,9 @@ class PricingWorkflowTest extends TestCase
 
     private function row(string $type, string $code, string $status, float $price, array $extra = []): PricingCalculationRow
     {
-        $currency = Currency::firstOrCreate(['code' => $code], ['name_hu' => $code, 'active' => true]);
+        $currency = Currency::firstOrCreate(['code' => $code], ['name' => $code, 'active' => true]);
         $list = $type === 'cost' ? null : PriceList::firstOrCreate(['code' => $type.'-'.$code],
-            ['name_hu' => $type, 'type' => $type, 'currency_id' => $currency->id, 'active' => true]);
+            ['name' => $type, 'type' => $type, 'currency_id' => $currency->id, 'active' => true]);
 
         return PricingCalculationRow::create(array_replace(['pricing_project_id' => $this->project->id,
             'product_id' => $this->product->id, 'price_type' => $type, 'currency_id' => $currency->id,

@@ -78,12 +78,12 @@ class PricingProjectPublicationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => '2027 tél', 'active' => true]);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'B10024W27', 'name_hu' => 'ERVIN', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
         $this->project->products()->attach($this->product);
-        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name' => 'Kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460.125]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);
         PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => 'Retail', 'price_type' => 'retail', 'currency_id' => $huf->id, 'round_to' => 1000, 'mode' => 'nearest', 'adjustment' => -10, 'active' => true]);
@@ -131,14 +131,14 @@ class PricingProjectPublicationTest extends TestCase
     {
         $cost = $this->project->calculationRows()->where('price_type', 'cost')->firstOrFail();
         foreach (['outlet', 'wholesale', 'distributor'] as $type) {
-            $list = PriceList::create(['code' => 'DELETE-'.$type, 'name_hu' => $type, 'type' => $type,
+            $list = PriceList::create(['code' => 'DELETE-'.$type, 'name' => $type, 'type' => $type,
                 'currency_id' => $cost->currency_id, 'active' => true]);
             PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
                 'currency_id' => $cost->currency_id, 'price_type' => $type, 'price_list_id' => $list->id,
                 'calculated_price' => 100, 'source_retail_row_id' => $this->row->id]);
         }
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
-        $eurList = PriceList::create(['code' => 'DELETE-EUR', 'name_hu' => 'EUR', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
+        $eurList = PriceList::create(['code' => 'DELETE-EUR', 'name' => 'EUR', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
             'currency_id' => $eur->id, 'price_type' => 'retail', 'price_list_id' => $eurList->id,
             'calculated_price' => 10, 'source_retail_row_id' => $this->row->id]);
@@ -416,7 +416,7 @@ class PricingProjectPublicationTest extends TestCase
 
     public function test_duplicate_currency_lists_require_explicit_export_mapping(): void
     {
-        $second = PriceList::create(['code' => 'RETAIL_ALT', 'name_hu' => 'Másik kisker', 'type' => 'retail', 'currency_id' => $this->retail->currency_id, 'active' => true]);
+        $second = PriceList::create(['code' => 'RETAIL_ALT', 'name' => 'Másik kisker', 'type' => 'retail', 'currency_id' => $this->retail->currency_id, 'active' => true]);
         app(HufRetailCalculationService::class)->recalculate($this->project, $second);
         app(RetailPriceReviewService::class)->approveCurrentPrices(PricingCalculationRow::where('price_type', 'retail')->get());
         app(PricingProjectPublicationService::class)->publish($this->project);
@@ -449,25 +449,25 @@ class PricingProjectPublicationTest extends TestCase
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'distributor_discount', 'scope_type' => 'global', 'value' => 20, 'active' => true]);
         $retails = ['HUF' => $this->retail];
         foreach (['EUR' => 400, 'CZK' => 16, 'RON' => 80, 'PLN' => 90] as $code => $rate) {
-            $currency = Currency::create(['code' => $code, 'name_hu' => $code, 'active' => true]);
+            $currency = Currency::create(['code' => $code, 'name' => $code, 'active' => true]);
             ExchangeRate::create(['season_id' => $this->project->season_id, 'currency_id' => $currency->id, 'rate_to_huf' => $rate, 'active' => true]);
-            $list = PriceList::create(['code' => 'RETAIL_'.$code, 'name_hu' => $code, 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
+            $list = PriceList::create(['code' => 'RETAIL_'.$code, 'name' => $code, 'type' => 'retail', 'currency_id' => $currency->id, 'active' => true]);
             PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => $code, 'price_type' => 'retail', 'price_list_id' => $list->id, 'currency_id' => $currency->id, 'round_to' => 1, 'mode' => 'nearest', 'adjustment' => -0.05, 'active' => true]);
             app(ForeignRetailCalculationService::class)->recalculate($this->project, $this->retail, $list);
             $retails[$code] = $list;
         }
         foreach (['HUF', 'EUR'] as $code) {
-            $list = PriceList::create(['code' => 'WHOLE_'.$code, 'name_hu' => $code, 'type' => 'wholesale', 'retail_price_list_id' => $retails[$code]->id, 'currency_id' => $retails[$code]->currency_id, 'active' => true]);
+            $list = PriceList::create(['code' => 'WHOLE_'.$code, 'name' => $code, 'type' => 'wholesale', 'retail_price_list_id' => $retails[$code]->id, 'currency_id' => $retails[$code]->currency_id, 'active' => true]);
             PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => 'Whole '.$code, 'price_type' => 'wholesale', 'price_list_id' => $list->id, 'currency_id' => $list->currency_id, 'round_to' => 0.01, 'mode' => 'nearest', 'active' => true]);
         }
         app(WholesaleCalculationService::class)->recalculate($this->project);
         $whole = PriceList::where('code', 'WHOLE_EUR')->firstOrFail();
-        $dist = PriceList::create(['code' => 'DIST_EUR', 'name_hu' => 'Dist', 'type' => 'distributor', 'currency_id' => $whole->currency_id, 'source_wholesale_price_list_id' => $whole->id, 'active' => true]);
+        $dist = PriceList::create(['code' => 'DIST_EUR', 'name' => 'Dist', 'type' => 'distributor', 'currency_id' => $whole->currency_id, 'source_wholesale_price_list_id' => $whole->id, 'active' => true]);
         PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => 'Dist', 'price_type' => 'distributor', 'price_list_id' => $dist->id, 'currency_id' => $dist->currency_id, 'round_to' => 0.01, 'mode' => 'down', 'active' => true]);
         app(DistributorCalculationService::class)->recalculate($this->project, $dist->id);
         foreach (['HUF', 'CZK'] as $code) {
             $source = $retails[$code];
-            $list = PriceList::create(['code' => 'OUTLET_'.$code, 'name_hu' => 'Outlet', 'type' => 'outlet', 'currency_id' => $source->currency_id, 'source_retail_price_list_id' => $source->id, 'active' => true]);
+            $list = PriceList::create(['code' => 'OUTLET_'.$code, 'name' => 'Outlet', 'type' => 'outlet', 'currency_id' => $source->currency_id, 'source_retail_price_list_id' => $source->id, 'active' => true]);
             PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'outlet_discount', 'scope_type' => 'global', 'currency_id' => $source->currency_id, 'value' => 20, 'active' => true]);
             PricingRoundingRule::create(['pricing_project_id' => $this->project->id, 'name' => 'Outlet', 'price_type' => 'outlet', 'price_list_id' => $list->id, 'currency_id' => $list->currency_id, 'round_to' => 1, 'mode' => 'down', 'active' => true]);
             app(OutletCalculationService::class)->recalculate($this->project, $code);

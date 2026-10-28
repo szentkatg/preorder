@@ -340,6 +340,8 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
             $seenModelCodes[$modelCode] = true;
 
             $this->validateRequiredValue($modelCode, $row, 'name_hu', "products {$rowNumber}. sor: hiányzó name_hu");
+            $this->validateSharedName($modelCode, $row, 'name', "products {$rowNumber}. sor");
+            $this->validateSharedName($modelCode, $row, 'catalog_group_name', "products {$rowNumber}. sor");
 
             $this->validateCodeExists($modelCode, $seasonCodes, $row['season_code'] ?? null, "products {$rowNumber}. sor: nem létező season_code");
             $this->validateCodeExists($modelCode, $brandCodes, $row['brand_code'] ?? null, "products {$rowNumber}. sor: nem létező brand_code");
@@ -382,6 +384,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
             }
 
             $this->validateRequiredValue($modelCode, $row, 'name_hu', "colors {$rowNumber}. sor: hiányzó name_hu");
+            $this->validateSharedName($modelCode, $row, 'name', "colors {$rowNumber}. sor");
 
             $imageUrl = $this->nullIfEmpty($row['image_url'] ?? null);
 
@@ -492,9 +495,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
                 'item_main_group_id' => $groups->get($this->nullIfEmpty($row['item_main_group_code'] ?? null))?->id,
                 'size_range_id' => $sizeRangeCode ? $sizeRanges->get($sizeRangeCode)?->id : null,
                 'name_hu' => $row['name_hu'],
-                'name_en' => $this->nullIfEmpty($row['name_en'] ?? null),
                 'catalog_group_name_hu' => $this->nullIfEmpty($row['catalog_group_name_hu'] ?? null),
-                'catalog_group_name_en' => $this->nullIfEmpty($row['catalog_group_name_en'] ?? null),
                 'catalog_group_sort' => (int) ($row['catalog_group_sort'] ?? 0),
                 'catalog_sort' => $this->nullIfEmpty($row['catalog_sort'] ?? null),
                 'catalog_page' => $this->nullIfEmpty($row['catalog_page'] ?? null),
@@ -565,7 +566,6 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             $color->forceFill([
                 'name_hu' => $this->nullIfEmpty($row['name_hu'] ?? null) ?? $colorCode,
-                'name_en' => $this->nullIfEmpty($row['name_en'] ?? null),
                 'sort_order' => (int) ($row['sort_order'] ?? 0),
                 'active' => $this->boolValue($row['active'] ?? true),
             ]);
@@ -774,6 +774,14 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
     {
         if (! $this->nullIfEmpty($row[$column] ?? null)) {
             $this->addRowError($modelCode, $message);
+        }
+    }
+
+    private function validateSharedName(?string $modelCode, array $row, string $field, string $context): void
+    {
+        $legacyValue = $this->nullIfEmpty($row[$field.'_en'] ?? null);
+        if ($legacyValue !== null && $legacyValue !== $this->nullIfEmpty($row[$field.'_hu'] ?? null)) {
+            $this->addRowError($modelCode, "{$context}: a {$field}_en eltér a közös {$field}_hu értékétől. Egységesítsd a nevet, vagy hagyd üresen a régi angol oszlopot.");
         }
     }
 

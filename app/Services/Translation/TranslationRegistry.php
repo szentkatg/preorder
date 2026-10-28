@@ -8,6 +8,7 @@ use App\Models\ItemMainGroup;
 use App\Models\Language;
 use App\Models\OrderSheetType;
 use App\Models\OrderType;
+use App\Models\PriceList;
 use App\Models\Season;
 use InvalidArgumentException;
 
@@ -69,6 +70,14 @@ class TranslationRegistry
                 'fields' => [
                     'name' => 'Név',
                 ],
+            ],
+
+            'price_list' => [
+                'label' => 'Árlista',
+                'model' => PriceList::class,
+                'code_column' => 'code',
+                'fallback_column' => 'name',
+                'fields' => ['name' => 'Név'],
             ],
 
             'order_type' => [

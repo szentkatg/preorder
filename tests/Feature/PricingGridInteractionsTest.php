@@ -80,15 +80,15 @@ class PricingGridInteractionsTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Teszt', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST-COST', 'name_hu' => 'Teszt modell', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt projekt', 'status' => 'active', 'active' => true]);
         $this->project->products()->attach($product);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id,
             'currency_id' => $currency->id, 'price_type' => 'cost', 'calculated_price' => 120.96, 'calculation_snapshot' => ['test_source' => true]]);
-        $list = PriceList::create(['code' => 'RETAIL_HUF', 'name_hu' => 'Kisker', 'type' => 'retail',
+        $list = PriceList::create(['code' => 'RETAIL_HUF', 'name' => 'Kisker', 'type' => 'retail',
             'currency_id' => $this->cost->currency_id, 'active' => true]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier',
             'scope_type' => 'global', 'value' => 4.7, 'active' => true]);

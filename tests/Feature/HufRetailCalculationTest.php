@@ -61,13 +61,13 @@ class HufRetailCalculationTest extends TestCase
         parent::setUp();
         config(['app.key' => 'base64:'.base64_encode(str_repeat('test', 8))]);
         $season = Season::create(['code' => 'S27', 'name' => 'Teszt szezon', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'B10024W27', 'name_hu' => 'Teszt táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt árprojekt', 'status' => 'active', 'active' => true]);
         $this->project->products()->attach($product);
-        $this->list = PriceList::create(['code' => 'RETAIL-HUF', 'name_hu' => 'HUF kisker', 'type' => 'retail',
+        $this->list = PriceList::create(['code' => 'RETAIL-HUF', 'name' => 'HUF kisker', 'type' => 'retail',
             'currency_id' => $currency->id, 'active' => true]);
         $this->cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id,
             'product_id' => $product->id, 'price_type' => 'cost', 'currency_id' => $currency->id,
@@ -185,7 +185,7 @@ class HufRetailCalculationTest extends TestCase
 
     public function test_wrong_currency_price_list_is_rejected(): void
     {
-        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'name_hu' => 'Euró', 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
         $this->list->update(['currency_id' => $eur->id]);
         $this->expectException(DomainException::class);
         $this->calculate();
@@ -407,7 +407,7 @@ class HufRetailCalculationTest extends TestCase
 
     public function test_each_price_list_uses_its_own_parameter_and_colors_have_separate_rows(): void
     {
-        $otherList = PriceList::create(['code' => 'HUF-OTHER', 'name_hu' => 'Másik kisker', 'type' => 'retail',
+        $otherList = PriceList::create(['code' => 'HUF-OTHER', 'name' => 'Másik kisker', 'type' => 'retail',
             'currency_id' => $this->list->currency_id, 'active' => true]);
         PricingParameter::create(['pricing_project_id' => $this->project->id,
             'parameter_type' => 'retail_multiplier', 'scope_type' => 'global',
@@ -526,7 +526,7 @@ class HufRetailCalculationTest extends TestCase
         $projectCost->pricing_project_id = $otherProject->id;
         $projectCost->product_id = $otherProjectProduct->id;
         $projectCost->save();
-        PriceList::create(['code' => 'HUF-SECOND', 'name_hu' => 'Második árlista', 'type' => 'retail',
+        PriceList::create(['code' => 'HUF-SECOND', 'name' => 'Második árlista', 'type' => 'retail',
             'currency_id' => $this->list->currency_id, 'active' => true]);
         app(HufRetailCalculationService::class)->recalculate($this->project);
         app(HufRetailCalculationService::class)->recalculate($otherProject, $this->list);
@@ -742,7 +742,7 @@ class HufRetailCalculationTest extends TestCase
 
     public function test_supplier_columns_and_purchase_target_support_filter_sort_and_export(): void
     {
-        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollar', 'name_hu' => 'Dollár', 'active' => true]);
+        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollar', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'SUP-PRICE', 'name' => 'Test Supplier Name', 'active' => true]);
         $this->cost->update(['purchase_price' => 8.8, 'purchase_currency_id' => $usd->id, 'supplier_id' => $supplier->supplier_id]);
         $this->calculate();
@@ -796,7 +796,7 @@ class HufRetailCalculationTest extends TestCase
         $second->base_price = 300;
         $second->calculated_price = 1200;
         $second->save();
-        $otherList = PriceList::create(['code' => 'OTHER-AVG', 'name_hu' => 'Másik átlag árlista', 'type' => 'retail',
+        $otherList = PriceList::create(['code' => 'OTHER-AVG', 'name' => 'Másik átlag árlista', 'type' => 'retail',
             'currency_id' => $this->list->currency_id, 'active' => true]);
         $third = $first->replicate();
         $third->price_list_id = $otherList->id;
@@ -960,7 +960,7 @@ class HufRetailCalculationTest extends TestCase
         }
         $this->calculate();
         $excluded = $this->retail();
-        $otherList = PriceList::create(['code' => 'OTHER-BULK', 'name_hu' => 'Másik árlista', 'type' => 'retail',
+        $otherList = PriceList::create(['code' => 'OTHER-BULK', 'name' => 'Másik árlista', 'type' => 'retail',
             'currency_id' => $this->list->currency_id, 'active' => true]);
         app(HufRetailCalculationService::class)->recalculate($this->project, $otherList);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -980,7 +980,7 @@ class HufRetailCalculationTest extends TestCase
     public function test_bulk_query_cannot_approve_forged_cost_or_non_huf_row_ids(): void
     {
         $this->calculate();
-        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euro', 'name_hu' => 'Euró', 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euro', 'active' => true]);
         $foreign = $this->retail()->replicate();
         $foreign->currency_id = $eur->id;
         $foreign->save();

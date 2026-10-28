@@ -55,8 +55,8 @@ class PricingAuthorizationTest extends TestCase
         config(['app.key' => 'base64:'.base64_encode(str_repeat('test', 8))]);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $season = Season::create(['code' => 'AUTH', 'name' => 'Jogosultság teszt', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'AUTH', 'name_hu' => 'Teszt', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'AUTH', 'name' => 'Teszt', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'AUTH-MODEL', 'name_hu' => 'Teszt termék', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'AUTH-SUPPLIER', 'name' => 'Teszt', 'active' => true]);

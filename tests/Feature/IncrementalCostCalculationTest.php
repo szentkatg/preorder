@@ -40,11 +40,11 @@ class IncrementalCostCalculationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
         $groups = [];
         foreach (['A', 'B'] as $code) {
-            $groups[] = ItemMainGroup::create(['code' => $code, 'name_hu' => $code, 'active' => true]);
+            $groups[] = ItemMainGroup::create(['code' => $code, 'name' => $code, 'active' => true]);
         }
         foreach (['CN', 'PL'] as $country) {
             $this->suppliers[$country] = Supplier::create(['erp_partner_code' => $country, 'name' => $country,

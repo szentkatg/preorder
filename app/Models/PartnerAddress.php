@@ -60,7 +60,7 @@ class PartnerAddress extends Model
     {
         return $this->belongsToMany(OrderSheetType::class, 'partner_address_order_sheet_type');
     }
-    
+
     public static function exportColumns(): array
     {
         return [
@@ -77,7 +77,7 @@ class PartnerAddress extends Model
             'phone' => 'Telefon',
             'language.code' => 'Nyelv',
             'priceList.code' => 'Árlista kód',
-            'priceList.name_hu' => 'Árlista',
+            'priceList.name' => 'Árlista',
             'currency.code' => 'Pénznem',
             'active' => [
                 'label' => 'Aktív',
@@ -93,17 +93,17 @@ class PartnerAddress extends Model
             ],
         ];
     }
-    
+
     public static function exportRelations(): array
     {
         return [
             'partner',
             'language',
             'priceList',
-            'currency'
+            'currency',
         ];
     }
-    
+
     public static function exportStringColumns(): array
     {
         return [
@@ -112,10 +112,9 @@ class PartnerAddress extends Model
             'phone',
         ];
     }
-    
+
     public static function exportOrderBy(): ?string
     {
         return 'name';
     }
-    
 }

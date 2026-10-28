@@ -62,13 +62,13 @@ class OutletCalculationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => '2027 tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'BAG27', 'name_hu' => 'BAGW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => '2027 árprojekt', 'status' => 'active', 'active' => true]);
         $this->project->products()->attach($product);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
-        $this->outlet = PriceList::create(['code' => 'OUTLET_HUF', 'name_hu' => 'Magyar outlet', 'type' => 'outlet', 'currency_id' => $huf->id, 'source_retail_price_list_id' => $this->retail->id, 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $this->retail = PriceList::create(['code' => 'RETAIL_HU', 'name' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $this->outlet = PriceList::create(['code' => 'OUTLET_HUF', 'name' => 'Magyar outlet', 'type' => 'outlet', 'currency_id' => $huf->id, 'source_retail_price_list_id' => $this->retail->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);
         $this->discount = PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'outlet_discount', 'scope_type' => 'global', 'currency_id' => $huf->id, 'value' => 20, 'active' => true]);
@@ -245,10 +245,10 @@ class OutletCalculationTest extends TestCase
 
     public function test_czk_outlet_uses_czk_retail_and_only_appears_on_czk_tab(): void
     {
-        $czk = Currency::create(['code' => 'CZK', 'name_hu' => 'Korona', 'active' => true]);
+        $czk = Currency::create(['code' => 'CZK', 'name' => 'Korona', 'active' => true]);
         ExchangeRate::create(['season_id' => $this->project->season_id, 'currency_id' => $czk->id, 'rate_to_huf' => 16, 'active' => true]);
-        $retail = PriceList::create(['code' => 'RETAIL_CZK', 'name_hu' => 'CZ', 'type' => 'retail', 'currency_id' => $czk->id, 'active' => true]);
-        $outlet = PriceList::create(['code' => 'OUTLET_CZK', 'name_hu' => 'CZ outlet', 'type' => 'outlet', 'currency_id' => $czk->id, 'source_retail_price_list_id' => $retail->id, 'active' => true]);
+        $retail = PriceList::create(['code' => 'RETAIL_CZK', 'name' => 'CZ', 'type' => 'retail', 'currency_id' => $czk->id, 'active' => true]);
+        $outlet = PriceList::create(['code' => 'OUTLET_CZK', 'name' => 'CZ outlet', 'type' => 'outlet', 'currency_id' => $czk->id, 'source_retail_price_list_id' => $retail->id, 'active' => true]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'country_multiplier', 'scope_type' => 'global', 'value' => 1.1, 'active' => true]);
         PricingParameter::create(['pricing_project_id' => $this->project->id, 'parameter_type' => 'outlet_discount', 'scope_type' => 'global', 'currency_id' => $czk->id, 'value' => 30, 'active' => true]);
         foreach (['retail', 'outlet'] as $type) {
@@ -358,10 +358,10 @@ class OutletCalculationTest extends TestCase
 
     public function test_outlet_configuration_is_list_specific_and_validates_same_currency_source(): void
     {
-        $second = PriceList::create(['code' => 'OUTLET_SECOND', 'name_hu' => 'Második', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id, 'source_retail_price_list_id' => $this->retail->id, 'active' => true]);
+        $second = PriceList::create(['code' => 'OUTLET_SECOND', 'name' => 'Második', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id, 'source_retail_price_list_id' => $this->retail->id, 'active' => true]);
         $this->discount->update(['price_list_id' => $this->outlet->id]);
         $this->assertSame([$this->outlet->id], app(OutletCalculationService::class)->lists($this->project, 'HUF')->modelKeys());
-        $czk = Currency::create(['code' => 'CZK', 'name_hu' => 'Korona', 'active' => true]);
+        $czk = Currency::create(['code' => 'CZK', 'name' => 'Korona', 'active' => true]);
         $this->expectException(ValidationException::class);
         $second->update(['currency_id' => $czk->id]);
     }
@@ -369,12 +369,12 @@ class OutletCalculationTest extends TestCase
     public function test_outlet_list_can_be_created_in_admin_and_requires_matching_source(): void
     {
         Livewire::test(CreatePriceList::class)
-            ->fillForm(['code' => 'OUTLET_UI', 'name_hu' => 'Teszt outlet', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id,
+            ->fillForm(['code' => 'OUTLET_UI', 'name' => 'Teszt outlet', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id,
                 'source_retail_price_list_id' => $this->retail->id, 'active' => true])
             ->call('create')->assertHasNoFormErrors();
         $this->assertDatabaseHas('price_lists', ['code' => 'OUTLET_UI', 'type' => 'outlet', 'source_retail_price_list_id' => $this->retail->id]);
         Livewire::test(CreatePriceList::class)
-            ->fillForm(['code' => 'OUTLET_INVALID', 'name_hu' => 'Érvénytelen', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id,
+            ->fillForm(['code' => 'OUTLET_INVALID', 'name' => 'Érvénytelen', 'type' => 'outlet', 'currency_id' => $this->retail->currency_id,
                 'source_retail_price_list_id' => $this->outlet->id, 'active' => true])
             ->call('create')->assertHasFormErrors(['source_retail_price_list_id']);
         $this->assertDatabaseMissing('price_lists', ['code' => 'OUTLET_INVALID']);

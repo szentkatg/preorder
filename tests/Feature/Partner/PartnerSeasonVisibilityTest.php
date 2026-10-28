@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Partner;
 
+use App\Exports\PartnerOrderMatrixExport;
+use App\Exports\PartnerOrderSummaryMatrixExport;
 use App\Filament\Resources\Seasons\Pages\CreateSeason;
 use App\Filament\Resources\Seasons\Pages\EditSeason;
 use App\Livewire\Partner\CatalogGroupOrder;
@@ -32,11 +34,13 @@ use App\Models\Season;
 use App\Models\Size;
 use App\Models\SizeRange;
 use App\Models\Sku;
+use App\Models\Translation;
 use App\Models\User;
 use App\Services\PartnerOrderCoverageService;
 use App\Services\Pricing\CostCalculationAuthorization;
 use App\Services\Pricing\PricingProjectProductService;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -79,27 +83,27 @@ class PartnerSeasonVisibilityTest extends TestCase
         $this->visible = Season::create(['code' => 'S27', 'name' => 'Visible S27', 'active' => true, 'visible_to_partners' => true]);
         $this->hidden = Season::create(['code' => 'W27', 'name' => 'Hidden W27', 'active' => true]);
         $this->historical = Season::create(['code' => 'W26', 'name' => 'Historical W26', 'active' => false, 'visible_to_partners' => true]);
-        $language = Language::create(['code' => 'HU', 'name_hu' => 'Magyar', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'symbol' => 'Ft', 'active' => true]);
+        $language = Language::create(['code' => 'HU', 'name' => 'Magyar', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'symbol' => 'Ft', 'active' => true]);
         $partner = Partner::create(['erp_partner_code' => 'P1', 'name' => 'Partner', 'language_id' => $language->id, 'active' => true]);
-        $this->list = PriceList::create(['code' => 'WHOLE_HU', 'name_hu' => 'Nagyker', 'type' => 'wholesale', 'currency_id' => $currency->id, 'active' => true]);
+        $this->list = PriceList::create(['code' => 'WHOLE_HU', 'name' => 'Nagyker', 'type' => 'wholesale', 'currency_id' => $currency->id, 'active' => true]);
         $this->address = PartnerAddress::create(['partner_id' => $partner->id, 'addrid' => 'A1', 'name' => 'Cím', 'price_list_id' => $this->list->id,
             'language_id' => $language->id, 'currency_id' => $currency->id, 'active' => true]);
         $this->user = PartnerUser::create(['partner_id' => $partner->id, 'role' => 'partner_admin', 'name' => 'Partner',
             'email' => 'partner@example.test', 'password' => 'password', 'active' => true]);
         $this->actingAs($this->user, 'partner');
         $this->brand = Brand::create(['code' => 'HT', 'name' => 'HT', 'active' => true]);
-        $this->type = OrderSheetType::create(['code' => 'B', 'name' => 'Táska', 'name_hu' => 'Táska', 'active' => true]);
+        $this->type = OrderSheetType::create(['code' => 'B', 'name' => 'Táska', 'active' => true]);
         $this->address->brands()->attach($this->brand);
         $this->address->orderSheetTypes()->attach($this->type);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táskák', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táskák', 'active' => true]);
         $range = SizeRange::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);
         foreach (['visible', 'hidden', 'historical'] as $kind) {
             $season = $this->{$kind};
             $product = Product::create(['season_id' => $season->id, 'model_code' => 'B01'.$season->code, 'name_hu' => 'Model '.$kind,
                 'item_main_group_id' => $group->id, 'size_range_id' => $range->id, 'brand_id' => $this->brand->id,
-                'order_sheet_type_id' => $this->type->id, 'catalog_group_name_hu' => 'Táskák', 'catalog_group_name_en' => 'Bags', 'active' => true]);
+                'order_sheet_type_id' => $this->type->id, 'catalog_group_name_hu' => 'Táskák', 'active' => true]);
             $color = Color::create(['product_id' => $product->id, 'code' => 'BLACK', 'name_hu' => 'Fekete', 'active' => true]);
             $sku = Sku::create(['product_id' => $product->id, 'color_id' => $color->id, 'size_id' => $size->id,
                 'sku_code' => $product->model_code.'-BLACK', 'sku_name' => $product->name_hu, 'type' => 'piece', 'active' => true]);
@@ -118,6 +122,48 @@ class PartnerSeasonVisibilityTest extends TestCase
     {
         return OrderShareLink::create(['order_id' => $this->orders[$kind]->id, 'token' => str_repeat($kind === 'hidden' ? 'a' : 'b', 64),
             'price_list_id' => $this->list->id, 'expires_at' => now()->addDay(), 'created_by_partner_user_id' => $this->user->id]);
+    }
+
+    #[DataProvider('commonNameLocales')]
+    public function test_product_color_and_catalog_group_names_are_shared_across_interface_languages(string $locale): void
+    {
+        session(['partner.locale' => $locale]);
+        $this->address->language->update(['code' => strtoupper($locale)]);
+        Livewire::test(CatalogGroupOrder::class, ['order' => $this->orders['visible'], 'catalogGroupName' => 'Táskák'])
+            ->assertSuccessful()->assertSee('Model visible')->assertSee('Fekete')
+            ->set('modelSearch', 'Model visible')->call('jumpToFirstModelSearchResult')
+            ->assertSet('modelSearchResults.0.model_code', $this->products['visible']->model_code);
+        Livewire::test(OrderSummary::class, ['season' => $this->visible, 'brand' => $this->brand, 'orderSheetType' => $this->type])
+            ->assertSuccessful()->assertSee('Model visible')->assertSee('Fekete')->assertSee('Táskák');
+        Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $this->share('visible'), 'catalogGroupName' => 'Táskák'])
+            ->assertSuccessful()->assertSee('Model visible')->assertSee('Fekete');
+        session(['partner_order_selector.season_id' => $this->visible->id, 'partner_order_selector.brand_id' => $this->brand->id,
+            'partner_order_selector.partner_address_id' => $this->address->id, 'partner_order_selector.order_sheet_type_id' => $this->type->id,
+            'partner_order_selector.order_id' => $this->orders['visible']->id]);
+        $selector = Livewire::test(OrderSelector::class)->assertSuccessful();
+        $this->assertSame(['Táskák'], $selector->instance()->catalogGroups->pluck('name')->all());
+    }
+
+    public static function commonNameLocales(): array
+    {
+        return ['Hungarian' => ['hu'], 'English' => ['en']];
+    }
+
+    public function test_price_list_names_are_translated_in_partner_sharing_and_both_order_exports(): void
+    {
+        $en = Language::create(['code' => 'EN', 'name' => 'English', 'active' => true]);
+        $this->address->update(['language_id' => $en->id]);
+        session(['partner.locale' => 'en', 'partner.language_id' => $en->id]);
+        Translation::create(['entity' => 'price_list', 'entity_code' => $this->list->code,
+            'field' => 'name', 'language_id' => $en->id, 'value' => 'English wholesale']);
+        $order = $this->orders['visible']->fresh();
+        $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Táskák'])->assertSuccessful();
+        $this->assertStringContainsString('English wholesale', $page->instance()->sharePriceListOptions()[$this->list->id]);
+        foreach ([new PartnerOrderMatrixExport($order), new PartnerOrderSummaryMatrixExport(new Collection([$order]))] as $export) {
+            $cells = collect($export->array())->flatten()->all();
+            $this->assertContains('English wholesale', $cells);
+            $this->assertNotContains('Nagyker', $cells);
+        }
     }
 
     public function test_new_seasons_start_hidden_even_when_active(): void

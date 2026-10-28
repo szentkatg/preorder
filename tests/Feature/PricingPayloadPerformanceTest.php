@@ -35,13 +35,13 @@ class PricingPayloadPerformanceTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'PERF', 'name' => 'Teljesítmény teszt', 'active' => true]);
-        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'PERF', 'name_hu' => 'Teszt csoport', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'PERF', 'name' => 'Teszt csoport', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'PERF-001', 'name_hu' => 'Teszt termék', 'active' => true]);
         $project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt projekt', 'status' => 'active', 'active' => true]);
         $project->products()->attach($product);
-        $list = PriceList::create(['code' => 'PERF-HUF', 'name_hu' => 'Teszt kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $list = PriceList::create(['code' => 'PERF-HUF', 'name' => 'Teszt kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         $cost = PricingCalculationRow::create(['pricing_project_id' => $project->id, 'product_id' => $product->id,
             'price_type' => 'cost', 'currency_id' => $huf->id, 'calculated_price' => 460]);
         for ($index = 1; $index < 100; $index++) {

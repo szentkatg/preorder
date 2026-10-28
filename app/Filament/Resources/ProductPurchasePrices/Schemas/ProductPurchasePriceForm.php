@@ -3,14 +3,13 @@
 namespace App\Filament\Resources\ProductPurchasePrices\Schemas;
 
 use App\Models\Color;
-use App\Models\Product;
 use App\Models\Supplier;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 
 class ProductPurchasePriceForm
 {
@@ -30,7 +29,6 @@ class ProductPurchasePriceForm
                     ->searchable([
                         'model_code',
                         'name_hu',
-                        'name_en',
                     ])
                     ->live()
                     ->afterStateUpdated(

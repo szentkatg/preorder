@@ -447,8 +447,6 @@ trait HandlesMultiAddressExcelImport
         $orderSheetType = OrderSheetType::query()
             ->where('code', $header['order_sheet_type'])
             ->orWhere('name', $header['order_sheet_type'])
-            ->orWhere('name_hu', $header['order_sheet_type'])
-            ->orWhere('name_en', $header['order_sheet_type'])
             ->orWhereIn(
                 'code',
                 Translation::query()

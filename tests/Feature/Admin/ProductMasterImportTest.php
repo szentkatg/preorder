@@ -3,9 +3,11 @@
 namespace Tests\Feature\Admin;
 
 use App\Filament\Pages\ProductMasterImport;
+use App\Models\Color;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -115,6 +117,10 @@ class ProductMasterImportTest extends TestCase
             ['EXCEL-DATE', 'Excel dátum teszt', 'S01', 'BR', 'STD', 'TST', $value],
         ]);
         $sheet->getStyle('G2')->getNumberFormat()->setFormatCode($format);
+        if (is_string($value) && str_starts_with($value, '=')) {
+            // A previous export's global value binder may intentionally escape formulas.
+            $sheet->setCellValueExplicit('G2', $value, DataType::TYPE_FORMULA);
+        }
         $page = $this->importPage();
         $rows = $page->rowsFromSheet($sheet);
         $this->assertEquals(46295, $rows[0]['promised_delivery_date']);
@@ -162,12 +168,12 @@ class ProductMasterImportTest extends TestCase
                 return $this->sheetToRows($sheet);
             }
 
-            public function validateProductRows(array $rows): array
+            public function validateProductRows(array $rows, array $colors = []): array
             {
                 $this->resetImportState();
                 $this->sheets = [
                     'products' => $rows,
-                    'colors' => [],
+                    'colors' => $colors,
                     'skus' => [],
                     'assortments' => [],
                 ];
@@ -180,7 +186,50 @@ class ProductMasterImportTest extends TestCase
             {
                 $this->importProducts($rows);
             }
+
+            public function importColorRows(array $rows): void
+            {
+                $this->importColors($rows);
+            }
         };
+    }
+
+    #[DataProvider('legacyNames')]
+    public function test_optional_legacy_columns_are_compatible_but_conflicts_skip_the_entire_model(?string $legacyName, ?string $legacyGroup, ?string $legacyColor, bool $valid): void
+    {
+        $this->createProductReferences();
+        $products = [['model_code' => 'TEST001', 'season_code' => 'S01', 'brand_code' => 'BR',
+            'order_sheet_type_code' => 'STD', 'item_main_group_code' => 'TST', 'name_hu' => 'EMIRO',
+            'name_en' => $legacyName, 'catalog_group_name_hu' => 'SIDE BAGS', 'catalog_group_name_en' => $legacyGroup]];
+        $colors = [['model_code' => 'TEST001', 'color_code' => '01', 'name_hu' => 'BLACK', 'name_en' => $legacyColor]];
+        $page = $this->importPage();
+        $errors = $page->validateProductRows($products, $colors);
+        $this->assertSame($valid, $errors === []);
+        if (! $valid) {
+            $this->assertStringContainsString('eltér a közös', implode(' ', $errors));
+            $this->assertArrayHasKey('TEST001', $page->invalidModelCodes);
+        }
+        $page->importProductRows($products);
+        $page->importColorRows($colors);
+        $this->assertSame($valid ? 1 : 0, Product::count());
+        $this->assertSame($valid ? 1 : 0, Color::count());
+        if ($valid) {
+            $this->assertSame('EMIRO', Product::first()->name_hu);
+            $this->assertSame('SIDE BAGS', Product::first()->catalog_group_name_hu);
+            $this->assertSame('BLACK', Color::first()->name_hu);
+        }
+    }
+
+    public static function legacyNames(): array
+    {
+        return [
+            'empty columns' => [null, '', null, true],
+            'identical legacy columns' => ['EMIRO', 'SIDE BAGS', 'BLACK', true],
+            'surrounding import whitespace' => [' EMIRO ', 'SIDE BAGS', ' BLACK ', true],
+            'conflicting model name' => ['OTHER', 'SIDE BAGS', 'BLACK', false],
+            'conflicting catalog group' => ['EMIRO', 'SHOULDER BAGS', 'BLACK', false],
+            'conflicting color' => ['EMIRO', 'SIDE BAGS', 'WHITE', false],
+        ];
     }
 
     private function createProductReferences(): void
@@ -201,12 +250,12 @@ class ProductMasterImportTest extends TestCase
             ...$timestamps,
         ]);
         DB::table('order_sheet_types')->insert([
-            'name_hu' => 'Teszt rendelőlap',
+            'name' => 'Teszt rendelőlap',
             'code' => 'STD',
             ...$timestamps,
         ]);
         DB::table('item_main_groups')->insert([
-            'name_hu' => 'Teszt főcsoport',
+            'name' => 'Teszt főcsoport',
             'code' => 'TST',
             ...$timestamps,
         ]);

@@ -31,13 +31,9 @@ class SizeRangesTable
                     ->sortable(),
 
                 TextColumn::make('name_hu')
-                    ->label('Név HU')
+                    ->label('Név')
                     ->searchable()
                     ->sortable(),
-
-                TextColumn::make('name_en')
-                    ->label('Név EN')
-                    ->searchable(),
 
                 TextColumn::make('sort_order')
                     ->label('Sorrend')
@@ -64,12 +60,8 @@ class SizeRangesTable
                             ->unique(table: 'size_ranges', column: 'code'),
 
                         TextInput::make('name_hu')
-                            ->label('Új név HU')
+                            ->label('Új név')
                             ->required()
-                            ->maxLength(255),
-
-                        TextInput::make('name_en')
-                            ->label('Új név EN')
                             ->maxLength(255),
 
                         TextInput::make('matrix_group')
@@ -86,9 +78,8 @@ class SizeRangesTable
                             ->default(true),
                     ])
                     ->fillForm(fn ($record): array => [
-                        'code' => $record->code . '_COPY',
-                        'name_hu' => $record->name_hu . ' másolat',
-                        'name_en' => $record->name_en ? $record->name_en . ' copy' : null,
+                        'code' => $record->code.'_COPY',
+                        'name_hu' => $record->name_hu.' másolat',
                         'matrix_group' => $record->matrix_group,
                         'sort_order' => $record->sort_order,
                         'active' => $record->active,
@@ -99,7 +90,6 @@ class SizeRangesTable
                             attributes: [
                                 'code' => $data['code'],
                                 'name_hu' => $data['name_hu'],
-                                'name_en' => $data['name_en'] ?? null,
                                 'matrix_group' => $data['matrix_group'] ?? null,
                                 'sort_order' => $data['sort_order'] ?? 0,
                                 'active' => $data['active'] ?? true,

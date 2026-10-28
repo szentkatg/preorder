@@ -25,7 +25,7 @@ class PricingParametersTable
                 TextColumn::make('parameter_type')->label('Paraméter')->badge(),
                 TextColumn::make('scope_type')->label('Szűkítés')->badge(),
                 TextColumn::make('supplier_country_code')->label('Ország'),
-                TextColumn::make('itemMainGroup.name_hu')->label('Főcsoport'),
+                TextColumn::make('itemMainGroup.name')->label('Főcsoport'),
                 TextColumn::make('material_composition')->label('Anyagösszetétel'),
                 TextColumn::make('product.model_code')->label('Modell'),
                 TextColumn::make('priceList.code')->label('Árlista'),

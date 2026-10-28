@@ -22,7 +22,7 @@ class PartnerPriceListService
 {
     public const LANGUAGES = ['HU', 'EN'];
 
-    public const CATALOG_KEY_SQL = "COALESCE(NULLIF(products.catalog_group_name_hu, ''), products.catalog_group_name_en, '')";
+    public const CATALOG_KEY_SQL = "COALESCE(products.catalog_group_name_hu, '')";
 
     public static function canRead(): bool
     {
@@ -129,7 +129,7 @@ class PartnerPriceListService
         $translations = Translation::where('language_id', $language->id)->whereIn('entity', ['brand', 'item_main_group', 'order_sheet_type', 'season'])
             ->where('field', 'name')->get()->mapWithKeys(fn ($row) => [$row->entity.'|'.$row->entity_code => $row->value])->all();
         $label = static fn ($model, string $entity) => trim((string) ($translations[$entity.'|'.$model?->code]
-            ?? ($locale === 'en' ? ($model?->name_en ?: $model?->name_hu ?: $model?->name) : ($model?->name_hu ?: $model?->name ?: $model?->name_en)) ?? $model?->code));
+            ?? $model?->name ?? $model?->code));
         $list = PriceList::with('currency')->findOrFail($configuration['price_list_id']);
         $retailList = $configuration['retail_price_list_id'] ? PriceList::with('currency')->findOrFail($configuration['retail_price_list_id']) : null;
         $season = Season::findOrFail($configuration['season_id']);
@@ -157,9 +157,9 @@ class PartnerPriceListService
             $missing += $net === null || ($configuration['retail_price_list_id'] !== null && $retail === null) ? 1 : 0;
             $delivery = $product->promised_delivery_date ? CarbonImmutable::parse($product->promised_delivery_date)->startOfDay() : null;
             $sections[$sectionKey]['rows'][] = ['id' => $product->id, 'code' => $product->model_code,
-                'name' => $locale === 'en' ? ($product->name_en ?: $product->name_hu) : ($product->name_hu ?: $product->name_en),
+                'name' => $product->name_hu,
                 'main_group' => $label($product->itemMainGroup, 'item_main_group'),
-                'catalog_group' => trim((string) ($locale === 'en' ? ($product->catalog_group_name_en ?: $product->catalog_group_name_hu) : ($product->catalog_group_name_hu ?: $product->catalog_group_name_en))),
+                'catalog_group' => trim((string) $product->catalog_group_name_hu),
                 'net_price' => $net, 'retail_price' => $retail, 'delivery_date' => $delivery, 'catalog_page' => $product->catalog_page];
         }
 

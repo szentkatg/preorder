@@ -12,8 +12,6 @@ use App\Models\Season;
 use App\Services\PartnerPriceListPdf;
 use App\Services\PartnerPriceListService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
-use Filament\Actions\Action;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -21,12 +19,12 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\GridDirection;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -49,6 +47,8 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
     protected string $view = 'filament.pages.partner-price-list-export';
 
     public ?array $data = [];
+
+    public bool $settingsOpen = true;
 
     #[Locked]
     public ?array $appliedFilters = null;
@@ -78,7 +78,7 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
             Select::make('season_id')->label('Szezon')->options(fn () => Season::orderByDesc('code')->get()->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->name]))
                 ->required()->searchable()->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set)),
             Select::make('price_list_id')->label('Nettó árlista')->options(fn () => PriceList::where('active', true)->whereIn('type', ['wholesale', 'distributor'])
-                ->with('currency')->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->name_hu.' ('.$row->currency?->code.')']))
+                ->with('currency')->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->translate('name').' ('.$row->currency?->code.')']))
                 ->required()->searchable()->live()->afterStateUpdated(function ($state, Set $set): void {
                     $list = PriceList::find($state);
                     $retail = $list?->retailPriceList;
@@ -89,31 +89,52 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
                 ->options(fn () => PriceList::where('active', true)->whereIn('type', ['retail', 'outlet'])->with('currency')->orderBy('code')->get()
                     ->mapWithKeys(fn ($list) => [$list->id => $list->code.' ('.$list->currency?->code.')']))
                 ->searchable()->live()->afterStateUpdated($invalidate)
-                ->helperText('Alapból a kapcsolt árlista. Bármely aktív kisker vagy outlet választható, eltérő pénznemben is. Átváltás nem történik.'),
+                ->hintIcon('heroicon-o-information-circle', tooltip: 'Alapból a kapcsolt árlista. Bármely aktív kisker vagy outlet választható, eltérő pénznemben is. Átváltás nem történik.'),
             Select::make('language_id')->label('Fájl nyelve')->options(fn () => Language::where('active', true)
-                ->whereRaw('UPPER(code) IN (?, ?)', PartnerPriceListService::LANGUAGES)->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => strtoupper($row->code).' - '.($row->name_hu ?: $row->name)]))
+                ->whereRaw('UPPER(code) IN (?, ?)', PartnerPriceListService::LANGUAGES)->orderBy('code')->get()->mapWithKeys(fn ($row) => [$row->id => strtoupper($row->code).' - '.$row->translate('name')]))
                 ->required()->live()->afterStateUpdated($invalidate),
             Select::make('format')->label('Formátum')->options(['xlsx' => 'Excel (.xlsx)', 'pdf' => 'PDF (.pdf)'])->required()->live()->afterStateUpdated($invalidate),
             $this->productFilter('brand_ids', 'Márkák')->options(fn () => Brand::where('active', true)->orderBy('name')->pluck('name', 'id'))
-                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set))
-                ->helperText('Több márka is kipipálható. Üresen: minden márka.'),
+                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set)),
             $this->productFilter('item_main_group_ids', 'Főcsoportok')->options(fn () => ItemMainGroup::where('active', true)->orderBy('code')->get()
-                ->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.($row->name_hu ?: $row->name)]))
-                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set))
-                ->helperText('Több főcsoport is kipipálható. Üresen: minden főcsoport.'),
+                ->mapWithKeys(fn ($row) => [$row->id => $row->code.' - '.$row->translate('name')]))
+                ->live()->afterStateUpdated(fn (Get $get, Set $set) => $this->refreshCatalogSelection($get, $set)),
             $this->productFilter('catalog_groups', 'Katalóguscsoportok')
                 ->options(fn (Get $get) => app(PartnerPriceListService::class)->catalogGroups($get('season_id') ? (int) $get('season_id') : null, $get('brand_ids') ?? [], $get('item_main_group_ids') ?? []))
-                ->live()->afterStateUpdated($invalidate)->helperText('Több csoport is kipipálható. Üresen: minden katalóguscsoport. A három szűrő együtt érvényesül.'),
-        ])->columns(['default' => 1, 'md' => 2, 'xl' => 3])->statePath('data');
+                ->live()->afterStateUpdated($invalidate),
+        ])->columns(['default' => 1, 'md' => 2, 'xl' => 4])->statePath('data');
     }
 
-    private function productFilter(string $name, string $label): CheckboxList
+    private function productFilter(string $name, string $label): Select
     {
-        return CheckboxList::make($name)->label($label)->searchable()->searchPrompt('Keresés...')->bulkToggleable()->columns(1)->gridDirection(GridDirection::Row)
-            ->selectAllAction(fn (Action $action) => $action->label('Mindent kijelöl'))
-            ->deselectAllAction(fn (Action $action) => $action->label('Kijelölés visszavonása'))
-            ->extraAttributes(['class' => 'partner-price-list-product-filter',
-                'style' => 'max-height:12rem;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:minmax(0,1fr);gap:.125rem;align-content:start;']);
+        return Select::make($name)->label($label)->multiple()->searchable()->preload()
+            ->placeholder('Mindegyik')->searchPrompt('Keresés...')
+            ->hintIcon('heroicon-o-information-circle', tooltip: 'Több érték választható. Üresen: mindegyik. A termékszűrők együtt érvényesülnek.')
+            ->extraAttributes(['class' => 'partner-price-list-product-filter']);
+    }
+
+    #[Computed]
+    public function appliedSummary(): array
+    {
+        if (! $this->appliedFilters) {
+            return [];
+        }
+
+        $filters = $this->appliedFilters;
+        $lists = PriceList::with('currency')->whereIn('id', array_filter([
+            $filters['price_list_id'], $filters['retail_price_list_id'],
+        ]))->get()->keyBy('id');
+        $listLabel = fn ($id) => ($list = $lists->get($id)) ? $list->code.' ('.$list->currency?->code.')' : 'Nincs';
+
+        return [
+            'Szezon' => Season::find($filters['season_id'])?->code,
+            'Nettó' => $listLabel($filters['price_list_id']),
+            'Kisker / outlet' => $listLabel($filters['retail_price_list_id']),
+            'Fájl' => strtoupper($filters['locale']).' / '.strtoupper($filters['format']),
+            'Márka' => count($filters['brand_ids']) ?: 'Mindegyik',
+            'Főcsoport' => count($filters['item_main_group_ids']) ?: 'Mindegyik',
+            'Katalóguscsoport' => count($filters['catalog_groups']) ?: 'Mindegyik',
+        ];
     }
 
     private function refreshCatalogSelection(Get $get, Set $set): void
@@ -126,7 +147,9 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
 
     public function clearPreview(): void
     {
+        $this->settingsOpen = true;
         $this->appliedFilters = null;
+        unset($this->appliedSummary);
         $this->selectedTableRecords = $this->deselectedTableRecords = [];
         $this->isTrackingDeselectedTableRecords = false;
         AdminResourceTable::refreshPreservingState($this);
@@ -135,9 +158,12 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
     public function loadProducts(): void
     {
         abort_unless(static::canAccess(), 403);
+        $this->settingsOpen = true;
         $this->appliedFilters = app(PartnerPriceListService::class)->validateConfiguration($this->form->getState());
+        unset($this->appliedSummary);
         AdminResourceTable::refreshPreservingState($this);
         $this->selectAllProducts();
+        $this->settingsOpen = false;
     }
 
     public function selectAllProducts(): void
@@ -169,14 +195,10 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
             ->columns([
                 TextColumn::make('model_code')->label('Cikkszám')->searchable()->sortable(),
                 TextColumn::make('name_hu')->label('Megnevezés')
-                    ->getStateUsing(fn ($record) => ($this->appliedFilters['locale'] ?? 'hu') === 'en' ? ($record->name_en ?: $record->name_hu) : ($record->name_hu ?: $record->name_en))
-                    ->searchable(query: fn ($query, string $search) => $query->where(fn ($query) => $query->where('name_hu', 'like', '%'.$search.'%')->orWhere('name_en', 'like', '%'.$search.'%')))
-                    ->sortable(query: fn ($query, string $direction) => $query->orderBy(($this->appliedFilters['locale'] ?? 'hu') === 'en' ? 'name_en' : 'name_hu', $direction)),
-                TextColumn::make('name_en')->label('Megnevezés EN')->searchable()->sortable()->toggleable(isToggledHiddenByDefault: true),
+                    ->searchable()->sortable(),
                 TextColumn::make('brand.name')->label('Márka')->sortable(),
-                TextColumn::make('itemMainGroup.name_hu')->label('Főcsoport')->sortable(),
+                TextColumn::make('itemMainGroup.name')->label('Főcsoport')->sortable(),
                 TextColumn::make('catalog_group_name_hu')->label('Katalóguscsoport')
-                    ->getStateUsing(fn ($record) => ($this->appliedFilters['locale'] ?? 'hu') === 'en' ? ($record->catalog_group_name_en ?: $record->catalog_group_name_hu) : ($record->catalog_group_name_hu ?: $record->catalog_group_name_en))
                     ->searchable()->sortable(),
                 TextColumn::make('export_net_price')->label('Nettó ár')->numeric(decimalPlaces: 2, decimalSeparator: ',', thousandsSeparator: ' ')->placeholder('Hiányzó ár')->alignEnd()->sortable(),
                 TextColumn::make('export_retail_price')->label('Bruttó kisker ár')->numeric(decimalPlaces: 2, decimalSeparator: ',', thousandsSeparator: ' ')->placeholder('Hiányzó ár')->alignEnd()->sortable()
@@ -197,7 +219,15 @@ class PartnerPriceListExport extends Page implements HasForms, HasTable
             throw ValidationException::withMessages(['selection' => 'Először töltsd be a terméklistát.']);
         }
         $ids = $this->getSelectedTableRecords()->modelKeys();
-        $document = app(PartnerPriceListService::class)->document($this->appliedFilters, $ids);
+        try {
+            $document = app(PartnerPriceListService::class)->document($this->appliedFilters, $ids);
+        } catch (ValidationException $exception) {
+            if (collect(array_keys($exception->errors()))->contains(fn ($key) => str_starts_with($key, 'data.'))) {
+                $this->settingsOpen = true;
+            }
+
+            throw $exception;
+        }
         $filename = 'partner-arlista-'.preg_replace('/[^a-zA-Z0-9_-]/', '_', $document['season_code']).'-'.strtoupper($document['locale']);
         if ($this->appliedFilters['format'] === 'xlsx') {
             return Excel::download(new PriceListWorkbook($document), $filename.'.xlsx');

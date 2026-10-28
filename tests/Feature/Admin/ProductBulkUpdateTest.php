@@ -52,12 +52,12 @@ class ProductBulkUpdateTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táskák', 'name_hu' => 'Táskák', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táskák', 'active' => true]);
         $size = SizeRange::create(['code' => 'ONE', 'name_hu' => 'Egyméretes', 'active' => true]);
         $brand = Brand::create(['code' => 'HT', 'name' => 'Heavy Tools', 'active' => true]);
-        $sheet = OrderSheetType::create(['code' => 'NORMAL', 'name' => 'Normál', 'name_hu' => 'Normál', 'active' => true]);
+        $sheet = OrderSheetType::create(['code' => 'NORMAL', 'name' => 'Normál', 'active' => true]);
         foreach (['first', 'second', 'untouched'] as $name) {
-            $this->{$name} = Product::create(['model_code' => 'MODEL-'.$name, 'name_hu' => 'Termék '.$name, 'name_en' => 'Original '.$name,
+            $this->{$name} = Product::create(['model_code' => 'MODEL-'.$name, 'name_hu' => 'Termék '.$name,
                 'season_id' => $season->id, 'item_main_group_id' => $group->id, 'size_range_id' => $size->id,
                 'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id, 'active' => true, 'catalog_sort' => 10]);
         }
@@ -106,7 +106,7 @@ class ProductBulkUpdateTest extends TestCase
             $this->assertSame('2027-09-30', $product->fresh()->promised_delivery_date);
             $this->assertSame(12, $product->fresh()->catalog_page);
             $this->assertFalse((bool) $product->fresh()->active);
-            $this->assertSame('Original '.($product->id === $this->first->id ? 'first' : 'second'), $product->fresh()->name_en);
+            $this->assertSame('Termék '.($product->id === $this->first->id ? 'first' : 'second'), $product->fresh()->name_hu);
         }
         $this->assertSame($before, $this->untouched->fresh()->getAttributes());
         $page->assertSet('mountedActions', [])->assertDispatched('deselectAllTableRecords');
@@ -260,8 +260,8 @@ class ProductBulkUpdateTest extends TestCase
 
     public function test_optional_values_can_be_cleared_and_false_and_zero_are_saved(): void
     {
-        $this->update([['field' => 'name_en', 'value' => ''], ['field' => 'catalog_sort', 'value' => 0], ['field' => 'active', 'value' => '0']]);
-        $this->assertNull($this->first->fresh()->name_en);
+        $this->update([['field' => 'catalog_group_name_hu', 'value' => ''], ['field' => 'catalog_sort', 'value' => 0], ['field' => 'active', 'value' => '0']]);
+        $this->assertNull($this->first->fresh()->catalog_group_name_hu);
         $this->assertSame(0, $this->first->fresh()->catalog_sort);
         $this->assertFalse((bool) $this->first->fresh()->active);
     }
@@ -273,6 +273,19 @@ class ProductBulkUpdateTest extends TestCase
             $this->fail('Expected validation error');
         } catch (ValidationException) {
             $this->assertSame('Termék first', $this->first->fresh()->name_hu);
+        }
+    }
+
+    public function test_removed_english_fields_cannot_be_bulk_updated(): void
+    {
+        foreach (['name_en', 'catalog_group_name_en'] as $field) {
+            $this->assertArrayNotHasKey($field, ProductBulkUpdateService::fields());
+            try {
+                $this->update([['field' => 'name_hu', 'value' => 'Must not be saved'], ['field' => $field, 'value' => 'Old field']]);
+                $this->fail('Expected obsolete field rejection.');
+            } catch (ValidationException) {
+                $this->assertSame('Termék first', $this->first->fresh()->name_hu);
+            }
         }
     }
 
@@ -393,7 +406,7 @@ class ProductBulkUpdateTest extends TestCase
 
     public function test_parameter_source_changes_mark_only_open_calculations_for_review(): void
     {
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $open = PricingProject::create(['season_id' => $this->first->season_id, 'name' => 'Open', 'status' => 'active', 'active' => true]);
         $closed = PricingProject::create(['season_id' => $this->first->season_id, 'name' => 'Closed', 'status' => 'closed', 'active' => true]);
         $rows = [];

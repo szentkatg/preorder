@@ -50,8 +50,8 @@ class PricingConfigurationCopyTest extends TestCase
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'COPY', 'name_hu' => 'Másolás', 'active' => true]);
-        $this->currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'COPY', 'name' => 'Másolás', 'active' => true]);
+        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'COPY-1', 'name_hu' => 'Másolás', 'active' => true]);
         $this->source = PricingProject::create(['season_id' => $season->id, 'name' => 'Forrás', 'status' => 'active', 'active' => true]);
@@ -253,7 +253,7 @@ class PricingConfigurationCopyTest extends TestCase
     public function test_public_prices_and_source_stay_unchanged_and_target_prices_are_only_flagged(string $model): void
     {
         $row = $this->row($model);
-        $list = PriceList::create(['code' => 'COPY-RETAIL', 'name_hu' => 'Kisker', 'currency_id' => $this->currency->id, 'type' => 'retail', 'active' => true]);
+        $list = PriceList::create(['code' => 'COPY-RETAIL', 'name' => 'Kisker', 'currency_id' => $this->currency->id, 'type' => 'retail', 'active' => true]);
         $item = PriceListItem::create(['price_list_id' => $list->id, 'season_id' => $this->target->season_id,
             'product_id' => $this->product->id, 'net_price' => 1000]);
         $price = PricingCalculationRow::create(['pricing_project_id' => $this->target->id, 'product_id' => $this->product->id,

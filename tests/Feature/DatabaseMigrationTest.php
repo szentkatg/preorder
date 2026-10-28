@@ -24,8 +24,7 @@ class DatabaseMigrationTest extends TestCase
 
         $this->assertTrue(Schema::hasColumns('item_main_groups', [
             'code',
-            'name_hu',
-            'name_en',
+            'name',
             'active',
         ]));
         $this->assertTrue(Schema::hasTable('size_ranges'));
@@ -33,6 +32,9 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumn('partners', 'sales_rep_erp_partner_code'));
         $this->assertFalse(Schema::hasColumn('products', 'serial_number'));
         $this->assertTrue(Schema::hasColumn('products', 'material_composition'));
+        $this->assertFalse(Schema::hasColumn('products', 'name_en'));
+        $this->assertFalse(Schema::hasColumn('products', 'catalog_group_name_en'));
+        $this->assertFalse(Schema::hasColumn('colors', 'name_en'));
         $this->assertTrue(Schema::hasColumns('products', ['previous_season_product_id', 'previous_season_match_override']));
         $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', ['source_retail_row_id', 'source_retail_price', 'retail_exchange_rate']));
         $this->assertTrue(Schema::hasColumns('pricing_calculation_rows', ['source_wholesale_row_id', 'distributor_discount_percent']));

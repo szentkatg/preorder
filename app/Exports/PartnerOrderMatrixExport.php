@@ -160,7 +160,7 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
         $rows[] = [
             '',
             __('partner.price_list'),
-            $order->priceList?->name_hu,
+            $order->priceList?->translate('name', $this->translationLanguageId($order)),
             __('partner.currency'),
             $order->priceList?->currency?->code,
         ];
@@ -221,7 +221,7 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
                     ->sortBy([
                         fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
                         fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
-                ])
+                    ])
                     ->values();
 
                 $fixedHeaderColumns = [

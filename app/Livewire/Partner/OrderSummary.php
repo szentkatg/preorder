@@ -157,21 +157,12 @@ class OrderSummary extends Component
 
     protected function catalogGroupNameColumn(): string
     {
-        return app()->getLocale() === 'en'
-            ? 'catalog_group_name_en'
-            : 'catalog_group_name_hu';
+        return 'catalog_group_name_hu';
     }
 
-    protected function localizedValue(object $model, string $baseName): string
+    protected function commonName(object $model): string
     {
-        $locale = app()->getLocale() === 'en' ? 'en' : 'hu';
-        $fallback = $locale === 'en' ? 'hu' : 'en';
-
-        return (string) (
-            $model->{$baseName.'_'.$locale}
-            ?? $model->{$baseName.'_'.$fallback}
-            ?? ''
-        );
+        return (string) ($model->name_hu ?? '');
     }
 
     protected function loadExistingQuantities(): void
@@ -434,7 +425,7 @@ class OrderSummary extends Component
             'id' => $product->id,
             'model_code' => $product->model_code,
             'catalog_page' => $product->catalog_page ?? null,
-            'name' => $this->localizedValue($product, 'name'),
+            'name' => $this->commonName($product),
             'price' => $wholesalePrice,
             'retail_price' => $retailPrice,
             'colors' => $product->colors
@@ -443,7 +434,7 @@ class OrderSummary extends Component
                 ->map(fn ($color) => [
                     'id' => $color->id,
                     'code' => $color->code,
-                    'name' => $this->localizedValue($color, 'name'),
+                    'name' => $this->commonName($color),
                     'sku_map' => $color->skus
                         ->where('active', true)
                         ->mapWithKeys(fn ($sku) => [
@@ -518,7 +509,7 @@ class OrderSummary extends Component
             return;
         }
 
-        $this->imageModalTitle = $product->model_code.' - '.$this->localizedValue($product, 'name');
+        $this->imageModalTitle = $product->model_code.' - '.$this->commonName($product);
 
         $images = collect();
 
@@ -556,8 +547,8 @@ class OrderSummary extends Component
                         ? $image->image_url
                         : asset(ltrim($image->image_url, '/')),
                     'color_name' => $image->color
-                        ? $this->localizedValue($image->color, 'name')
-                        : $this->localizedValue($product, 'name'),
+                        ? $this->commonName($image->color)
+                        : $this->commonName($product),
                     'type' => 'product',
                 ]);
             });

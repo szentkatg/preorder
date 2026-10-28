@@ -40,7 +40,7 @@ class PricingMaterialScopeTest extends TestCase
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'TEST', 'name_hu' => 'Teszt', 'material_composition' => '100% POLYESTER', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt', 'status' => 'active', 'active' => true]);
@@ -72,7 +72,7 @@ class PricingMaterialScopeTest extends TestCase
 
     public function test_inline_cost_adjustment_writes_material_scope_and_counts_only_matching_project_rows(): void
     {
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $cost = PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $this->product->id,
             'currency_id' => $currency->id, 'price_type' => 'cost', 'calculated_price' => 100]);
         $parameter = app(PricingParameterAdjustmentService::class)->updateCostPercentParameter($cost, 'customs_percent', 'material_composition', 12);
@@ -106,7 +106,7 @@ class PricingMaterialScopeTest extends TestCase
 
     public function test_material_cost_parameter_is_available_in_the_inline_workspace_and_used_in_real_calculation(): void
     {
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'SUP', 'name' => 'Szállító', 'active' => true]);
         ProductPurchasePrice::create(['product_id' => $this->product->id, 'supplier_id' => $supplier->getKey(),
             'currency_id' => $currency->id, 'purchase_price' => 100, 'active' => true]);

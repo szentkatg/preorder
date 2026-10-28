@@ -58,9 +58,9 @@ class PreviousSeasonRetailPriceTest extends TestCase
         $this->actingAs($user);
         $this->current = Season::create(['code' => 'W27', 'name' => 'Tél 27', 'active' => true]);
         $this->previous = Season::create(['code' => 'W26', 'name' => 'Tél 26', 'active' => false]);
-        ItemMainGroup::create(['code' => 'TEST', 'name_hu' => 'Teszt', 'active' => true]);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $this->list = PriceList::create(['code' => 'HU', 'name_hu' => 'Kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        ItemMainGroup::create(['code' => 'TEST', 'name' => 'Teszt', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $this->list = PriceList::create(['code' => 'HU', 'name' => 'Kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
         $this->project = PricingProject::create(['name' => 'Tél', 'season_id' => $this->current->id, 'status' => 'active', 'active' => true]);
         $this->product = $this->product($this->current, 'NACKW27', 'NEW');
         $this->pair = $this->product($this->previous, 'NACKW26', 'OLD');
@@ -133,7 +133,7 @@ class PreviousSeasonRetailPriceTest extends TestCase
     public function test_price_from_another_list_or_a_wrong_season_is_never_used(): void
     {
         PriceListItem::query()->delete();
-        $other = PriceList::create(['code' => 'OTHER', 'name_hu' => 'Másik', 'type' => 'retail', 'currency_id' => $this->list->currency_id, 'active' => true]);
+        $other = PriceList::create(['code' => 'OTHER', 'name' => 'Másik', 'type' => 'retail', 'currency_id' => $this->list->currency_id, 'active' => true]);
         PriceListItem::create(['price_list_id' => $other->id, 'season_id' => $this->previous->id, 'product_id' => $this->pair->id, 'net_price' => 3333]);
         PriceListItem::create(['price_list_id' => $this->list->id, 'season_id' => $this->current->id, 'product_id' => $this->pair->id, 'net_price' => 4444]);
         $this->assertNull($this->query()->firstOrFail()->previous_season_price);
@@ -218,8 +218,8 @@ class PreviousSeasonRetailPriceTest extends TestCase
 
     public function test_manual_pair_is_shared_with_other_currency_prices_but_each_list_has_its_own_price(): void
     {
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euro', 'active' => true]);
-        $list = PriceList::create(['code' => 'EUR', 'name_hu' => 'Euro kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euro', 'active' => true]);
+        $list = PriceList::create(['code' => 'EUR', 'name' => 'Euro kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
         $alternative = $this->product($this->previous, 'OTHERW26', 'MANUAL');
         app(PreviousSeasonRetailPriceService::class)->setPair($this->project, $this->product, 'manual', $alternative->id);
         PriceListItem::create(['price_list_id' => $list->id, 'season_id' => $this->previous->id, 'product_id' => $alternative->id, 'net_price' => 24.95]);

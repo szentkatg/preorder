@@ -26,7 +26,7 @@ class HufRetailCalculationsTable
             TextColumn::make('pricingProject.name')->label('Árprojekt'),
             TextColumn::make('priceList.code')->label('Árlista'),
             TextColumn::make('product.catalog_group_name_hu')->label('Katalógus csoport'),
-            TextColumn::make('product.itemMainGroup.name_hu')->label('Főcsoport')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('product.itemMainGroup.name')->label('Főcsoport')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('product.model_code')->label('Modell kód'),
             TextColumn::make('product.name_hu')->label('Modell név'),
             TextColumn::make('color.name_hu')->label('Szín'),

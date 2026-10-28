@@ -166,7 +166,7 @@ class ErpPricingExportService
             $codes[mb_strtoupper($code)] = true;
             $row = array_fill(0, 30, null);
             $row[0] = $code;
-            $row[1] = $product['name_hu'] ?: $product['name_en'];
+            $row[1] = $product['name_hu'];
             $row[5] = BigDecimal::of($product['cost'])->toScale(2, RoundingMode::HALF_UP)->toFloat();
             $productPrices = $prices->get($product['id'], collect())->keyBy('price_list_id');
             foreach (self::SLOTS as $slot => [, , , $columns]) {

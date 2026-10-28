@@ -53,9 +53,9 @@ class PricingProjectContextTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
-        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
-        ItemMainGroup::create(['code' => 'CTX', 'name_hu' => 'Teszt', 'active' => true]);
-        $this->priceList = PriceList::create(['code' => 'CTX-HUF', 'name_hu' => 'Kisker', 'type' => 'retail',
+        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        ItemMainGroup::create(['code' => 'CTX', 'name' => 'Teszt', 'active' => true]);
+        $this->priceList = PriceList::create(['code' => 'CTX-HUF', 'name' => 'Kisker', 'type' => 'retail',
             'currency_id' => $this->currency->id, 'active' => true]);
         $this->first = $this->makeProject('FIRST', PricingProject::STATUS_ACTIVE, false, false);
         $this->second = $this->makeProject('SECOND', PricingProject::STATUS_DRAFT, true, true);

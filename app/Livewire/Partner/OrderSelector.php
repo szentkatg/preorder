@@ -314,8 +314,7 @@ class OrderSelector extends Component
                                     $haystack = mb_strtolower(
                                         ($product['model_code'] ?? '').' '.
                                         ($product['name'] ?? '').' '.
-                                        ($product['name_hu'] ?? '').' '.
-                                        ($product['name_en'] ?? '')
+                                        ($product['name_hu'] ?? '')
                                     );
 
                                     return str_contains($haystack, $search);
@@ -640,16 +639,6 @@ class OrderSelector extends Component
 
         $order->loadMissing(['partnerAddress.language', 'priceList.currency']);
 
-        $languageCode = strtolower($order->partnerAddress?->language?->code ?? 'hu');
-
-        $catalogGroupColumn = $languageCode === 'en'
-            ? 'catalog_group_name_en'
-            : 'catalog_group_name_hu';
-
-        $fallbackCatalogGroupColumn = $languageCode === 'en'
-            ? 'catalog_group_name_hu'
-            : 'catalog_group_name_en';
-
         $products = Product::query()
             ->with(['skus.assortmentComponents'])
             ->where('season_id', $order->season_id)
@@ -681,14 +670,11 @@ class OrderSelector extends Component
 
         return $products
             ->map(function (Product $product) use (
-                $catalogGroupColumn,
-                $fallbackCatalogGroupColumn,
                 $orderItems,
                 $wholesalePrices,
                 $retailPrices
             ) {
-                $groupName = $product->{$catalogGroupColumn}
-                    ?: $product->{$fallbackCatalogGroupColumn};
+                $groupName = $product->catalog_group_name_hu;
 
                 if (! $groupName) {
                     return null;

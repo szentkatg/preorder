@@ -206,8 +206,7 @@ class CatalogGroupOrder extends Component
 
                     $query
                         ->where('model_code', 'like', $like)
-                        ->orWhere('name_hu', 'like', $like)
-                        ->orWhere('name_en', 'like', $like);
+                        ->orWhere('name_hu', 'like', $like);
                 })
                 ->orderBy('catalog_group_sort')
                 ->orderBy('catalog_sort')
@@ -325,35 +324,12 @@ class CatalogGroupOrder extends Component
 
     protected function catalogGroupNameColumn(): string
     {
-        return app()->getLocale() === 'en'
-            ? 'catalog_group_name_en'
-            : 'catalog_group_name_hu';
+        return 'catalog_group_name_hu';
     }
 
-    protected function productNameColumn(): string
+    protected function commonName(object $model): string
     {
-        return app()->getLocale() === 'en'
-            ? 'name_en'
-            : 'name_hu';
-    }
-
-    protected function colorNameColumn(): string
-    {
-        return app()->getLocale() === 'en'
-            ? 'name_en'
-            : 'name_hu';
-    }
-
-    protected function localizedValue(object $model, string $baseName): string
-    {
-        $locale = app()->getLocale() === 'en' ? 'en' : 'hu';
-        $fallback = $locale === 'en' ? 'hu' : 'en';
-
-        return (string) (
-            $model->{$baseName.'_'.$locale}
-            ?? $model->{$baseName.'_'.$fallback}
-            ?? ''
-        );
+        return (string) ($model->name_hu ?? '');
     }
 
     protected function loadExistingQuantities(): void
@@ -461,7 +437,7 @@ class CatalogGroupOrder extends Component
             'id' => $product->id,
             'model_code' => $product->model_code,
             'catalog_page' => $product->catalog_page ?? null,
-            'name' => $this->localizedValue($product, 'name'),
+            'name' => $this->commonName($product),
             'price' => $wholesalePrice,
             'retail_price' => $retailPrice,
             'colors' => $product->colors
@@ -470,7 +446,7 @@ class CatalogGroupOrder extends Component
                 ->map(fn ($color) => [
                     'id' => $color->id,
                     'code' => $color->code,
-                    'name' => $this->localizedValue($color, 'name'),
+                    'name' => $this->commonName($color),
                     'sku_map' => $color->skus
                         ->where('active', true)
                         ->mapWithKeys(fn ($sku) => [
@@ -713,7 +689,7 @@ class CatalogGroupOrder extends Component
             return;
         }
 
-        $this->imageModalTitle = $product->model_code.' - '.$this->localizedValue($product, 'name');
+        $this->imageModalTitle = $product->model_code.' - '.$this->commonName($product);
 
         $images = collect();
 
@@ -751,8 +727,8 @@ class CatalogGroupOrder extends Component
                         ? $image->image_url
                         : asset(ltrim($image->image_url, '/')),
                     'color_name' => $image->color
-                        ? $this->localizedValue($image->color, 'name')
-                        : $this->localizedValue($product, 'name'),
+                        ? $this->commonName($image->color)
+                        : $this->commonName($product),
                     'type' => 'product',
                 ]);
             });
@@ -883,7 +859,7 @@ class CatalogGroupOrder extends Component
             ->mapWithKeys(fn (PriceList $priceList) => [
                 $priceList->id => trim(collect([
                     $priceList->code,
-                    $priceList->name_hu,
+                    $priceList->translate('name'),
                     $priceList->currency?->code,
                 ])->filter()->implode(' - ')),
             ])
@@ -916,7 +892,7 @@ class CatalogGroupOrder extends Component
                 ]),
                 'price_list' => trim(collect([
                     $shareLink->priceList?->code,
-                    $shareLink->priceList?->name_hu,
+                    $shareLink->priceList?->translate('name'),
                     $shareLink->priceList?->currency?->code,
                 ])->filter()->implode(' - ')),
                 'expires_at' => $shareLink->expires_at?->format('Y.m.d. H:i'),

@@ -3,10 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Models\Currency;
+use App\Models\Language;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
+use App\Models\Translation;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -102,7 +104,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
                     $spreadsheet->getSheetByName('price_lists'),
                     [
                         'code',
-                        'name_hu',
+                        'name',
                         'type',
                         'currency_code',
                         'active',
@@ -230,6 +232,9 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             ->all();
 
         foreach ($requiredColumns as $column) {
+            if ($sheetName === 'price_lists' && $column === 'name' && in_array('name_hu', $headers, true)) {
+                continue;
+            }
             if (! in_array($column, $headers, true)) {
                 $this->addFatalError("{$sheetName}: hiányzó oszlop: {$column}");
             }
@@ -272,7 +277,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
         foreach ($this->sheets['price_lists'] ?? [] as $index => $row) {
             $rowNumber = $index + 2;
             $code = $this->nullIfEmpty($row['code'] ?? null);
-            $nameHu = $this->nullIfEmpty($row['name_hu'] ?? null);
+            $name = $this->nullIfEmpty($row['name'] ?? null) ?? $this->nullIfEmpty($row['name_hu'] ?? null);
             $type = $this->nullIfEmpty($row['type'] ?? null);
             $currencyCode = $this->nullIfEmpty($row['currency_code'] ?? null);
             $retailPriceListCode = $this->nullIfEmpty($row['retail_price_list_code'] ?? null);
@@ -289,8 +294,27 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
 
             $seenPriceListCodes[$code] = true;
 
-            if (! $nameHu) {
-                $this->addRowError($code, "price_lists {$rowNumber}. sor: hiányzó name_hu");
+            if (! $name) {
+                $this->addRowError($code, "price_lists {$rowNumber}. sor: hiányzó name (régi fájlban: name_hu)");
+            }
+            foreach (['HU' => 'name_hu', 'EN' => 'name_en'] as $languageCode => $column) {
+                $legacy = $this->nullIfEmpty($row[$column] ?? null);
+                if ($legacy === null) {
+                    continue;
+                }
+                $languageId = Language::whereRaw('UPPER(code) = ?', [$languageCode])->value('id');
+                if (! $languageId) {
+                    if ($legacy !== $name) {
+                        $this->addRowError($code, "price_lists {$rowNumber}. sor: a {$column} megőrzéséhez hiányzik a {$languageCode} nyelv.");
+                    }
+
+                    continue;
+                }
+                $existing = Translation::where('entity', 'price_list')->where('entity_code', $code)
+                    ->where('field', 'name')->where('language_id', $languageId)->value('value');
+                if ($existing !== null && trim($existing) !== $legacy) {
+                    $this->addRowError($code, "price_lists {$rowNumber}. sor: a {$column} eltér a meglévő fordítástól. A fordítást a Fordítások menüben módosítsd.");
+                }
             }
 
             if (! $type) {
@@ -400,8 +424,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             $exists = $priceList->exists;
 
             $priceList->forceFill([
-                'name_hu' => $row['name_hu'],
-                'name_en' => $this->nullIfEmpty($row['name_en'] ?? null),
+                'name' => $this->nullIfEmpty($row['name'] ?? null) ?? $this->nullIfEmpty($row['name_hu'] ?? null),
                 'type' => $this->nullIfEmpty($row['type'] ?? null) ?: 'wholesale',
                 'currency_id' => $currencyCode ? $currencies->get($currencyCode)?->id : null,
                 'retail_price_list_id' => array_key_exists('retail_price_list_code', $row)
@@ -411,6 +434,13 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
             ]);
 
             $priceList->save();
+            foreach (['HU' => 'name_hu', 'EN' => 'name_en'] as $languageCode => $column) {
+                $value = $this->nullIfEmpty($row[$column] ?? null);
+                $languageId = $value !== null ? Language::whereRaw('UPPER(code) = ?', [$languageCode])->value('id') : null;
+                if ($languageId) {
+                    Translation::firstOrCreate(['entity' => 'price_list', 'entity_code' => $code, 'field' => 'name', 'language_id' => $languageId], ['value' => $value]);
+                }
+            }
 
             $priceLists->put($code, $priceList);
 

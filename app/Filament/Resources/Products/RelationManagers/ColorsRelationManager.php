@@ -31,11 +31,8 @@ class ColorsRelationManager extends RelationManager
                     ->maxLength(2),
 
                 TextInput::make('name_hu')
-                    ->label('Név HU')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
 
                 TextInput::make('sort_order')
                     ->label('Sorrend')
@@ -57,11 +54,8 @@ class ColorsRelationManager extends RelationManager
                     ->sortable(),
 
                 TextColumn::make('name_hu')
-                    ->label('Név HU')
+                    ->label('Név')
                     ->searchable(),
-
-                TextColumn::make('name_en')
-                    ->label('Név EN'),
 
                 TextColumn::make('sort_order')
                     ->label('Sorrend')

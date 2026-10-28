@@ -16,7 +16,7 @@ class PriceListsTable
         return $table
             ->columns([
                 TextColumn::make('code')->searchable()->sortable(),
-                TextColumn::make('name_hu')->label('Név HU')->searchable(),
+                TextColumn::make('name')->label('Név')->getStateUsing(fn ($record) => $record->translate('name'))->searchable(),
                 TextColumn::make('currency.code')->label('Pénznem'),
                 TextColumn::make('type')->label('Árlista típusa')->formatStateUsing(fn ($state) => match ($state) {
                     'retail' => 'Kisker', 'wholesale' => 'Nagyker', 'distributor' => 'Disztribútor', 'outlet' => 'Outlet', default => $state,

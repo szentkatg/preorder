@@ -11,15 +11,14 @@ class Color extends Model
         'product_id',
         'code',
         'name_hu',
-        'name_en',
         'sort_order',
         'active',
     ];
 
-	public function purchasePrices(): HasMany
-	{
-		return $this->hasMany(ProductPurchasePrice::class);
-	}
+    public function purchasePrices(): HasMany
+    {
+        return $this->hasMany(ProductPurchasePrice::class);
+    }
 
     public function product()
     {
@@ -38,8 +37,9 @@ class Color extends Model
 
     public function __toString(): string
     {
-        return $this->code . ' - ' . $this->name_hu;
+        return $this->code.' - '.$this->name_hu;
     }
+
     public function images()
     {
         return $this->hasMany(ColorImage::class);

@@ -72,16 +72,16 @@ class DistributorCalculationTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => '2027 tél', 'active' => true]);
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $product = Product::create(['season_id' => $season->id, 'item_main_group_id' => $group->id, 'model_code' => 'BAG27', 'name_hu' => 'BAGW27', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => '2027 árprojekt', 'status' => 'active', 'active' => true]);
         $this->project->products()->attach($product);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
-        $retailHuf = PriceList::create(['code' => 'RETAIL_HU', 'name_hu' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
-        $this->retail = PriceList::create(['code' => 'RETAIL_EU', 'name_hu' => 'Euró kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
-        $this->whole = PriceList::create(['code' => 'WHOLE_EU', 'name_hu' => 'Euró nagyker', 'type' => 'wholesale', 'currency_id' => $eur->id, 'retail_price_list_id' => $this->retail->id, 'active' => true]);
-        $this->target = PriceList::create(['code' => 'DIST_EU', 'name_hu' => 'Euró disztribútor', 'type' => 'distributor', 'currency_id' => $eur->id, 'source_wholesale_price_list_id' => $this->whole->id, 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
+        $retailHuf = PriceList::create(['code' => 'RETAIL_HU', 'name' => 'Magyar kisker', 'type' => 'retail', 'currency_id' => $huf->id, 'active' => true]);
+        $this->retail = PriceList::create(['code' => 'RETAIL_EU', 'name' => 'Euró kisker', 'type' => 'retail', 'currency_id' => $eur->id, 'active' => true]);
+        $this->whole = PriceList::create(['code' => 'WHOLE_EU', 'name' => 'Euró nagyker', 'type' => 'wholesale', 'currency_id' => $eur->id, 'retail_price_list_id' => $this->retail->id, 'active' => true]);
+        $this->target = PriceList::create(['code' => 'DIST_EU', 'name' => 'Euró disztribútor', 'type' => 'distributor', 'currency_id' => $eur->id, 'source_wholesale_price_list_id' => $this->whole->id, 'active' => true]);
         PricingCalculationRow::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id, 'currency_id' => $huf->id, 'price_type' => 'cost', 'calculated_price' => 460]);
         ExchangeRate::create(['season_id' => $season->id, 'currency_id' => $eur->id, 'rate_to_huf' => 400, 'active' => true]);
         foreach (['retail_multiplier' => 4.7, 'country_multiplier' => 1.1, 'wholesale_margin' => 2.5, 'distributor_discount' => 20] as $type => $value) {
@@ -328,7 +328,7 @@ class DistributorCalculationTest extends TestCase
 
     public function test_price_list_form_creates_valid_eur_distributor_sources_and_rejects_huf(): void
     {
-        $data = ['code' => 'DIST_FORM', 'name_hu' => 'Disztribútor', 'type' => 'distributor', 'currency_id' => $this->whole->currency_id,
+        $data = ['code' => 'DIST_FORM', 'name' => 'Disztribútor', 'type' => 'distributor', 'currency_id' => $this->whole->currency_id,
             'source_wholesale_price_list_id' => $this->whole->id, 'retail_price_list_id' => $this->retail->id, 'active' => true];
         Livewire::test(CreatePriceList::class)->fillForm($data)->call('create')->assertHasNoFormErrors();
         $this->assertDatabaseHas('price_lists', ['code' => 'DIST_FORM', 'source_wholesale_price_list_id' => $this->whole->id,
@@ -374,7 +374,7 @@ class DistributorCalculationTest extends TestCase
 
     public function test_editing_a_legacy_wholesale_list_to_distributor_preserves_both_links(): void
     {
-        $legacy = PriceList::create(['code' => 'LEGACY_DIST', 'name_hu' => 'Régi disztribútor', 'type' => 'wholesale',
+        $legacy = PriceList::create(['code' => 'LEGACY_DIST', 'name' => 'Régi disztribútor', 'type' => 'wholesale',
             'currency_id' => $this->whole->currency_id, 'retail_price_list_id' => $this->retail->id, 'active' => true]);
         $page = Livewire::test(EditPriceList::class, ['record' => $legacy->getRouteKey()]);
         $page->set('data.type', 'distributor')
@@ -387,13 +387,13 @@ class DistributorCalculationTest extends TestCase
         $this->assertSame($this->retail->id, $legacy->fresh()->retail_price_list_id);
         $this->assertSame($this->whole->id, $legacy->fresh()->source_wholesale_price_list_id);
         // Ordinary model saves must also retain the portal's independent retail link.
-        $legacy->fresh()->update(['name_hu' => 'Új név']);
+        $legacy->fresh()->update(['name' => 'Új név']);
         $this->assertSame($this->retail->id, $legacy->fresh()->retail_price_list_id);
     }
 
     public function test_distributor_discount_uses_wholesale_even_with_a_different_display_retail_list(): void
     {
-        $display = PriceList::create(['code' => 'DISPLAY_RETAIL', 'name_hu' => 'Megjelenítési kisker', 'type' => 'retail',
+        $display = PriceList::create(['code' => 'DISPLAY_RETAIL', 'name' => 'Megjelenítési kisker', 'type' => 'retail',
             'currency_id' => $this->whole->currency_id, 'active' => true]);
         $this->target->update(['retail_price_list_id' => $display->id]);
         // A wholesale multiplier exists only for the WHOLE_EU source, not the distributor target.

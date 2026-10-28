@@ -36,13 +36,13 @@ class PricingRoundingRuleFiltersTest extends TestCase
         $this->actingAs($user);
 
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
+        $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         foreach (['Első', 'Második', 'Harmadik'] as $name) {
             $this->projects[] = PricingProject::create(['season_id' => $season->id, 'name' => $name,
                 'status' => 'active', 'active' => true]);
         }
         foreach (['retail', 'wholesale', 'outlet'] as $type) {
-            $this->lists[] = PriceList::create(['code' => strtoupper($type).'_HU', 'name_hu' => $type,
+            $this->lists[] = PriceList::create(['code' => strtoupper($type).'_HU', 'name' => $type,
                 'type' => $type, 'currency_id' => $currency->id, 'active' => true]);
         }
         $this->rules = [

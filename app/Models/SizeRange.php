@@ -10,7 +10,6 @@ class SizeRange extends Model
         'code',
         'matrix_group',
         'name_hu',
-        'name_en',
         'sort_order',
         'active',
     ];

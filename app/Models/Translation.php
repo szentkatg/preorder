@@ -58,24 +58,6 @@ class Translation extends Model
             return $value;
         }
 
-        /*
-         * Átmeneti kompatibilitás a régi mezőkkel, amíg a name_hu,
-         * name_en, catalog_group_name_hu és catalog_group_name_en
-         * oszlopok átvezetése nem készül el.
-         */
-        foreach ([
-            "{$fallbackColumn}_hu",
-            "{$fallbackColumn}_en",
-        ] as $legacyColumn) {
-            $value = $this->normalizeValue(
-                $record->getAttribute($legacyColumn)
-            );
-
-            if ($value !== null) {
-                return $value;
-            }
-        }
-
         return null;
     }
 

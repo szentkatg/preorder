@@ -21,7 +21,7 @@ class AdminTableFilters
         $filters = [];
         $path = self::productPath($model);
         if ($path !== null) {
-            foreach (['item_main_group_id' => ['Főcsoport', ItemMainGroup::class, 'name_hu'],
+            foreach (['item_main_group_id' => ['Főcsoport', ItemMainGroup::class, 'name'],
                 'brand_id' => ['Márka', Brand::class, 'name']] as $field => [$label, $class, $name]) {
                 $aliases = $field === 'brand_id' ? ['brand_id', 'brand'] : ['item_main_group_id', 'itemMainGroup', 'item_main_group'];
                 foreach ($aliases as $alias) {

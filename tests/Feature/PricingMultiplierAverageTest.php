@@ -27,8 +27,8 @@ class PricingMultiplierAverageTest extends TestCase
     {
         parent::setUp();
         $season = Season::create(['code' => 'W27', 'name' => 'Teszt szezon', 'active' => true]);
-        $this->currency = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $this->group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $this->group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $this->project = PricingProject::create(['season_id' => $season->id, 'name' => 'Teszt árprojekt', 'status' => 'active']);
     }
 

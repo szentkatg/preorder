@@ -21,11 +21,8 @@ class SizeRangeForm
                     ->maxLength(255),
 
                 TextInput::make('name_hu')
-                    ->label('Név HU')
+                    ->label('Név')
                     ->required(),
-
-                TextInput::make('name_en')
-                    ->label('Név EN'),
 
                 TextInput::make('sort_order')
                     ->numeric()

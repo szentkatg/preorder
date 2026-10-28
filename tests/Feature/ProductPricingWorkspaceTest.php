@@ -70,13 +70,13 @@ class ProductPricingWorkspaceTest extends TestCase
         $user->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($user);
         $season = Season::create(['code' => 'W27', 'name' => 'Tél', 'active' => true]);
-        $huf = Currency::create(['code' => 'HUF', 'name_hu' => 'Forint', 'active' => true]);
-        $eur = Currency::create(['code' => 'EUR', 'name_hu' => 'Euró', 'active' => true]);
-        $usd = Currency::create(['code' => 'USD', 'name_hu' => 'Dollár', 'active' => true]);
+        $huf = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
+        $eur = Currency::create(['code' => 'EUR', 'name' => 'Euró', 'active' => true]);
+        $usd = Currency::create(['code' => 'USD', 'name' => 'Dollár', 'active' => true]);
         foreach ([[$eur, 400], [$usd, 380]] as [$currency, $rate]) {
             ExchangeRate::create(['season_id' => $season->id, 'currency_id' => $currency->id, 'rate_to_huf' => $rate, 'active' => true]);
         }
-        $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
+        $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
         $supplier = Supplier::create(['erp_partner_code' => 'SUPP', 'name' => 'Beszállító', 'country_code' => 'CN', 'active' => true]);
         foreach (['TEST' => 'product', 'OTHER' => 'other'] as $code => $property) {
             $brand = Brand::create(['code' => $code, 'name' => $code, 'active' => true]);
