@@ -13,6 +13,7 @@ class Dashboard extends Component
         return view('livewire.partner.dashboard', [
             'user' => Auth::guard('partner')->user(),
             'seasons' => Season::query()
+                ->visibleToPartners()
                 ->where('active', true)
                 ->orderBy('deadline')
                 ->get(),

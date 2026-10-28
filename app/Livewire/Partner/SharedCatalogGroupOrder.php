@@ -29,6 +29,7 @@ class SharedCatalogGroupOrder extends CatalogGroupOrder
 
         abort_if($this->order->isSubmitted(), 404);
 
+        $this->assertPartnerSeasonVisible();
         $this->setPartnerLocale();
 
         $this->catalogGroupName = urldecode($catalogGroupName);

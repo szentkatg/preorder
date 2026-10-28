@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Partner;
 
+use App\Livewire\Partner\Concerns\RequiresVisiblePartnerSeason;
 use App\Models\Brand;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
@@ -11,6 +12,8 @@ use Livewire\Component;
 
 class ProductList extends Component
 {
+    use RequiresVisiblePartnerSeason;
+
     public Season $season;
 
     public PartnerAddress $address;
@@ -25,6 +28,7 @@ class ProductList extends Component
         Brand $brand,
         OrderSheetType $type
     ): void {
+        $this->assertPartnerSeasonVisible($season->id);
         $partnerUser = auth('partner')->user();
 
         abort_unless(

@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderMatrixExport;
 use App\Livewire\Partner\Concerns\HandlesMultiAddressExcelImport;
+use App\Livewire\Partner\Concerns\RequiresVisiblePartnerSeason;
 use App\Models\Catalog;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -21,6 +22,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class CatalogGroupOrder extends Component
 {
     use HandlesMultiAddressExcelImport;
+    use RequiresVisiblePartnerSeason;
     use WithFileUploads;
 
     protected ?array $matrixGroupsCache = null;
@@ -265,6 +267,7 @@ class CatalogGroupOrder extends Component
             $order = Order::query()->findOrFail($order);
         }
 
+        $this->assertPartnerSeasonVisible($order->season_id);
         $partnerUser = auth('partner')->user();
 
         abort_unless($partnerUser && $partnerUser->canAccessOrder($order), 403);
@@ -704,7 +707,7 @@ class CatalogGroupOrder extends Component
             ->with([
                 'colorImages.color',
             ])
-            ->find($productId);
+            ->where('season_id', $this->order->season_id)->find($productId);
 
         if (! $product) {
             return;

@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\SalesRepSummaryExport;
 use App\Models\Order;
+use App\Models\Season;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -143,9 +144,11 @@ class SalesRepOrderSummary extends Component
             return $this->salesRepOrderSummariesCache;
         }
 
+        $visibleIds = Season::query()->visibleToPartners()->pluck('id')->all();
+
         return $this->salesRepOrderSummariesCache = collect(
             Cache::get($this->summaryCacheKey(), [])
-        );
+        )->filter(fn (array $summary) => in_array((int) ($summary['season_id'] ?? 0), $visibleIds, true))->values();
     }
 
     public function getFilteredSalesRepOrderSummariesProperty(): Collection

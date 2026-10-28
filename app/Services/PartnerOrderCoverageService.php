@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Models\Brand;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
+use App\Services\Partner\PartnerSeasonVisibility;
 use Illuminate\Support\Collection;
 
 class PartnerOrderCoverageService
 {
     public function build(?int $seasonId = null): array
     {
+        if ($seasonId !== null) {
+            PartnerSeasonVisibility::assertVisible($seasonId);
+        }
         $flatColumns = $this->buildFlatColumns();
 
         $partnerUser = auth('partner')->user();
@@ -157,8 +161,7 @@ class PartnerOrderCoverageService
         $brandTotals = $cells
             ->filter(fn (array $cell): bool => (bool) ($cell['enabled'] ?? false))
             ->groupBy('brand_id')
-            ->map(fn (Collection $brandCells): int =>
-                (int) $brandCells->sum(fn (array $cell): int => (int) ($cell['quantity'] ?? 0))
+            ->map(fn (Collection $brandCells): int => (int) $brandCells->sum(fn (array $cell): int => (int) ($cell['quantity'] ?? 0))
             )
             ->all();
 

@@ -90,7 +90,7 @@ class PartnerAccessService
 
     public function accessibleOrdersQuery(PartnerUser $user): Builder
     {
-        return Order::query()->whereIn(
+        return Order::query()->whereHas('season', fn (Builder $query) => $query->visibleToPartners())->whereIn(
             'orders.partner_address_id',
             $this->accessibleAddressesQuery($user)
                 ->select('partner_addresses.id')

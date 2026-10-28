@@ -217,6 +217,7 @@ class PartnerAccessTest extends TestCase
             'name' => 'Test season',
             'code' => 'TEST',
             'active' => true,
+            'visible_to_partners' => true,
         ]);
         $brand = Brand::query()->create([
             'name' => 'Test brand',
@@ -304,6 +305,7 @@ class PartnerAccessTest extends TestCase
             $table->string('name');
             $table->string('code');
             $table->boolean('active')->default(true);
+            $table->boolean('visible_to_partners')->default(false);
             $table->timestamps();
         });
 

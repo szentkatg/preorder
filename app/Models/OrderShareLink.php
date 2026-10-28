@@ -51,6 +51,7 @@ class OrderShareLink extends Model
             return false;
         }
 
-        return $this->expires_at === null || $this->expires_at->isFuture();
+        return ($this->expires_at === null || $this->expires_at->isFuture())
+            && $this->order()->whereHas('season', fn ($query) => $query->visibleToPartners())->exists();
     }
 }

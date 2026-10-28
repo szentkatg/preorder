@@ -7,6 +7,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class SeasonsTable
@@ -28,7 +29,12 @@ class SeasonsTable
                 IconColumn::make('active')
                     ->label('Aktív')
                     ->boolean(),
+
+                IconColumn::make('visible_to_partners')
+                    ->label('Partnerportálon látható')
+                    ->boolean(),
             ])
+            ->filters([TernaryFilter::make('visible_to_partners')->label('Partnerportálon látható')])
             ->recordActions([
                 EditAction::make(),
             ])

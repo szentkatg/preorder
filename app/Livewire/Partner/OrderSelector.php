@@ -17,6 +17,7 @@ use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\Translation;
+use App\Services\Partner\PartnerSeasonVisibility;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -168,6 +169,7 @@ class OrderSelector extends Component
     public function getSeasonsProperty(): Collection
     {
         return Season::query()
+            ->visibleToPartners()
             ->orderBy('name')
             ->get();
     }
@@ -257,7 +259,7 @@ class OrderSelector extends Component
 
     public function getBrandsProperty(): Collection
     {
-        if (! $this->seasonId || ! $this->partnerAddressId) {
+        if (! PartnerSeasonVisibility::isVisible($this->seasonId) || ! $this->partnerAddressId) {
             return collect();
         }
 
@@ -349,7 +351,7 @@ class OrderSelector extends Component
 
     public function getOrderSheetTypesProperty(): Collection
     {
-        if (! $this->seasonId || ! $this->partnerAddressId || ! $this->brandId) {
+        if (! PartnerSeasonVisibility::isVisible($this->seasonId) || ! $this->partnerAddressId || ! $this->brandId) {
             return collect();
         }
 
@@ -480,6 +482,9 @@ class OrderSelector extends Component
 
     public function updatedSeasonId(): void
     {
+        if ($this->seasonId !== null) {
+            PartnerSeasonVisibility::assertVisible($this->seasonId);
+        }
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
@@ -529,6 +534,7 @@ class OrderSelector extends Component
 
     protected function createOrder(): Order
     {
+        PartnerSeasonVisibility::assertVisible($this->seasonId);
         $this->referenceNumber = trim($this->referenceNumber);
 
         $address = PartnerAddress::query()
@@ -603,6 +609,7 @@ class OrderSelector extends Component
     {
         return (bool) (
             $this->seasonId
+            && PartnerSeasonVisibility::isVisible($this->seasonId)
             && $this->partnerAddressId
             && $this->brandId
             && $this->orderSheetTypeId
@@ -1135,6 +1142,11 @@ class OrderSelector extends Component
 
     protected function clearInvalidSessionSelection(): void
     {
+        if ($this->seasonId !== null && ! PartnerSeasonVisibility::isVisible($this->seasonId)) {
+            $this->seasonId = $this->brandId = $this->orderSheetTypeId = $this->selectedOrderId = null;
+            $this->resetNewOrderFields();
+            $this->storeSelection();
+        }
         if (! $this->partnerAddressId) {
             return;
         }

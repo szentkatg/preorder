@@ -47,8 +47,8 @@ class PriceListSeasonTest extends TestCase
 
         parent::setUp();
         config(['app.key' => 'base64:'.base64_encode(str_repeat('test', 8))]);
-        $this->firstSeason = Season::create(['code' => 'S27', 'name' => '2027', 'active' => true]);
-        $this->secondSeason = Season::create(['code' => 'S28', 'name' => '2028', 'active' => true]);
+        $this->firstSeason = Season::create(['code' => 'S27', 'name' => '2027', 'active' => true, 'visible_to_partners' => true]);
+        $this->secondSeason = Season::create(['code' => 'S28', 'name' => '2028', 'active' => true, 'visible_to_partners' => true]);
         $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'name_hu' => 'Forint', 'active' => true]);
         $group = ItemMainGroup::create(['code' => 'BAG', 'name_hu' => 'Táska', 'active' => true]);
         $this->product = Product::create(['season_id' => $this->firstSeason->id,

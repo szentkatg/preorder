@@ -41,6 +41,11 @@ class SeasonResource extends Resource
 
                 Toggle::make('active')
                     ->default(false),
+
+                Toggle::make('visible_to_partners')
+                    ->label('Partnerportálon látható')
+                    ->helperText('Kikapcsolva a szezon a partnerek számára nem érhető el, megosztott linkkel sem. Az árképzés ettől független. A partnerkezdőlapon az Aktív jelölés is szükséges.')
+                    ->default(false),
             ]);
     }
 

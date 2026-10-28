@@ -5,6 +5,7 @@ namespace App\Livewire\Partner;
 use App\Exports\PartnerOrderCoverageExport;
 use App\Models\PartnerUser;
 use App\Models\Season;
+use App\Services\Partner\PartnerSeasonVisibility;
 use App\Services\PartnerOrderCoverageService;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -21,6 +22,7 @@ class PartnerOrderCoverage extends Component
     public function getSeasonsProperty()
     {
         return Season::query()
+            ->visibleToPartners()
             ->orderByDesc('id')
             ->get();
     }
@@ -117,5 +119,8 @@ class PartnerOrderCoverage extends Component
             auth('partner')->user()?->role === PartnerUser::ROLE_SALES_REP,
             403
         );
+        if ($this->seasonId !== null) {
+            PartnerSeasonVisibility::assertVisible($this->seasonId);
+        }
     }
 }

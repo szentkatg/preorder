@@ -98,6 +98,14 @@ class PricingProjectPublicationTest extends TestCase
         return app(PricingProjectPublicationService::class)->publish($this->project);
     }
 
+    public function test_publishing_prices_does_not_make_a_hidden_season_visible_to_partners(): void
+    {
+        $this->assertFalse($this->project->season->visible_to_partners);
+        $this->publish();
+        $this->assertGreaterThan(0, PriceListItem::where('season_id', $this->project->season_id)->count());
+        $this->assertFalse($this->project->season->fresh()->visible_to_partners);
+    }
+
     public function test_project_item_delete_waits_for_confirmation_and_preserves_published_prices_and_snapshot(): void
     {
         $publication = $this->publish();

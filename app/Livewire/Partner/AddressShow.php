@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Partner;
 
+use App\Livewire\Partner\Concerns\RequiresVisiblePartnerSeason;
 use App\Models\PartnerAddress;
 use App\Models\Season;
 use Livewire\Component;
 
 class AddressShow extends Component
 {
+    use RequiresVisiblePartnerSeason;
+
     public Season $season;
 
     public PartnerAddress $address;
@@ -16,6 +19,7 @@ class AddressShow extends Component
         Season $season,
         PartnerAddress $address
     ): void {
+        $this->assertPartnerSeasonVisible($season->id);
         $partnerUser = auth('partner')->user();
 
         abort_unless(

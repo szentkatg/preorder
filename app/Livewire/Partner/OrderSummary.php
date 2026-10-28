@@ -3,6 +3,7 @@
 namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderSummaryMatrixExport;
+use App\Livewire\Partner\Concerns\RequiresVisiblePartnerSeason;
 use App\Models\Brand;
 use App\Models\Catalog;
 use App\Models\Order;
@@ -17,6 +18,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class OrderSummary extends Component
 {
+    use RequiresVisiblePartnerSeason;
+
     public Season $season;
 
     public Brand $brand;
@@ -58,7 +61,7 @@ class OrderSummary extends Component
         Brand $brand,
         OrderSheetType $orderSheetType
     ): void {
-
+        $this->assertPartnerSeasonVisible($season->id);
         $startedAt = microtime(true);
         $checkpoint = $startedAt;
 
@@ -509,7 +512,7 @@ class OrderSummary extends Component
             ->with([
                 'colorImages.color',
             ])
-            ->find($productId);
+            ->where('season_id', $this->season->id)->find($productId);
 
         if (! $product) {
             return;
