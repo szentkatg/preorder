@@ -110,6 +110,20 @@
                     <option value="filled">{{ __('partner.filled_orders') }}</option>
                     <option value="empty">{{ __('partner.empty_orders') }}</option>
                 </select>
+
+                <select wire:model.live="summaryStatus" aria-label="{{ __('partner.order_status') }}" class="rounded border">
+                    <option value="">{{ __('partner.all_order_statuses') }}</option>
+                    @foreach ($summaryStatuses as $status)
+                        <option value="{{ $status['code'] }}">{{ $status['name'] }}</option>
+                    @endforeach
+                </select>
+
+                <select wire:model.live="summarySalesRepCode" aria-label="{{ __('partner.sales_representative') }}" class="rounded border">
+                    <option value="">{{ __('partner.all_sales_representatives') }}</option>
+                    @foreach ($summarySalesReps as $representative)
+                        <option value="{{ $representative['code'] }}">{{ $representative['name'] }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
 

@@ -346,9 +346,9 @@ class PartnerSeasonVisibilityTest extends TestCase
     {
         $this->user->update(['role' => 'sales_rep']);
         $this->user->partners()->attach($this->address->partner_id);
-        Cache::put('order-selector:sales-rep-summary:'.$this->user->id, [
-            ['season_id' => $this->visible->id, 'season_name' => 'Visible S27'],
-            ['season_id' => $this->hidden->id, 'season_name' => 'Hidden W27'],
+        Cache::put('order-selector:sales-rep-summary:v2:'.$this->user->id.':hu', [
+            ['order_id' => $this->orders['visible']->id, 'season_id' => $this->visible->id, 'season_name' => 'Visible S27'],
+            ['order_id' => $this->orders['hidden']->id, 'season_id' => $this->hidden->id, 'season_name' => 'Hidden W27'],
         ]);
         $page = Livewire::test(SalesRepOrderSummary::class);
         $this->assertSame([$this->visible->id], $page->instance()->salesRepOrderSummaries->pluck('season_id')->all());

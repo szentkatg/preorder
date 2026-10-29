@@ -4,7 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\SalesRepSummaryExport;
 use App\Models\Order;
-use App\Models\Season;
+use App\Models\Partner;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -32,6 +32,10 @@ class SalesRepOrderSummary extends Component
 
     public ?string $summaryFilledFilter = null;
 
+    public ?string $summaryStatus = null;
+
+    public ?string $summarySalesRepCode = null;
+
     public ?string $summaryCurrency = null;
 
     public bool $summaryLoaded = false;
@@ -51,6 +55,8 @@ class SalesRepOrderSummary extends Component
         $this->summaryOrderSheetTypeId = $filters['order_sheet_type_id'] ?? null;
         $this->summaryCurrency = $filters['currency'] ?? null;
         $this->summaryFilledFilter = $filters['filled_filter'] ?? null;
+        $this->summaryStatus = $filters['status'] ?? null;
+        $this->summarySalesRepCode = $filters['sales_rep_code'] ?? null;
     }
 
     public function updated(string $property): void
@@ -70,6 +76,8 @@ class SalesRepOrderSummary extends Component
                 'order_sheet_type_id' => $this->summaryOrderSheetTypeId,
                 'currency' => $this->summaryCurrency,
                 'filled_filter' => $this->summaryFilledFilter,
+                'status' => $this->summaryStatus,
+                'sales_rep_code' => $this->summarySalesRepCode,
             ],
         ]);
     }
@@ -144,11 +152,11 @@ class SalesRepOrderSummary extends Component
             return $this->salesRepOrderSummariesCache;
         }
 
-        $visibleIds = Season::query()->visibleToPartners()->pluck('id')->all();
+        $accessibleIds = $this->accessibleOrders->pluck('id')->flip();
 
         return $this->salesRepOrderSummariesCache = collect(
             Cache::get($this->summaryCacheKey(), [])
-        )->filter(fn (array $summary) => in_array((int) ($summary['season_id'] ?? 0), $visibleIds, true))->values();
+        )->filter(fn (array $summary) => $accessibleIds->has((int) ($summary['order_id'] ?? 0)))->values();
     }
 
     public function getFilteredSalesRepOrderSummariesProperty(): Collection
@@ -194,6 +202,14 @@ class SalesRepOrderSummary extends Component
                     'order_sheet_type_id',
                     (int) $this->summaryOrderSheetTypeId
                 )
+            )
+            ->when(
+                filled($this->summaryStatus),
+                fn (Collection $rows) => $rows->whereStrict('status', $this->summaryStatus)
+            )
+            ->when(
+                filled($this->summarySalesRepCode),
+                fn (Collection $rows) => $rows->whereStrict('sales_rep_erp_partner_code', $this->summarySalesRepCode)
             )
             ->when(
                 $this->summaryFilledFilter === 'filled',
@@ -351,7 +367,32 @@ class SalesRepOrderSummary extends Component
                 'order_sheet_type_id',
                 'type'
             ),
+            'summaryStatuses' => $summaries
+                ->map(fn (array $summary): array => [
+                    'code' => (string) ($summary['status'] ?? ''),
+                    'name' => (string) ($summary['status_label'] ?? ''),
+                ])
+                ->filter(fn (array $option): bool => $option['code'] !== '')
+                ->unique('code')->sortBy('name')->values(),
+            'summarySalesReps' => $this->salesRepOptions($summaries),
         ]);
+    }
+
+    protected function salesRepOptions(Collection $summaries): Collection
+    {
+        $codes = $summaries->pluck('sales_rep_erp_partner_code')
+            ->filter(fn ($code): bool => filled($code))->uniqueStrict()->values();
+
+        if ($codes->isEmpty()) {
+            return collect();
+        }
+
+        $names = Partner::query()->whereIn('erp_partner_code', $codes)->pluck('name', 'erp_partner_code');
+
+        return $codes->map(fn ($code): array => [
+            'code' => (string) $code,
+            'name' => filled($names->get($code)) ? $code.' – '.$names->get($code) : (string) $code,
+        ])->sortBy('name')->values();
     }
 
     protected function summaryOptions(
@@ -372,6 +413,7 @@ class SalesRepOrderSummary extends Component
 
     protected function summaryCacheKey(): string
     {
-        return 'order-selector:sales-rep-summary:'.(int) auth('partner')->id();
+        // Versioned because summary rows now include the partner's representative.
+        return 'order-selector:sales-rep-summary:v2:'.(int) auth('partner')->id().':'.app()->getLocale();
     }
 }

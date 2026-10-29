@@ -358,6 +358,8 @@ class SalesRepOrderSummaryService
 
                     'partner_name' => $order->partner?->name ?? '',
 
+                    'sales_rep_erp_partner_code' => $order->partner?->sales_rep_erp_partner_code ?? '',
+
                     'address_name' => $order->partnerAddress?->name
                         ?? $order->partnerAddress?->addrid
                         ?? '',
