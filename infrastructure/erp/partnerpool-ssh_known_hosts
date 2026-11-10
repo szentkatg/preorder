@@ -1,0 +1,3 @@
+# Public server key from the existing trusted local OpenSSH known_hosts entry.
+# Not a private key. On key mismatch, verify the change with the hosting provider.
+szeganet.hu ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJb9ZPbPGyyL/g7YXNWCW/GDHFvuVUDmVopPVxiUnQ8o

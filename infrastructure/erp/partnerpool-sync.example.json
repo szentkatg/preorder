@@ -1,0 +1,29 @@
+{
+  "environment": "staging",
+  "mssql": {
+    "connection_string": "DRIVER={ODBC Driver 18 for SQL Server};SERVER=YOUR_SQL_SERVER;DATABASE=master;Encrypt=yes;TrustServerCertificate=no;",
+    "username": "YOUR_SQL_USERNAME",
+    "password_env": "PARTNERPOOL_MSSQL_PASSWORD",
+    "query_file": "partnerpool.sql",
+    "timeout_seconds": 300
+  },
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "szeganet_preorder_test",
+    "user": "YOUR_DEDICATED_POOL_SYNC_USER",
+    "password_env": "PARTNERPOOL_MYSQL_PASSWORD",
+    "ssl_ca": null
+  },
+  "ssh": {
+    "enabled": true,
+    "host": "szeganet.hu",
+    "port": 22,
+    "username": "szeganet",
+    "known_hosts_file": "partnerpool-ssh_known_hosts",
+    "password_env": "PARTNERPOOL_SSH_PASSWORD"
+  },
+  "country_map": {},
+  "min_rows": 1,
+  "max_drop_fraction": 0.2
+}

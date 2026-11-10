@@ -1,0 +1,43 @@
+PREORDER PARTNERPOOL - SSH FRISSITES
+
+1. A csomag fajljait masold az SQL szerveren ide:
+   C:\servio_work\preorder_partners
+   A meglevo sync_partnerpool.py es requirements-partnerpool.txt frissul.
+   A sajat partnerpool-sync.config.json fajlt NE ird felul mintaval.
+   A csomag nem tartalmaz jelszot vagy privat kulcsot.
+
+2. A legegyszerubb inditas: PowerShellben ez az egy sor elvegzi a
+   csomagfrissitest, a helyi konfiguracio menteset/atallitasat es az iras nelkuli tesztet:
+C:\servio_work\preorder_partners\setup-and-check-ssh.cmd
+
+   A tovabbiakban ugyanennek a harom lepesnek a kulon parancsai kovetkeznek.
+   Ha a fenti indito mar lefutott, ezeket nem kell meg egyszer kiadni.
+
+Kezi csomagfrissites:
+C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe -m pip install -r C:\servio_work\preorder_partners\requirements-partnerpool.txt
+
+Kezi konfiguracio: ez az egy sor beallitja az SSH-t, es elotte menti a konfiguraciot.
+   A mar mukodo MSSQL-beallitasok es a celadatbazis nem valtoznak.
+   Ez csak a helyi konfiguraciot szerkeszti, adatbazishoz nem kapcsolodik.
+C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe C:\servio_work\preorder_partners\sync_partnerpool.py --config C:\servio_work\preorder_partners\partnerpool-sync.config.json --setup-ssh
+
+Kezi teszt: ez az egy sor ellenorzi az SSH-t es a MySQL-belepest, adatiras nelkul.
+C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe C:\servio_work\preorder_partners\sync_partnerpool.py --config C:\servio_work\preorder_partners\partnerpool-sync.config.json --check-target --prompt-passwords
+
+Ket kulon jelszo kellhet; a program csak a hianyzokat keri be, rejtetten:
+- MySQL jelszo: a konfiguracioban szereplo MySQL-felhasznalo (tesztnel szeganet_po_test).
+- Tarhely SSH jelszo: a szeganet SSH-felhasznalo jelszava (nem az adatbazis-jelszo).
+
+Sikeres eredmeny:
+{"status": "ok", "target_connection": true, "transport": "ssh", "published": false}
+
+A --check-target nem olvas ERP-adatot, nem hoz letre tablat es nem tolt fel adatot.
+A --apply kapcsolot egyelore ne hasznald: elobb a tesztadatbazis pooltablait es a feluletet telepitjuk.
+
+Az SSH szerverkulcs a korabban megbizhatonak elfogadott helyi known_hosts fajlbol szarmazik.
+Valtozasnal a program leall; ne fogadj el automatikusan masik kulcsot.
+Ed25519: SHA256:pZIRN6Lb4FOZ8dNS8BQ53/EQ4ntqhol2b1wdKsW7ioU
+
+Ha az SSH forwarding tiltott, a szolgaltatoval engedelyeztetni kell.
+A program nem valt vissza kozvetlen, titkositatlan internetes MySQL-re.
+Ejszakai utemezes es tartos jelszotarolas meg nincs beallitva.
