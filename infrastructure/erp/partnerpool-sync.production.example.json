@@ -1,0 +1,29 @@
+{
+  "environment": "production",
+  "mssql": {
+    "connection_string": "DRIVER={ODBC Driver 18 for SQL Server};SERVER=HT-SERVIO;DATABASE=Kontrolling;Encrypt=yes;TrustServerCertificate=no;",
+    "username": "servio",
+    "password_env": "PARTNERPOOL_MSSQL_PASSWORD",
+    "query_file": "partnerpool.sql",
+    "timeout_seconds": 300
+  },
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "szeganet_elorendeles",
+    "user": "YOUR_PRODUCTION_POOL_SYNC_USER",
+    "password_env": "PARTNERPOOL_MYSQL_PASSWORD",
+    "ssl_ca": null
+  },
+  "ssh": {
+    "enabled": true,
+    "host": "szeganet.hu",
+    "port": 22,
+    "username": "szeganet",
+    "known_hosts_file": "partnerpool-ssh_known_hosts",
+    "identity_file": "C:/Users/servio/.ssh/id_ed25519_preorder_partners"
+  },
+  "country_map": {},
+  "min_rows": 1,
+  "max_drop_fraction": 0.2
+}

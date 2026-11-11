@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="hu">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Árképzési oldal — görgetési teszt</title>
+<link rel="stylesheet" href="../../public/css/admin-table-scroll.css">
+<style>
+    * { box-sizing:border-box }
+    body { margin:0;background:#f3f4f6;color:#111827;font:14px/1.4 Arial,sans-serif }
+    .fi-topbar { position:sticky;top:0;z-index:30;height:64px;padding:20px 32px;background:#111827;color:white }
+    main { padding:24px 32px 32px }
+    h1 { font-size:24px;margin:0 0 20px }
+    #intro { padding:16px 20px;border:1px solid #cbd5e1;border-radius:10px;background:white;margin-bottom:24px;min-height:250px }
+    #intro p { max-width:850px }
+    label { display:inline-block;margin:8px 16px 8px 0 }
+    select,button { font:inherit;padding:6px;border:1px solid #94a3b8;border-radius:5px;background:white }
+    .fi-ta-ctn { display:flex;overflow:hidden;background:white;border:1px solid #94a3b8;border-radius:10px }
+    .fi-ta-main { display:grid;min-width:0;width:100% }
+    .toolbar { min-height:52px;padding:10px 16px;border-bottom:1px solid #cbd5e1 }
+    .fi-ta-content-ctn { position:relative;overflow:auto;min-width:0 }
+    .fi-ta-table { width:2200px;border-collapse:collapse }
+    .fi-ta-table th,.fi-ta-table td { padding:5px 14px;white-space:nowrap;border-bottom:1px solid #e5e7eb;text-align:left }
+    .fi-ta-table th { height:48px;background:#e2e8f0 }
+    .fi-pagination { display:flex;justify-content:space-between;min-height:58px;padding:12px 16px;background:#e5e7eb }
+    .fi-modal-content { position:fixed;inset:100px 80px 80px;z-index:50;overflow-y:auto;background:white;border:2px solid #1e40af }
+</style>
+<header class="fi-topbar">Laravel — elkülönített elrendezési teszt, nem éles adatok</header>
+<main class="fi-page">
+    <span hidden data-pricing-page-scroll aria-hidden="true"></span>
+    <h1>HUF kisker árak</h1>
+    <section id="intro">
+        <label>Árprojekt <select><option>2027 AW — tesztprojekt</option></select></label>
+        <label><input type="checkbox"> Archív megtekintés</label>
+        <p>A magyarázat, projektválasztó és az oldalcím a lap része: görgetéskor eltűnnek a képernyőről.</p>
+        <p>A lista ezután a teljes munkaterületet használja. A táblázat fejléce, kijelölése és a lapozó alatti vízszintes gördítősáv megmarad.</p>
+        <button type="button">Oszlopszélességek tartalomhoz igazítása</button>
+        <button type="button">Oszlopszélességek alaphelyzetbe</button>
+    </section>
+    <div class="fi-ta-ctn"><div class="fi-ta-main">
+        <div class="toolbar">Aktív szűrők — kereső — oszlopválasztó</div>
+        <div class="fi-ta-content-ctn"><table class="fi-ta-table">
+            <thead><tr><th class="fi-ta-selection-cell"><input type="checkbox" aria-label="Mindent kijelöl"></th><th>Árlista</th><th>Főcsoport</th><th>Modellkód</th><th>Modellnév</th><th>Bekerülési érték</th><th>Kisker ár</th><th>Szorzó</th><th>Státusz</th></tr></thead>
+            <tbody></tbody>
+        </table></div>
+        <nav class="fi-pagination"><span>1–100 / 100 találat</span><button>100 sor oldalanként</button></nav>
+    </div></div>
+</main>
+<script>
+    window.fillScrollTestRows = (count = 100) => {
+        document.querySelector('tbody').innerHTML = Array.from({length:count}, (_, i) =>
+            `<tr><td class="fi-ta-selection-cell"><input type="checkbox" aria-label="${i+1}. modell kijelölése"></td><td>Retail_HU</td><td>Hátizsák</td><td>TESZT${String(i+1).padStart(3,'0')}W27</td><td>MINTA ${i+1}</td><td>2 500,00</td><td>10 990,00</td><td>4,40</td><td>Kalkulált ár</td></tr>`).join('');
+    };
+    fillScrollTestRows();
+</script>
+<script src="../../public/js/admin-table-scroll.js"></script>
+</html>

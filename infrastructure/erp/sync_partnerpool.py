@@ -22,6 +22,11 @@ import tempfile
 import uuid
 import warnings
 
+from partnerpool_credentials import (
+    CredentialStore, CredentialStoreError, credential_fields, require_windows,
+    saved_passwords,
+)
+
 
 TEXT_FIELDS = {
     "erp_partner_code": 50, "partner_name": 255, "short_name": 255,
@@ -304,15 +309,7 @@ def target_connection(config: dict, config_dir: Path):
 @contextmanager
 def prompt_passwords(config: dict, *, source: bool, target: bool):
     """Optional interactive convenience; scheduled jobs never prompt by default."""
-    fields = []
-    if source:
-        fields.append((config.get("mssql", {}).get("password_env"), "MSSQL jelszo"))
-    if target:
-        fields.append((config["mysql"].get("password_env"), "MySQL jelszo"))
-        ssh = config.get("ssh", {})
-        if ssh.get("enabled"):
-            fields.extend([(ssh.get("password_env"), "Tarhely SSH jelszo"),
-                           (ssh.get("key_password_env"), "SSH privat kulcs jelmondata")])
+    fields = credential_fields(config, source=source, target=target)
     previous = {}
     try:
         for name, label in fields:
@@ -333,6 +330,24 @@ def prompt_passwords(config: dict, *, source: bool, target: bool):
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+
+def save_passwords(config: dict, config_path: Path) -> dict:
+    require_windows()
+    fields = credential_fields(config, source=True, target=True)
+    if not fields:
+        raise CredentialStoreError("No password environment variables are configured")
+    if not sys.stdin.isatty():
+        raise CredentialStoreError("Saving passwords requires an interactive console")
+    values = {}
+    for name, label in fields:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            values[name] = getpass.getpass(label + " (menteshez, nem latszik): ")
+    store = CredentialStore(config_path, config)
+    store.save(values)
+    return {"status": "ok", "credentials_saved": True, "credential_count": len(values),
+            "credential_store": str(store.path), "published": False}
 
 
 def setup_ssh(config: dict, config_path: Path) -> dict:
@@ -421,8 +436,12 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--apply", action="store_true", help="Actually replace the pool; default is source-only validation")
     mode.add_argument("--check-target", action="store_true", help="Check SSH/TLS and MySQL with SELECT only; do not read ERP or publish")
     mode.add_argument("--setup-ssh", action="store_true", help="Configure szeganet.hu SSH defaults locally with a config backup; no network or database operations")
+    mode.add_argument("--save-passwords", action="store_true", help="Save configured passwords using Windows current-user DPAPI; no database operations")
+    mode.add_argument("--prepare-task", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--prompt-passwords", action="store_true", help="Ask for missing passwords on an interactive console; do not use for scheduled runs")
     parser.add_argument("--allow-production", action="store_true")
+    parser.add_argument("--expect-environment", choices=("staging", "production", "development"), help="Reject a launcher/config environment mismatch before any connection")
+    parser.add_argument("--expect-database", help="Reject a launcher/config target database mismatch before any connection")
     parser.add_argument("--allow-large-drop", action="store_true", help="Explicitly allow a validated nonempty snapshot to shrink by more than the configured guard")
     args = parser.parse_args(argv)
     phase = "config"
@@ -431,14 +450,27 @@ def main(argv: list[str] | None = None) -> int:
         environment = config.get("environment")
         if environment not in {"staging", "production", "development"}:
             raise PoolValidationError("Explicit environment is required")
+        if args.expect_environment and environment != args.expect_environment:
+            raise PoolValidationError("Configured environment does not match this launcher")
+        if args.expect_database and config["mysql"]["database"] != args.expect_database:
+            raise PoolValidationError("Configured target database does not match this launcher")
         if args.setup_ssh:
             print(json.dumps(setup_ssh(config, args.config)))
             return 0
+        if args.save_passwords:
+            phase = "save_credentials"
+            print(json.dumps(save_passwords(config, args.config)))
+            return 0
+        if args.prepare_task:
+            raise PoolValidationError("Test task generation is retired; run the test CMD manually and schedule only the production CMD")
         if args.apply and environment == "production" and not args.allow_production:
             raise PoolValidationError("Production writes require --allow-production")
         if args.apply and config["mysql"]["database"] == "szeganet_elorendeles" and environment != "production":
             raise PoolValidationError("Known production database cannot be labeled as staging")
         with ExitStack() as resources:
+            phase = "saved_credentials"
+            resources.enter_context(saved_passwords(args.config, config, source=not args.check_target,
+                                                   target=args.apply or args.check_target))
             if args.prompt_passwords:
                 phase = "password"
                 resources.enter_context(prompt_passwords(config, source=not args.check_target, target=args.apply or args.check_target))
@@ -473,7 +505,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         # Driver exception messages can contain connection strings or source PII.
         # Log only an error class and fixed validation messages, never raw SQL errors.
-        message = str(exc) if isinstance(exc, PoolValidationError) else "Driver/configuration operation failed; credentials withheld"
+        message = str(exc) if isinstance(exc, (PoolValidationError, CredentialStoreError)) else "Driver/configuration operation failed; credentials withheld"
         diagnostic = {"status": "error", "phase": phase, "error_type": type(exc).__name__, "message": message}
         if exc.args and isinstance(exc.args[0], int):
             diagnostic["error_code"] = exc.args[0]

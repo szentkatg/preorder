@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "infrastructure/erp"))
 sync_spec = importlib.util.spec_from_file_location("sync_partnerpool", ROOT / "infrastructure/erp/sync_partnerpool.py")
 sync = importlib.util.module_from_spec(sync_spec)
 sync_spec.loader.exec_module(sync)

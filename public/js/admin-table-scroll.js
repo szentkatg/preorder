@@ -52,6 +52,12 @@
         resizeObserver.disconnect();
         for (const container of containers) {
             const entry = tables.get(container) || register(container);
+            if (pricingPage(entry) && !entry.pricingWheelRegistered) {
+                // Only the pricing grid hands the first downward wheel movement
+                // to the page, so its introduction scrolls away before its rows.
+                container.addEventListener('wheel', event => scrollPricingIntro(entry, event), { passive: false });
+                entry.pricingWheelRegistered = true;
+            }
             // Morphing may strip client-added attributes without replacing the node.
             container.dataset.adminTableScrollEnhanced = 'true';
             // Livewire may remove the injected node or add pagination after it.
@@ -81,6 +87,37 @@
         return { top, bottom };
     }
 
+    function pricingPage(entry) {
+        if (entry.container.closest('.fi-modal-content')) return null;
+        const page = entry.container.closest('.fi-page');
+        return page?.querySelector('[data-pricing-page-scroll]') ? page : null;
+    }
+
+    function pricingViewportTop(bounds) {
+        const topbar = document.querySelector('.fi-topbar');
+        return Math.max(bounds.top, topbar ? topbar.getBoundingClientRect().bottom : 0);
+    }
+
+    function scrollPricingIntro(entry, event) {
+        if (!pricingPage(entry) || event.cancelable === false || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey
+            || event.deltaY <= 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY)
+            || event.target?.closest?.('textarea, [contenteditable="true"], [role="listbox"], .fi-dropdown-panel')) return;
+
+        const root = document.scrollingElement;
+        if (!root) return;
+        const distance = entry.host.getBoundingClientRect().top - pricingViewportTop(viewportBounds(entry.container)) - 8;
+        const remaining = root.scrollHeight - root.clientHeight - root.scrollTop;
+        if (distance <= 1 || remaining <= 0) return;
+
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? entry.container.clientHeight : 1;
+        const delta = event.deltaY * unit;
+        const consumed = Math.min(delta, distance, remaining);
+        event.preventDefault();
+        root.scrollTop += consumed;
+        // Do not discard a large wheel delta that crosses the page/grid boundary.
+        if (consumed >= distance - 1 && delta > consumed) entry.container.scrollTop += delta - consumed;
+    }
+
     function updateTable(entry) {
         const { container, scrollbar, content } = entry;
         // Hidden tabs/modals must not contribute zero-width measurements.
@@ -98,8 +135,14 @@
         const barHeight = wide ? barRect.height : 0;
         const headHeight = container.querySelector('thead')?.getBoundingClientRect().height || 0;
         const minimumHeight = Math.max(64, headHeight + 28);
-        const maximumHeight = Math.max(minimumHeight, bounds.bottom - bounds.top - 160);
-        const availableHeight = bounds.bottom - Math.max(bounds.top, rect.top) - footerHeight - barHeight - 8;
+        const pricing = pricingPage(entry);
+        const toolbarHeight = Math.max(0, rect.top - entry.host.getBoundingClientRect().top);
+        // Pricing pages must be taller than the viewport when they have an intro.
+        // Measuring only the space BELOW that intro trapped it permanently above
+        // a tiny inner list. A full workspace allows normal outer page scrolling.
+        const top = pricing ? pricingViewportTop(bounds) + toolbarHeight + 8 : Math.max(bounds.top, rect.top);
+        const maximumHeight = pricing ? Infinity : Math.max(minimumHeight, bounds.bottom - bounds.top - 160);
+        const availableHeight = bounds.bottom - top - footerHeight - barHeight - 8;
         setStyle(container, '--admin-table-content-max-height', Math.floor(Math.max(minimumHeight, Math.min(maximumHeight, availableHeight))) + 'px');
 
         if (wide) {

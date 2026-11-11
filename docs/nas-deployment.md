@@ -51,6 +51,25 @@ a frontend buildet Windows alatt kell elkészíteni, és a teljes `public/build`
 könyvtár feltöltését külön kell megszervezni. A Blade/PHP módosítások nem
 igényelnek frontend buildet.
 
+## Árképzési oldalak görgethető bevezetője
+
+Az árképzési oldalakon, az árképzési törzslistákon és a partnerárlista-készítőn
+a lista előtti cím, magyarázat és választók az oldal görgetésével kikerülhetnek
+a képernyőről. A táblázat így a rendelkezésre álló munkaterületet használja,
+nem csak a bevezető alatt maradt kis sávot. Az első lefelé görgetés előbb az
+oldal bevezetőjét mozgatja ki, utána a táblázat sorai görgethetők. A modalok,
+beviteli mezők, nagyítás és vízszintes görgetés önálló működése megmarad.
+
+A bekapcsolást a `PricingPageLayout` és a PAGE_START render hook jelöli;
+az egyéb adminoldalak és a partnerportál nem kapják meg ezt az elrendezést.
+A módosított JS közvetlenül a `public/js/admin-table-scroll.js` fájlból töltődik,
+nem Vite-bemenet. Ehhez nincs migráció, Composer-telepítés vagy frontendbuild;
+a PHP/Blade/JS fájlokat Gitből és a szokásos cache-újraépítéssel telepítjük.
+
+Ellenőrzés: `PricingPageScrollTest`, az adminjogosultság- és partnerhozzáférés-
+tesztek, valamint a `tests/Browser/admin-table-scroll.mjs` 25 determinisztikus
+DOM-geometriai esete. Ez utóbbi nem valódi böngészős vagy képernyőképes teszt.
+
 ## Összecsukható admin-menü
 
 Az admin panel a Filament beépített `sidebarFullyCollapsibleOnDesktop()`

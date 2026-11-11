@@ -31,7 +31,7 @@ export function runAdminTableScrollTests() {
         const classes = new Set();
         const events = new Map();
         const el = { children: [], parentElement: null, dataset: {}, nodeType: 1, style: style(),
-            setAttribute() {}, addEventListener: (name, callback) => events.set(name, callback), emit: name => events.get(name)?.(),
+            setAttribute() {}, addEventListener: (name, callback) => events.set(name, callback), emit: (name, event) => events.get(name)?.(event),
             classList: { add: name => classes.add(name), remove: name => classes.delete(name), contains: name => classes.has(name),
                 toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name) },
             append(child) { child.remove(); this.children.push(child); child.parentElement = this; },
@@ -42,14 +42,21 @@ export function runAdminTableScrollTests() {
         return el;
     }
     const body = element();
-    const document = { body, createElement: element, querySelectorAll: () => containers,
+    const root = { scrollTop: 0, scrollHeight: 1400, clientHeight: 800 };
+    const topbar = { getBoundingClientRect: () => ({ bottom: 64 }) };
+    const document = { body, scrollingElement: root, createElement: element, querySelectorAll: () => containers,
+        querySelector: selector => selector === '.fi-topbar' ? topbar : null,
         addEventListener(name, callback) { listeners.set(name, callback); } };
     function table(top = 200) {
         const host = element(); host.className = 'fi-ta-main'; body.append(host);
         const container = element(); container.top = top; container.naturalHeight = 2000;
+        container.scrollTop = 0; container.toolbarHeight = 0;
         container.scrollWidth = 2400; container.clientWidth = 783; container.scrollLeft = 0;
         container.style = style(() => resizeCallbacks.forEach(callback => callback()));
-        container.getBoundingClientRect = () => ({ top: container.top, bottom: container.top + container.clientHeight, height: container.clientHeight });
+        container.getBoundingClientRect = () => {
+            const top = container.top - (container.pageScrolling ? root.scrollTop : 0);
+            return { top, bottom: top + container.clientHeight, height: container.clientHeight };
+        };
         Object.defineProperty(container, 'clientHeight', { get: () => Math.min(container.naturalHeight,
             parseInt(container.style.getPropertyValue('--admin-table-content-max-height')) || 640) });
         container.getClientRects = () => container.hidden ? [] : [container.getBoundingClientRect()];
@@ -57,7 +64,8 @@ export function runAdminTableScrollTests() {
         container.querySelector = selector => selector.includes('thead') ? head : element();
         host.append(container);
         const footer = element(); footer.className = 'fi-pagination'; host.append(footer);
-        host.getBoundingClientRect = () => ({ bottom: container.getBoundingClientRect().bottom + 60 +
+        host.getBoundingClientRect = () => ({ top: container.getBoundingClientRect().top - container.toolbarHeight,
+            bottom: container.getBoundingClientRect().bottom + 60 +
             (host.lastElementChild?.classList.contains('is-visible') ? 20 : 0) });
         const oldAppend = host.append;
         host.append = function (bar) {
@@ -139,6 +147,53 @@ export function runAdminTableScrollTests() {
     assert.equal(second.bar().classList.contains('is-visible'), false);
     second.container.hidden = false; resizeCallbacks.forEach(callback => callback()); flush();
     assert.equal(second.bar().classList.contains('is-visible'), true);
+
+    // Pricing has enough document height to scroll the intro out, rather than
+    // permanently clamping its list to the pixels below the initial paragraph.
+    window.visualViewport.height = 800;
+    const page = element(); page.className = 'fi-page'; page.querySelector = () => ({}); body.append(page);
+    const pricing = table(500); pricing.container.toolbarHeight = 80; pricing.container.pageScrolling = true;
+    page.append(pricing.host); containers.push(pricing.container);
+    listeners.get('livewire:navigated')(); flush();
+    assert.equal(pricing.container.clientHeight, 560, 'Pricing reserves a full viewport workspace, independent of intro height');
+    const pricingHeight = pricing.container.clientHeight;
+    function wheel(deltaY, options = {}) {
+        const event = { deltaY, deltaX: 0, deltaMode: 0, target: pricing.container, defaultPrevented: false,
+            preventDefault() { this.defaultPrevented = true; }, ...options };
+        pricing.container.emit('wheel', event); return event;
+    }
+    assert.equal(wheel(120).defaultPrevented, true);
+    assert.equal(root.scrollTop, 120, 'The first downward gesture scrolls the page introduction');
+    assert.equal(pricing.container.scrollTop, 0, 'No data rows are skipped while the intro is still visible');
+    resizeCallbacks.forEach(callback => callback()); flush();
+    assert.equal(pricing.container.clientHeight, pricingHeight, 'Scrolling must not grow the grid against the gesture');
+    wheel(400);
+    assert.equal(root.scrollTop, 348, 'The table toolbar settles below the fixed application topbar');
+    assert.equal(pricing.container.scrollTop, 172, 'A large gesture carries its remaining delta into the rows');
+    assert.ok(pricing.bar().getBoundingClientRect().bottom <= 800, 'Pagination and horizontal bar fit after the intro scrolls away');
+    assert.equal(wheel(80).defaultPrevented, false, 'After the intro, scrolling is native');
+    root.scrollTop = 0; pricing.container.scrollTop = 0;
+    for (const options of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { deltaX: 1000 },
+        { defaultPrevented: true }, { cancelable: false }, { target: { closest: () => ({}) } }]) {
+        wheel(40, options); assert.equal(root.scrollTop, 0, 'Zoom, horizontal gestures, editors and handled events are not hijacked');
+    }
+    assert.equal(wheel(-40).defaultPrevented, false, 'Upward edge handoff remains native');
+    wheel(3, { deltaMode: 1 }); assert.equal(root.scrollTop, 48, 'Line deltas are converted to pixels');
+    root.scrollTop = 0; pricing.container.scrollTop = 0;
+    wheel(1, { deltaMode: 2 }); assert.equal(root.scrollTop, 348); assert.equal(pricing.container.scrollTop, 212);
+    root.scrollTop = 0; root.scrollHeight = root.clientHeight;
+    assert.equal(wheel(100).defaultPrevented, false, 'A short page without outer scroll range must not trap wheel events');
+    root.scrollHeight = 1400;
+    const pricingModal = element(); pricingModal.className = 'fi-modal-content';
+    pricingModal.getBoundingClientRect = () => ({ top: 100, bottom: 550 });
+    page.append(pricingModal); pricingModal.append(pricing.host);
+    pricing.container.pageScrolling = false; pricing.container.top = 180;
+    resizeCallbacks.forEach(callback => callback()); flush();
+    assert.ok(pricing.bar().getBoundingClientRect().bottom <= 550);
+    assert.equal(wheel(100).defaultPrevented, false, 'A modal on a pricing page must keep its independent scrolling');
+    page.append(pricing.host); pricing.container.top = 500; pricing.container.pageScrolling = true;
+    page.querySelector = () => null; listeners.get('livewire:navigated')(); flush();
+    assert.equal(wheel(100).defaultPrevented, false, 'Navigation away from pricing restores ordinary table behavior');
     assert.match(css, /\.admin-table-scrollbar\s*\{\s*position: relative;/);
     assert.match(css, /overflow-x: scroll;/);
     assert.match(css, /overscroll-behavior-y: auto;/);
@@ -147,5 +202,5 @@ export function runAdminTableScrollTests() {
     assert.match(css, /\.fi-ta-content-ctn\[data-admin-table-scroll-enhanced="true"\]:has\(\.fi-ta-table > thead\)/,
         'Adaptive max-height must have higher specificity than the original sticky-table rule');
     assert.doesNotMatch(source, /nativeScrollbarIsVisible|position: fixed|floatingScrollbar/);
-    return { status: 'passed', cases: 14, verification: 'deterministic DOM geometry, not a browser screenshot' };
+    return { status: 'passed', cases: 25, verification: 'deterministic DOM geometry, not a browser screenshot' };
 }

@@ -12,6 +12,9 @@
 /.phpunit.cache
 /.vscode
 /.zed
+/.tmp/
+/output/
+/outputs/
 /auth.json
 /bootstrap/cache/*
 /node_modules
@@ -29,8 +32,12 @@ Homestead.json
 Homestead.yaml
 database/*.sql
 /infrastructure/erp/partnerpool-sync.config.json
+/infrastructure/erp/partnerpool-sync.production.config.json
+/infrastructure/erp/logs/
 /infrastructure/erp/partnerpool-sync.config.json.before-ssh-*.bak
 /infrastructure/erp/partnerpool-config-*.tmp
+/infrastructure/erp/*.dpapi
+/infrastructure/erp/partnerpool-nightly-*.xml
 /infrastructure/erp/.venv-partnerpool/
 /infrastructure/erp/.venv/
 /infrastructure/erp/__pycache__/

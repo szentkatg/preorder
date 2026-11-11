@@ -113,7 +113,7 @@ Ha `SSH forwarding was refused` hibát kapsz, a szolgáltatónál engedélyeztet
 
 Éjszakai futtatáshoz javasolt egy külön, az SQL szerveren létrehozott SSH-kulcs. Az `ssh` blokkban a `password_env` helyett `identity_file` állítható be a privát kulcs elérési útjára; titkosított kulcsnál `key_password_env` adja a jelmondat környezeti változóját. A kulcs és a jelszavas SSH-belépés közül pontosan egy választható; nincs automatikus kulcskeresés vagy agent-/jelszó-visszaesés. A nyilvános kulcsot a tárhelyen kell engedélyezni, a privát kulcsot nem kell feltölteni oda vagy Gitbe tenni.
 
-A két adatbázis jelszava külön környezeti változóba kerüljön, a **feladatot futtató fióknak elérhetően**: `PARTNERPOOL_MSSQL_PASSWORD` az SQL-forráshoz, `PARTNERPOOL_MYSQL_PASSWORD` a tárhelyi célhoz. Ne írd a jelszavakat a parancssori argumentumokba, JSON-fájlba vagy Gitbe. A feladatfuttató fiókon és a rendszergazdákon kívül más ne férjen hozzá a konfigurációhoz és a környezetéhez.
+A két adatbázis jelszavának külön neve van: `PARTNERPOOL_MSSQL_PASSWORD` az SQL-forráshoz, `PARTNERPOOL_MYSQL_PASSWORD` a tárhelyi célhoz. Windows alatt az alább ismertetett DPAPI-mentés javasolt: a program a jelszavakat csak a saját folyamata környezetébe olvassa vissza, nem kell őket tartós Windows-környezeti változóként beállítani. Ne írd a jelszavakat a parancssori argumentumokba, JSON-fájlba vagy Gitbe. A futtató Windows-fiókhoz, a kódhoz, a konfigurációhoz és a privát SSH-kulcshoz való hozzáférést védeni kell.
 
 Az MSSQL-kapcsolat SQL-felhasználóval és jelszóval működik. A `mssql` konfigurációs rész:
 
@@ -139,7 +139,33 @@ $env:PARTNERPOOL_MSSQL_PASSWORD = [System.Net.NetworkCredential]::new('', $sqlSe
 Remove-Variable sqlSecret
 ```
 
-Ez csak az aktuális PowerShell-ablak és az innen indított folyamatok számára állítja be a változót. Az éjszakai feladathoz a futtató fiók környezetében külön, védetten biztosítani kell az SQL/MySQL- és a választott SSH-hitelesítéshez szükséges titkokat; az interaktív ablakban beállított változót a Feladatütemező nem örökli. A forrásellenőrző dry-run csak az MSSQL-jelszót igényli. Kézi futtatáshoz egyszerűbb a `--prompt-passwords`, amely a hiányzó jelszavakat rejtetten kéri be és a folyamat végén eltávolítja a beállított változókat; az eredetileg meglévő változókat megtartja. Ez nem tartós jelszótárolás.
+Ez csak az aktuális PowerShell-ablak és az innen indított folyamatok számára állítja be a változót; a Feladatütemező nem örökli. A forrásellenőrző dry-run csak az MSSQL-jelszót igényli. Kézi futtatáshoz a `--prompt-passwords` is használható: a hiányzó jelszavakat rejtetten kéri be és a folyamat végén eltávolítja a beállított változókat; az eredetileg meglévő változókat megtartja. Ez önmagában nem tartós jelszótárolás. Az ismételt bekérést az alábbi DPAPI-mentés szünteti meg.
+
+### Egyszeri, titkosított jelszómentés Windows alatt
+
+Másold át együtt az új `sync_partnerpool.py`, `partnerpool_credentials.py` és `save-passwords-and-check.cmd` fájlokat az SQL szerver meglévő `C:\servio_work\preorder_partners` mappájába. A konfigurációt, az SQL-lekérdezést, a virtuális környezetet és az SSH-kulcsot ne írd felül.
+
+Ugyanazzal a Windows-fiókkal, amely majd a feladatot is futtatja, lehetőleg egy friss PowerShell-ablakban indítsd ezt az egy sort:
+
+```powershell
+C:\servio_work\preorder_partners\save-passwords-and-check.cmd
+```
+
+Az indító egyszer rejtetten bekéri és titkosítva menti az összes konfigurált jelszót, majd külön kézi bekérés nélkül ellenőrzi a MySQL/SSH-kapcsolatot és az ERP-forrást. Egyik ellenőrzés sem publikál poolt. A jelmondat nélküli SSH-kulcshoz nem kér és nem tárol jelmondatot. Nem készít XML-t, nem telepít és nem engedélyez feladatot. Normál PowerShell-konzolt használj, ne ISE-t: a natív Python rejtett jelszóbekérése az ISE-ben nem megbízható.
+
+A mentés önálló parancsa:
+
+```powershell
+C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe C:\servio_work\preorder_partners\sync_partnerpool.py --config C:\servio_work\preorder_partners\partnerpool-sync.config.json --save-passwords
+```
+
+A titkosított fájl a futtató felhasználó profiljába kerül: `%LOCALAPPDATA%\PreorderPartnerPool\credentials-<azonosító>.dpapi`. Nem a projektbe vagy a tárhelyre. A fájl a Windows `CryptProtectData`/`CryptUnprotectData` API-ját használja felhasználói hatókörrel, `CRYPTPROTECT_LOCAL_MACHINE` nélkül. Nincs külön, fájlban tárolt titkosító kulcs, szöveges jelszómentés vagy Linuxos álcázott alternatíva. Az írás atomikus; a titkosítás/visszaolvasás ellenőrzése megelőzi a korábbi mentés cseréjét. A DPAPI-payload verziója, konfigurációs kötése és tartalmi ellenőrzőösszege is ellenőrződik.
+
+A beállítási fájl helye és a kapcsolódás azonosítói is részei a kötésnek. Másik konfigurációhoz, adatbázishoz, felhasználóhoz vagy SSH-hosthoz külön mentés készül: a tesztjelszavak nem kerülnek automatikusan az éles konfigurációba. Kapcsolati beállítás vagy a konfiguráció helyének megváltoztatása után ismét mentsd el a jelszavakat. A futtatási korlátok, például `min_rows` változtatása önmagában nem érvényteleníti a mentést.
+
+Normál futáskor a program automatikusan tölti be az adott konfigurációhoz elmentett jelszavakat; a `--prompt-passwords` elhagyható. Kifejezetten a környezetben megadott érték elsőbbséget élvez. A folyamat végén az ideiglenesen betöltött változókat visszaállítja. Hibás, sérült vagy másik fiókkal nem feloldható mentésnél nem vált titkosítatlan tárolásra vagy felügyelet nélküli jelszóbekérésre. A jelszócsere ugyanazzal a `--save-passwords` paranccsal végezhető.
+
+A DPAPI nem véd a már kompromittált futtató Windows-fiókkal szemben: az alkalmazásnak futás közben hozzá kell férnie a jelszavakhoz. Ne adj másnak hozzáférést ehhez a fiókhoz vagy az általa futtatott módosítható kódhoz. Másik gépre/fiókra telepítéskor az ottani felhasználóval újra meg kell adni a jelszavakat; a teljes projektmappa másolása nem viszi át automatikusan a feloldható titkokat.
 
 ### Kapcsolódási hiba diagnosztikája
 
@@ -169,23 +195,53 @@ C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe C:\servio_
 
 Éles betöltéshez az éles konfiguráció mellett külön `--allow-production` kapcsoló is kötelező. A szinkron alapból dry-run; ez a kapcsoló önmagában sem ír, az `--apply` is szükséges.
 
-## Éjszakai ütemezés
+## CMD-indítók: kézi teszt, ütemezett éles
 
-A Windows Feladatütemezőben hozz létre napi feladatot, például 02:00-ra, csak sikeres tárhelyi teszt és a jelszótárolás rendezése után. Akkor is fusson, ha nincs bejelentkezve felhasználó. A futtató Windows-fiók érje el a szükséges titkokat és kulcsokat; az SQL-login rendelkezzen az előbb tesztelt ERP/linked-server hozzáféréssel. Ne használd a `--prompt-passwords` kapcsolót ütemezésben: ott nincs kézi bevitel. Ne engedj párhuzamos feladatpéldányokat. Célszerű kimaradt futást később pótolni, hibánál értesítést/ellenőrzést beállítani.
+A tesztet **nem ütemezzük**. Kézi frissítése a meglévő tesztkonfigurációval és jelszómentéssel:
 
-Program:
-
-```text
-C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe
+```powershell
+C:\servio_work\preorder_partners\run-partnerpool-test.cmd
 ```
 
-Argumentumok, éleshez:
+Ez valóban frissíti a teszt partnerpoolt, de nem importál automatikusan partnert a törzsbe. Napló: `logs\partnerpool-test.log`. A korábbi `partnerpool-nightly-test.xml` nem használandó; ha már importáltál ilyen feladatot, tiltsd le. A régi `--prepare-task` kapcsoló magyarázó hibával leáll; új XML nem készül.
 
-```text
-"C:\servio_work\preorder_partners\sync_partnerpool.py" --config "C:\servio_work\preorder_partners\partnerpool-sync.config.json" --apply --allow-production
+Az éles konfiguráció külön fájl: `partnerpool-sync.production.config.json`. Kiindulópont a `partnerpool-sync.production.example.json`, nem kész kapcsolati beállítás. Környezet: `production`; céladatbázis: `szeganet_elorendeles`. Töltsd ki és ellenőrizd az éles MySQL-felhasználót, az ERP/SSH-kapcsolatokat, a tesztelt `country_map`-et és forrásparamétereket. A tesztfájlt ne nevezd át és ne írd át élesre! Az éles konfigurációhoz külön DPAPI-mentés szükséges:
+
+```powershell
+C:\servio_work\preorder_partners\save-production-passwords-and-check.cmd
 ```
 
-Munkakönyvtár: `C:\servio_work\preorder_partners`. A kimenet egy rövid JSON-eredmény, személyes adatok és kapcsolati jelszavak nélkül. Siker: 0 kilépési kód; hiba: 1. A Feladatütemező előzménye és a szkript standard hibakimenete alapján felügyelendő. Az alkalmazásban látszik az utolsó sikeres frissítés; 36 óra után elavultsági figyelmeztetés jelenik meg.
+Ez csak ment és ellenőriz, nem publikál. A meglévő tesztjelszó-mentés változatlan marad. A konfigurációs fájl helye/kapcsolati azonosítói a mentéshez kötöttek, ezért utólagos módosításuk új mentést igényel.
+
+Az éles feltöltést végző CMD (csak az előfeltételek rendezése után indítandó):
+
+```powershell
+C:\servio_work\preorder_partners\run-partnerpool-production.cmd
+```
+
+Mindkét indító a saját mappájából, az ottani `.venv-partnerpool\Scripts\python.exe`-t használja, nem a PATH-on talált Pythont. Kötött konfigurációt használ, átadja az elvárt környezetet és adatbázist; eltéréskor még jelszóbetöltés és kapcsolódás előtt leáll. Hiányzó éles konfiguráció esetén soha nem esik vissza a tesztre. Csak az éles indító tartalmaz `--allow-production` kapcsolót. Nincs automatikus, rejtett jelszóbekérés.
+
+Az indítók létrehozzák a `logs` könyvtárat, időbélyeggel naplózzák a START/OK/ERROR állapotot, a Python standard kimenetét és hibakimenetét. Az éles napló `logs\partnerpool-production.log`. Hiba esetén a Python kilépési kódját visszaadják a Feladatütemezőnek; siker: 0. Hiányzó fájl: 2. Nem írható naplónál nem indul el a szinkron. A naplókban nincsenek jelszavak vagy teljes driverüzenetek; hozzáférésüket korlátozd és méretüket időnként ellenőrizd/archiváld.
+
+### Éles ütemezés előfeltételei
+
+- Az éles Laravel-kiadásban legyen telepítve a partnerpool funkció és a hozzá tartozó migrációk. Ez a CMD-fejlesztés nem telepít éles webalkalmazást vagy sémát.
+- Ellenőrzött éles céladatbázis és korlátozott jogosultságú MySQL-felhasználó, helyes SSH-hostkulcs és elérhető privát kulcs.
+- Az MSSQL végleges tanúsítványellenőrzését rendezni kell: a korábbi `TrustServerCertificate=yes` ideiglenes kivétel. Az SSH-alagút a SQL Server oldali hitelességellenőrzést nem helyettesíti.
+- Előbb olvasási kapcsolat-/forráspróba a kitöltött éles konfigurációval, majd jóváhagyott egyszeri kézi éles feltöltés. A futtató ugyanaz a `servio` Windows-fiók legyen, mint a DPAPI-mentésnél.
+
+### Feladatütemező beállítása, kizárólag élesre
+
+- Program: `C:\Windows\System32\cmd.exe`
+- Argumentum: `/d /c "C:\servio_work\preorder_partners\run-partnerpool-production.cmd"`
+- Kezdés helye: `C:\servio_work\preorder_partners`
+- Napi időpont a felhasználó választása szerint (például 02:00, az SQL szerver helyi ideje).
+- Ugyanaz a Windows-fiók; bejelentkezés nélkül is fusson, `Password` hitelesítéssel. Mentéskor a Windows-fiók jelszavát kell megadni, nem az SQL/MySQL-jelszót. A „Ne tárolja a jelszót” / S4U mód nem megfelelő a hálózat és titkosított adatok eléréséhez.
+- Emelt jogosultság nem szükséges. Ha már fut, új példány ne induljon. Javasolt 30 perces futási korlát; kimaradt futás pótlása és hibák követése.
+
+A feladatot először letiltva készítsd el. Az előfeltételek és a kézi próba után külön ellenőrizd a Feladatütemezőből indított futást is, a `0x0` eredményt és a napló `OK`/`published: true` állapotát. Az automatikus ütemezés csak ezután engedélyezendő. A beállítást a felhasználó végzi az SQL szerveren; a csomag másolása semmilyen feladatot nem regisztrál.
+
+Az alkalmazásban látszik az utolsó sikeres frissítés; 36 óra után elavultsági figyelmeztetés jelenik meg. A kézzel frissített tesztnél ez várható, és nem ok egy tesztütemezés létrehozására.
 
 ## Sikertelen futások és adatvédelem
 
@@ -216,8 +272,10 @@ Az alábbi parancsok a `feature/pricing-module` munkapéldányban csak a partner
 git add -- .gitignore config/filament-shield.php app/Filament/Pages/ErpPartnerPool.php app/Models/PartnerPool.php app/Models/PartnerPoolSyncState.php app/Services/Imports/PartnerPoolImporter.php database/migrations/2026_11_10_090000_create_partnerpool_tables.php database/migrations/2026_11_10_090100_add_partnerpool_permissions.php resources/views/filament/pages/erp-partner-pool.blade.php infrastructure/erp/sync_partnerpool.py infrastructure/erp/partnerpool.sql infrastructure/erp/partnerpool-sync.example.json infrastructure/erp/requirements.txt infrastructure/erp/run-partnerpool-sync.ps1 tests/Feature/Admin/PartnerPoolTest.php tests/Python/test_partnerpool_sync.py docs/partnerpool.md
 git add -- infrastructure/erp/diagnose_mssql.py tests/Python/test_partnerpool_diagnostics.py
 git add -- infrastructure/erp/partnerpool-ssh_known_hosts infrastructure/erp/SSH-QUICKSTART.txt infrastructure/erp/setup-and-check-ssh.cmd tests/Python/test_partnerpool_ssh.py
+git add -- infrastructure/erp/partnerpool_credentials.py infrastructure/erp/save-passwords-and-check.cmd infrastructure/erp/PASSWORDS-QUICKSTART.txt tests/Python/test_partnerpool_credentials.py
+git add -- infrastructure/erp/run-partnerpool-test.cmd infrastructure/erp/run-partnerpool-production.cmd infrastructure/erp/save-production-passwords-and-check.cmd infrastructure/erp/partnerpool-sync.production.example.json tests/Python/test_partnerpool_launchers.py
 git diff --cached --check
-git commit -m "Add ERP partner pool and nightly synchronization"
+git commit -m "Add protected partnerpool CMD launchers and saved credentials"
 git push origin feature/pricing-module
 ```
 
@@ -240,5 +298,8 @@ Hivatalos háttér:
 - https://github.com/mkleehammer/pyodbc/wiki/Cursor
 - https://docs.paramiko.org/en/stable/api/client.html
 - https://docs.paramiko.org/en/stable/api/transport.html
+- https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
+- https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptunprotectdata
+- https://learn.microsoft.com/en-us/windows/win32/taskschd/taskschedulerschema-logontype-simpletype
 - https://pymysql.readthedocs.io/en/latest/modules/connections.html
 - https://dev.mysql.com/doc/refman/8.4/en/implicit-commit.html

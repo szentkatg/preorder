@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "infrastructure/erp"))
 spec = importlib.util.spec_from_file_location("sync_partnerpool", ROOT / "infrastructure/erp/sync_partnerpool.py")
 sync = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sync)
@@ -234,7 +235,7 @@ class SshTests(unittest.TestCase):
         rows = [{"erp_partner_code": "P1"}]
         published = {"published": True, "rows": 1, "partners": 1}
         with patch.object(sync, "target_connection", target), patch.object(sync, "fetch_source", return_value=rows), patch.object(sync, "normalize_rows", return_value=rows), patch.object(sync, "publish_snapshot", return_value=published) as publish, contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(sync.main(["--config", str(path), "--apply"]), 0)
+            self.assertEqual(sync.main(["--config", str(path), "--expect-environment", self.config["environment"], "--expect-database", "pool_test", "--apply"]), 0)
         self.assertIs(publish.call_args.args[0], connection)
         self.assertEqual(publish.call_args.kwargs["database"], "pool_test")
 

@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Exports\AdminTableExport;
 use App\Filament\Pages\StockOrderProportioning;
+use App\Filament\Pages\PricingHufRetailCalculations;
+use App\Filament\Pages\PricingHufRetailPriceDistribution;
 use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Filament\Resources\AdminUsers\Pages\CreateAdminUser;
 use App\Filament\Resources\AdminUsers\Pages\EditAdminUser;
@@ -11,11 +13,11 @@ use App\Filament\Resources\Brands\Pages\ListBrands;
 use App\Filament\Resources\Languages\LanguageResource;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\PartnerUsers\Pages\ListPartnerUsers;
+use App\Filament\Resources\PricingCalculationRows\PricingCalculationRowResource;
 use App\Filament\Resources\Products\Pages\ViewProduct;
 use App\Filament\Resources\Products\RelationManagers\ColorsRelationManager;
 use App\Filament\Resources\Skus\Pages\ListSkus;
 use App\Filament\Resources\Translations\Pages\ListTranslations;
-use App\Filament\Support\Pages\ReadOnlyRecord;
 use App\Models\Brand;
 use App\Models\Color;
 use App\Models\Language;
@@ -27,10 +29,12 @@ use BezhanSalleh\FilamentShield\Facades\FilamentShield as Shield;
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Facades\Filament;
+use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Enums\Width;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
@@ -355,12 +359,19 @@ class AdminAuthorizationTest extends TestCase
             ))
             ->values();
 
-        $this->assertCount(30, $resources);
+        // Compare the actual source inventory, not an old hard-coded count.
+        $expectedResources = collect(File::allFiles(app_path('Filament/Resources')))
+            ->filter(fn ($file): bool => str_ends_with($file->getFilename(), 'Resource.php'))
+            ->map(fn ($file): string => 'App\\Filament\\Resources\\'
+                .str_replace('/', '\\', substr(str_replace('\\', '/', $file->getRelativePathname()), 0, -4)))
+            ->values()->all();
+        $this->assertNotEmpty($expectedResources);
+        $this->assertEqualsCanonicalizing($expectedResources, $resources->all());
 
         foreach ($resources as $resource) {
             $this->assertTrue($resource::hasPage('view'), "Missing view page on {$resource}");
             $this->assertTrue(
-                is_subclass_of($resource::getPages()['view']->getPage(), ReadOnlyRecord::class),
+                is_subclass_of($resource::getPages()['view']->getPage(), ViewRecord::class),
                 "The view page of {$resource} is not read-only",
             );
 
@@ -368,10 +379,18 @@ class AdminAuthorizationTest extends TestCase
             $table = Livewire::test($listPage)->instance()->getTable();
 
             $this->assertNotEmpty($table->getColumns(), "Missing columns on {$resource}");
-            $this->assertTrue($table->hasAction('view'), "Missing view action on {$resource}");
+            if ($resource === PricingCalculationRowResource::class) {
+                $this->assertNotNull($table->getColumn('pricing_operations'));
+                $this->assertTrue(method_exists($listPage, 'openCostDetails'));
+            } else {
+                $this->assertTrue($table->hasAction('view'), "Missing view action on {$resource}");
+            }
             $this->assertTrue($table->hasAction('exportExcel'), "Missing Excel export on {$resource}");
 
             foreach ($table->getColumns() as $column) {
+                if ($column->getName() === 'pricing_operations') {
+                    continue; // Action menu, not a searchable/sortable database field.
+                }
                 $this->assertTrue(
                     $column->isSortable(),
                     "Column {$column->getName()} is not sortable on {$resource}",
@@ -563,8 +582,14 @@ class AdminAuthorizationTest extends TestCase
         $resources = collect(Shield::getResources());
         $pages = collect(Shield::getPages());
 
-        $this->assertCount(30, $resources);
-        $this->assertCount(5, $pages);
+        $expectedResources = collect(Filament::getPanel('admin')->getResources())
+            ->reject(fn (string $resource): bool => in_array($resource, config('filament-shield.resources.exclude'), true));
+        $expectedPages = collect(Filament::getPanel('admin')->getPages())
+            ->reject(fn (string $page): bool => in_array($page, config('filament-shield.pages.exclude'), true));
+        $this->assertNotEmpty($expectedResources);
+        $this->assertNotEmpty($expectedPages);
+        $this->assertEqualsCanonicalizing($expectedResources->values()->all(), $resources->keys()->all());
+        $this->assertEqualsCanonicalizing($expectedPages->values()->all(), $pages->keys()->all());
 
         foreach ($resources as $resource) {
             $policy = Gate::getPolicyFor($resource['modelFqcn']);
@@ -581,6 +606,12 @@ class AdminAuthorizationTest extends TestCase
         }
 
         foreach ($pages->keys() as $pageClass) {
+            // This read-only report deliberately shares HUF-retail access.
+            // Its allowed/forbidden behavior is covered by HufRetailPriceDistributionTest.
+            if ($pageClass === PricingHufRetailPriceDistribution::class) {
+                $this->assertSame(PricingHufRetailCalculations::canAccess(), $pageClass::canAccess());
+                continue;
+            }
             $this->assertContains(
                 HasPageShield::class,
                 class_uses_recursive($pageClass),

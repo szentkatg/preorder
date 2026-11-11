@@ -12,6 +12,7 @@ from unittest.mock import patch
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "infrastructure/erp"))
 spec = importlib.util.spec_from_file_location("sync_partnerpool", ROOT / "infrastructure/erp/sync_partnerpool.py")
 sync = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sync)

@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Support\PricingPageLayout;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -57,6 +58,12 @@ class AdminPanelProvider extends PanelProvider
                     ->modelLabel('szerepkör')
                     ->pluralModelLabel('szerepkörök'),
             ])
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (array $scopes) => view('filament.pricing.page-scroll-marker', [
+                    'enabled' => PricingPageLayout::scrollsIntro($scopes),
+                ]),
+            )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn () => view('filament.admin.table-scroll-styles'),
