@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 
 // Execute the real inline script, with controlled mutation delivery and a clock
 // that makes a wide table take longer than the former 150 ms suppression window.
-function fixture(source, columns = 80, bodyRows = 100) {
+function fixture(source, columns = 80, bodyRows = 100, { livewireReady = true } = {}) {
     let now = 0;
     let spanChecks = 0;
     let active = true;
@@ -14,6 +14,7 @@ function fixture(source, columns = 80, bodyRows = 100) {
     const calls = [];
     const storage = new Map();
     const hooks = {};
+    const hookRegistrations = [];
     const events = {};
     const mutations = (node) => {
         observers.filter((observer) => observer.target).forEach((observer) => {
@@ -72,7 +73,8 @@ function fixture(source, columns = 80, bodyRows = 100) {
     const document = {
         body: element('body'), documentElement: element('html'), createElement: element,
         querySelector() { return active ? container : null; },
-        querySelectorAll(selector) { return active ? (selector.includes('.fi-ta-table') ? [table] : [reset]) : []; },
+        querySelectorAll(selector) { return active ? (selector.includes('.fi-ta-table') ? [table]
+            : selector === '[data-pricing-column-width-reset]' ? [reset] : []) : []; },
         addEventListener(name, callback) { (events[name] ??= []).push(callback); },
     };
     class Observer {
@@ -80,11 +82,13 @@ function fixture(source, columns = 80, bodyRows = 100) {
         observe(target) { this.target = target; }
         disconnect() { this.target = null; this.records = []; }
     }
+    const livewire = { hook(name, callback) { hookRegistrations.push(name); hooks[name] = callback; },
+        find() { return { call(...args) { calls.push(args); } }; } };
     const window = {
         localStorage: { getItem: (k) => storage.get(k), setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) },
         setTimeout(callback) { const id = ++nextTimer; timers.set(id, callback); return id; },
         clearTimeout(id) { timers.delete(id); }, dispatchEvent() {},
-        Livewire: { hook(name, callback) { hooks[name] = callback; }, find() { return { call(...args) { calls.push(args); } }; } },
+        Livewire: livewireReady ? livewire : undefined,
     };
     runInNewContext(source, { window, document, MutationObserver: Observer, Event: class {}, Date: { now: () => now }, getComputedStyle: () => ({ fontSize: '16px' }) });
     function flush(limit = 8) {
@@ -97,12 +101,13 @@ function fixture(source, columns = 80, bodyRows = 100) {
         }
         throw new Error('Resizer did not settle: self-triggering mutation loop');
     }
-    return { window, headers, rows, group, table, container, reset, calls, storage, hooks, events, element, mutations, flush,
+    return { window, headers, rows, group, table, container, reset, calls, storage, hooks, hookRegistrations, events, element, mutations, flush,
+        startLivewire() { window.Livewire = livewire; events['livewire:init']?.forEach(callback => callback()); },
         now: () => now, spanChecks: () => spanChecks, pending: () => timers.size, setActive: (value) => { active = value; } };
 }
 
-export function runPricingColumnResizingTests(view = readFileSync(new URL('../../resources/views/filament/pages/pricing-cost-calculations.blade.php', import.meta.url), 'utf8'), collectFailures = false) {
-    const source = view.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/x-filament-panels::page>/)[1];
+export function runPricingColumnResizingTests(view = readFileSync(new URL('../../resources/views/filament/pricing/resizable-columns-scripts.blade.php', import.meta.url), 'utf8'), collectFailures = false) {
+    const source = view.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
     const results = [];
     function test(name, callback) {
         try { callback(); results.push({ name, passed: true }); }
@@ -152,6 +157,34 @@ export function runPricingColumnResizingTests(view = readFileSync(new URL('../..
         f.container.dataset.pricingStorageKey = 'test-user-retail';
         f.container.dataset.pricingServerWidths = '{"column-1":188}'; f.setActive(true);
         f.window.__pricingCostColumnResizingInit(); f.flush(); assert.equal(f.headers[1].style.width, '188px');
+    });
+    test('Late Livewire startup registers a single morph restoration hook', () => {
+        const f = fixture(source, 4, 2, { livewireReady: false });
+        assert.equal(f.hooks['morph.updated'], undefined);
+        f.startLivewire();
+        assert.equal(typeof f.hooks['morph.updated'], 'function');
+        f.startLivewire(); f.events['DOMContentLoaded']?.forEach(callback => callback());
+        f.events['livewire:initialized']?.forEach(callback => callback()); f.flush();
+        assert.equal(f.hookRegistrations.filter(name => name === 'morph.updated').length, 1);
+    });
+    test('Opening and cancelling a modal restores saved widths after attribute-only morphs', () => {
+        const f = fixture(source, 4, 2, { livewireReady: false }); f.startLivewire(); f.flush();
+        const handle = f.headers[1].children[0];
+        handle.emit('pointerdown', { clientX: 100, pointerId: 1 });
+        handle.emit('pointermove', { clientX: 127, pointerId: 1 });
+        handle.emit('pointerup', { pointerId: 1 });
+        assert.equal(f.headers[1].style.width, '150px');
+        const savedCalls = f.calls.length;
+        for (let cycle = 0; cycle < 4; cycle++) {
+            // Livewire strips client styles without replacing table rows/cells.
+            f.rows.flatMap(row => row.cells).forEach(cell => { cell.style.width = ''; cell.style.minWidth = ''; cell.style.maxWidth = ''; });
+            f.table.style.width = '';
+            f.hooks['morph.updated']({ el: f.container }); f.flush();
+            assert.equal(f.headers[1].style.width, '150px');
+            assert.equal(f.rows[1].cells[1].style.width, '150px');
+            assert.equal(f.headers[1].children.length, 1);
+        }
+        assert.equal(f.calls.length, savedCalls, 'Modal cancellation must not save natural widths over the user preference');
     });
     return { passed: results.filter((r) => r.passed).length, failed: results.filter((r) => !r.passed).length, results };
 }

@@ -83,6 +83,19 @@ felhasználónként történik (`erp_partner_pool_*` beállítások). A közös 
 igazítás és szélesség-visszaállítás is elérhető. A műveletoszlop átrendezés után
 is elöl marad.
 
+A szélességkezelő később induló Livewire esetén is egyszer kapcsolódik az
+újrarajzolási eseményekhez. Az átvételi modal megnyitása és Mégse gombbal történő
+bezárása után az attribútumokat visszaíró morph esetén is visszaállítja a mentett
+szélességeket; a természetes böngészős szélességet nem menti rá a felhasználó
+beállításaira. A közös javítás a többi ilyen táblázatra is érvényes.
+
+Ellenőrzés: a `pricing-column-resizing.mjs` a tényleges közös Blade-szkriptet
+futtatja, külön késői Livewire-indulással és ismételt modal-morph szimulációval.
+A `PartnerPoolTest` valódi Livewire action megnyitás/bezárás mellett ellenőrzi,
+hogy a szerveroldali szélességek változatlanok, és törzsadat nem keletkezik.
+Ez a javítás önmagában nem igényel migrációt, Composert vagy frontendbuildet;
+kihelyezéskor a Blade-cache-t a webes felhasználóval újra kell építeni.
+
 ### A javaslatbővítés kihelyezési sorrendje
 
 1. Laravel-kód és `2026_11_12_140000_add_suggestions_to_partnerpool` migráció

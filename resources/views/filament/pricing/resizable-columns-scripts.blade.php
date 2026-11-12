@@ -15,6 +15,7 @@
         let initialiseTimer = null;
         let isInitialising = false;
         let currentWidths = null;
+        let livewireHooksRegistered = false;
         const tableLayouts = new WeakMap();
 
         function fitState(component) {
@@ -343,6 +344,18 @@
             initialiseTimer = window.setTimeout(initialisePricingColumnResizing, delay);
         }
 
+        function registerLivewireHooks() {
+            if (livewireHooksRegistered || ! window.Livewire?.hook) {
+                return;
+            }
+
+            // Inline view scripts can execute before Livewire's deferred bundle.
+            // Attribute-only morphs (e.g. cancelling an import modal) remove
+            // client widths without triggering the table-structure observer.
+            window.Livewire.hook('morph.updated', () => scheduleInitialisePricingColumnResizing(50));
+            livewireHooksRegistered = true;
+        }
+
         function hasTableStructureChange(mutations) {
             const structure = 'table, thead, tbody, tr, th, td';
 
@@ -352,6 +365,7 @@
         }
 
         function initialisePricingColumnResizing(resetWidths = false) {
+            registerLivewireHooks();
             if (isInitialising) {
                 return;
             }
@@ -435,9 +449,12 @@
         });
         document.addEventListener('reset-table-column-manager', () => scheduleInitialisePricingColumnResizing(120));
 
-        if (window.Livewire) {
-            window.Livewire.hook('morph.updated', () => scheduleInitialisePricingColumnResizing(50));
-        }
+        const livewireReady = () => {
+            registerLivewireHooks();
+            scheduleInitialisePricingColumnResizing(50);
+        };
+        document.addEventListener('livewire:init', livewireReady);
+        document.addEventListener('livewire:initialized', livewireReady);
 
         initialisePricingColumnResizing();
     })();

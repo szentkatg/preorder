@@ -187,6 +187,22 @@ class PartnerPoolTest extends TestCase
         $this->assertSame($this->batch, PartnerPoolSyncState::find(1)->active_batch_id);
     }
 
+    public function test_cancelling_import_preserves_saved_widths_and_creates_no_master_records(): void
+    {
+        $row = $this->row();
+        $widths = ['erp-partner-code' => 110, 'partner-name' => 190];
+        $page = Livewire::test(ErpPartnerPool::class)->call('savePricingColumnWidths', $widths);
+        for ($cycle = 0; $cycle < 3; $cycle++) {
+            $page->mountTableAction('importPartner', $row)->assertSet('pricingColumnWidths', $widths)
+                ->unmountTableAction()->assertSet('pricingColumnWidths', $widths);
+        }
+        $this->assertSame($widths, AdminUiPreference::where('user_id', auth()->id())
+            ->where('preference_key', 'erp_partner_pool_column_widths')->firstOrFail()->value);
+        $this->assertDatabaseCount('partners', 0);
+        $this->assertDatabaseCount('partner_addresses', 0);
+        $this->assertDatabaseCount('partnerpool_import_logs', 0);
+    }
+
     public function test_supplier_and_both_destinations_are_supported(): void
     {
         $row = $this->row();
