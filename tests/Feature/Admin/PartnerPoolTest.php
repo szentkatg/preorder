@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Filament\Pages\ErpPartnerPool;
 use App\Models\Brand;
+use App\Models\AdminUiPreference;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\OrderSheetType;
@@ -16,9 +17,11 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Imports\PartnerPoolImporter;
 use Filament\Facades\Filament;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -83,6 +86,105 @@ class PartnerPoolTest extends TestCase
         $this->assertDatabaseCount('partner_users', 0);
         $this->assertDatabaseCount('suppliers', 0);
         $this->assertDatabaseHas('partnerpool_import_logs', ['erp_partner_code' => 'P000001', 'target_type' => 'customer']);
+    }
+
+    public function test_suggestions_prefill_the_modal_by_code_and_remain_editable(): void
+    {
+        $extraBrand = Brand::create(['code' => 'DV', 'name' => 'Másik márka', 'active' => true]);
+        $extraSheet = OrderSheetType::create(['code' => 'T', 'name' => 'Textil', 'active' => true]);
+        $language = Language::create(['code' => 'EN', 'name' => 'Angol', 'active' => true]);
+        $alternative = PriceList::create(['code' => 'ALT', 'name' => 'Másik árlista', 'type' => 'wholesale',
+            'currency_id' => $this->input['currency_id'], 'active' => true]);
+        $row = $this->row(['price_list_code' => 'pool-hu', 'currency_code' => 'huf', 'language_code' => 'hu',
+            'brand_codes' => ['ht', 'DV'], 'order_sheet_type_codes' => ['b', 'T'], 'address_type' => 'Szállítási,Számlázási']);
+        $page = Livewire::test(ErpPartnerPool::class)->mountTableAction('importPartner', $row)
+            ->assertTableActionDataSet(['price_list_id' => $this->input['price_list_id'], 'currency_id' => $this->input['currency_id'],
+                'language_id' => $this->input['language_id'], 'brand_ids' => [$this->input['brand_ids'][0], $extraBrand->id],
+                'order_sheet_type_ids' => [$this->input['order_sheet_type_ids'][0], $extraSheet->id],
+                'address_type_preview' => 'Szállítási,Számlázási', 'suggestion_notice' => null]);
+        $this->assertDatabaseCount('partners', 0); // Opening the proposal never imports anything.
+        $page->set('mountedActions.0.data.target_type', 'customer')
+            ->set('mountedActions.0.data.price_list_id', $alternative->id)
+            ->set('mountedActions.0.data.language_id', $language->id)
+            ->set('mountedActions.0.data.brand_ids', [$extraBrand->id])
+            ->set('mountedActions.0.data.order_sheet_type_ids', [$extraSheet->id])
+            ->callMountedTableAction()->assertHasNoTableActionErrors();
+        $address = PartnerAddress::firstOrFail();
+        $this->assertSame($alternative->id, $address->price_list_id);
+        $this->assertSame($language->id, $address->language_id);
+        $this->assertSame([$extraBrand->id], $address->brands()->pluck('brands.id')->all());
+        $this->assertSame([$extraSheet->id], $address->orderSheetTypes()->pluck('order_sheet_types.id')->all());
+        $this->assertFalse(Schema::hasColumn('partner_addresses', 'address_type'));
+    }
+
+    public function test_missing_or_inactive_suggestions_are_not_granted_and_have_a_visible_warning(): void
+    {
+        Brand::create(['code' => 'OFF', 'name' => 'Inaktív', 'active' => false]);
+        $row = $this->row(['price_list_code' => 'MISSING', 'currency_code' => 'ZZZ', 'language_code' => 'NO',
+            'brand_codes' => ['HT', 'OFF', 'UNKNOWN'], 'order_sheet_type_codes' => ['B', 'X']]);
+        $defaults = app(PartnerPoolImporter::class)->defaults($row, 'customer');
+        $this->assertNull($defaults['price_list_id']);
+        $this->assertNull($defaults['currency_id']);
+        $this->assertNull($defaults['language_id']);
+        $this->assertSame($this->input['brand_ids'], $defaults['brand_ids']);
+        $this->assertSame($this->input['order_sheet_type_ids'], $defaults['order_sheet_type_ids']);
+        foreach (['Árlista: MISSING', 'Pénznem: ZZZ', 'Nyelv: NO', 'Márka: OFF', 'Márka: UNKNOWN', 'Rendelőlaptípus: X'] as $text) {
+            $this->assertStringContainsString($text, $defaults['suggestion_notice']);
+        }
+        Livewire::test(ErpPartnerPool::class)->mountTableAction('importPartner', $row)
+            ->assertTableActionDataSet(['suggestion_notice' => $defaults['suggestion_notice']]);
+        $this->assertDatabaseCount('partners', 0);
+    }
+
+    public function test_absent_suggestions_leave_the_existing_manual_selection_flow_unchanged(): void
+    {
+        $row = $this->row();
+        $defaults = app(PartnerPoolImporter::class)->defaults($row, 'customer');
+        $this->assertSame([], $defaults['brand_ids']);
+        $this->assertSame([], $defaults['order_sheet_type_ids']);
+        $this->assertNull($defaults['price_list_id']);
+        $this->assertNull($defaults['suggestion_notice']);
+        $this->assertSame(['partner', 'address'], $this->import($row)['created']);
+    }
+
+    public function test_import_action_is_first_and_layout_preferences_survive_reentry_per_user(): void
+    {
+        $this->row(['address_type' => 'Szállítási', 'brand_codes' => ['HT'], 'order_sheet_type_codes' => ['B']]);
+        $page = Livewire::test(ErpPartnerPool::class)->assertSuccessful()
+            ->assertSee('data-pricing-resizable-columns', false)->assertSee('data-pricing-column-width-fit', false)
+            ->assertSee('data-compact-column-manager', false);
+        $table = $page->instance()->getTable();
+        $this->assertSame(RecordActionsPosition::BeforeColumns, $table->getRecordActionsPosition());
+        $this->assertTrue($table->hasReorderableColumns());
+        $this->assertTrue($table->hasAction('exportExcel'));
+        $columns = array_reverse($page->instance()->tableColumns);
+        foreach ($columns as &$column) {
+            if ($column['name'] === 'address_type') $column['isToggled'] = false;
+        }
+        unset($column);
+        $widths = ['erp-partner-code' => 130, 'partner-name' => 220];
+        $page->call('savePricingColumnWidths', $widths)->assertHasNoErrors();
+        $this->assertArrayNotHasKey('html', $page->effects);
+        $page->call('applyTableColumnManager', $columns, true)->assertHasNoErrors();
+        session()->flush();
+        $fresh = Livewire::test(ErpPartnerPool::class)->assertSet('pricingColumnWidths', $widths);
+        $this->assertSame(array_column($columns, 'name'), array_column($fresh->instance()->tableColumns, 'name'));
+        $this->assertTrue($fresh->instance()->isTableColumnToggledHidden('address_type'));
+        $this->assertNotNull(AdminUiPreference::where('user_id', auth()->id())->where('preference_key', 'erp_partner_pool_column_widths')->first());
+        $user = User::factory()->create(); $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($user); session()->flush();
+        Livewire::test(ErpPartnerPool::class)->assertSet('pricingColumnWidths', []);
+    }
+
+    public function test_additive_migration_preserves_existing_snapshot_rows(): void
+    {
+        $row = $this->row();
+        $migration = require database_path('migrations/2026_11_12_140000_add_suggestions_to_partnerpool.php');
+        $migration->down();
+        $this->assertDatabaseHas('partnerpool', ['id' => $row->id, 'partner_name' => 'ERP partner']);
+        $migration->up();
+        $this->assertDatabaseHas('partnerpool', ['id' => $row->id, 'partner_name' => 'ERP partner', 'brand_codes' => null, 'address_type' => null]);
+        $this->assertSame($this->batch, PartnerPoolSyncState::find(1)->active_batch_id);
     }
 
     public function test_supplier_and_both_destinations_are_supported(): void

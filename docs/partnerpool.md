@@ -47,6 +47,80 @@ Az ERP `countryid` mezője nem feltétlenül kétbetűs országkód. A lekérdez
 
 A `partner_phone` az eredeti lekérdezésben a cím telefonja, ezért címenként eltérhet. A többi ismétlődő partnerfejadat egyezőségét ellenőrizzük. A `default` forrásoszlop a poolban `is_default` néven szerepel. A kódok, címkódok, irányítószámok szöveges értékek maradnak, kezdő nulláikkal együtt, amennyiben az ERP szövegként adja őket.
 
+## ERP-javaslatok és oszlopelrendezés
+
+Az átvételi ablak a poolban kapott kódok alapján előre kitölti az árlistát,
+pénznemet, nyelvet, engedélyezett márkákat és rendelőlaptípusokat. Ez csak
+javaslat: valamennyi kiválasztás módosítható a jóváhagyás előtt. Az ablak
+megnyitása nem hoz létre partnert. A meglévő törzsadatok és hozzárendelések
+továbbra sem íródnak felül. A felhasználó végső választásait ellenőrizzük és
+mentjük, nem a nyers ERP-javaslatot.
+
+| SQL-eredmény oszlopa | Pool mezője | Tartalom |
+| --- | --- | --- |
+| `Language` | `language_code` | Nyelvkód, pl. HU/EN |
+| `Currency` | `currency_code` | Pénznemkód, pl. HUF/EUR |
+| `pricelist` | `price_list_code` | Árlistakód, pl. Wholesale_HU |
+| `brands` | `brand_codes` | JSON-kódlista, pl. `["HT","DV"]` |
+| `ordersheets` | `order_sheet_type_codes` | JSON-kódlista, pl. `["T","S","B"]` |
+| `address type` | `address_type` | Tájékoztató szöveg; nem kerül partnercímbe és nem ad jogosultságot |
+
+A kanonikus pool-mezőneveket is elfogadja a Python; egy mező több néven történő
+visszaadása hibának számít. A kódlistáknál hibás JSON, nem szöveges vagy üres
+elem, 100 karakternél hosszabb kód vagy 200-nál több elem leállítja a szinkront;
+a korábbi pool megmarad. A duplikált kódokat kis-/nagybetűtől függetlenül
+kiszűrjük. A régi, javaslatok nélküli lekérdezés továbbra is használható.
+
+A párosítás kis-/nagybetűtől független, csak aktív és egyértelmű törzsbeli
+kódokra. Hiányzó, inaktív vagy többértelmű javaslat esetén figyelmeztetés
+látszik az ablakban, és kézzel kell pótolni a választást. Nem engedélyezünk
+automatikusan minden márkát vagy rendelőlaptípust. Az árlista–pénznem egyezés
+ellenőrzése változatlan.
+
+Az Átvétel művelet a táblázat első oszlopa. Az adatmezők sorrendje és láthatósága
+az oszlopkezelőben, szélességük a fejléc szélének húzásával állítható; a mentés
+felhasználónként történik (`erp_partner_pool_*` beállítások). A közös tartalomhoz
+igazítás és szélesség-visszaállítás is elérhető. A műveletoszlop átrendezés után
+is elöl marad.
+
+### A javaslatbővítés kihelyezési sorrendje
+
+1. Laravel-kód és `2026_11_12_140000_add_suggestions_to_partnerpool` migráció
+   a frissítendő célrendszerre, a megfelelő PHP-val `artisan migrate --force`.
+   Az új három mező nullable; meglévő pool- vagy törzsadatot nem módosít.
+2. Cache-törlés és újraépítés a webszerver számára olvasható jogosultságokkal.
+   A privát mentések umaskját ne örökítsük át sablonfordításra.
+3. Az SQL szerveren a `sync_partnerpool.py` és `partnerpool.sql` frissítése
+   ugyanabban a mappában; a `partnerpool_credentials.py` maradjon mellettük.
+   A konfiguráció, kulcsok és DPAPI-jelszómentés nem változik.
+4. Kézi forrásellenőrző dry-run, majd a megfelelő teszt CMD-vel ellenőrzött
+   frissítés. Az új Python publikálás előtt ellenőrzi a céloszlopokat, és hiányos
+   séma esetén a régi pillanatképet megtartva leáll.
+
+Az SQL `both` ága két külön bitmaszk-feltételt kapcsol össze AND-del, mert
+`sp.type & 62 & 64` mindig nulla. A korábbi `sp.delstat=0` védelem, a determinisztikus
+kapcsolattartó-választás és a címrészek szóközzel összefűzése megmarad.
+A felhasználó megerősítése alapján a címtípustörzs is a linked server ERP-
+adatbázisában található: `[U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_typeline]`.
+A lekérdezés ezt a teljes hivatkozást használja, nem a helyi Kontrolling tábláját.
+
+Ehhez a bővítéshez **migráció és az SQL szerveren fájlmásolás szükséges**,
+de új Composer/Python-csomag, `npm run build` vagy `public/build` feltöltés nem.
+Az ERP-n történő SQL-futtatást a helyi tesztek nem helyettesítik.
+
+Git-parancsok külön jóváhagyott commit/push esetén:
+
+```powershell
+git add -- app/Filament/Pages/ErpPartnerPool.php app/Models/PartnerPool.php app/Services/Imports/PartnerPoolImporter.php resources/views/filament/pages/erp-partner-pool.blade.php database/migrations/2026_11_12_140000_add_suggestions_to_partnerpool.php infrastructure/erp/sync_partnerpool.py infrastructure/erp/partnerpool.sql infrastructure/erp/SUGGESTIONS-QUICKSTART.txt tests/Feature/Admin/PartnerPoolTest.php tests/Feature/DatabaseMigrationTest.php tests/Python/test_partnerpool_sync.py docs/partnerpool.md
+git commit -m "Prefill ERP partner pool imports from source suggestions"
+git push origin feature/pricing-module
+```
+
+A NAS kihelyezése a `deploy-nas.ps1` paranccsal, a teszt/éles tárhely frissítése
+csak a megfelelő jóváhagyott kiadási ágról történjen. A tárhelyi PHP/Artisan
+parancsok a dokumentum végén találhatók. A Windows-szinkron fájljai nem
+frissülnek attól, hogy a webalkalmazás Gitből frissült.
+
 ## Python telepítése az SQL-t elérő Windows-gépen
 
 Előfeltételek: Python 3.10 vagy újabb, Microsoft ODBC Driver 18 for SQL Server, megfelelő ERP/linked-server olvasási jogosultság az SQL-login számára. A tárhely felé SSH-hozzáférés és engedélyezett `direct-tcpip` továbbítás kell a helyi MySQL-hez, vagy közvetlen MySQL-elérés érvényesen ellenőrizhető TLS-tanúsítvánnyal. A Python és az ODBC-driver architektúrája egyezzen.

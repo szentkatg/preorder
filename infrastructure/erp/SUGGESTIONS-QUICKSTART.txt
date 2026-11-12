@@ -1,0 +1,36 @@
+PARTNERPOOL - JAVASOLT TORZSADATOK, 2026-11-12
+
+FONTOS: elobb a webalkalmazast es a celadatbazis semajat kell frissiteni!
+Uj migracio: 2026_11_12_140000_add_suggestions_to_partnerpool
+Ez nem irja at a mar atvett partnereket es cimjogosultsagokat.
+
+Az SQL szerveren a meglevo C:\servio_work\preorder_partners mappaba masold:
+  sync_partnerpool.py (felulirando a friss verzioval)
+  partnerpool.sql (elotte a sajat modositasaidrol legyen masolat)
+  partnerpool_credentials.py (a Python melle kell, most nem valtozott)
+  run-partnerpool-test.cmd (kezi tesztfrissites inditoja)
+
+A sajat config JSON fajlt, SSH-kulcsokat es jelszomenteseket ne ird felul.
+Uj pip-csomag, uj jelszomentes es tesztutemezes nem szukseges.
+
+Az SQL aliasok elfogadottak: Language, Currency, pricelist, brands, ordersheets,
+[address type]. A brands es ordersheets ervenyes JSON szoveges kodlistak.
+Az egyeb javaslatok a torzsben szereplo kodok, nem szabad szoveges nevek.
+A regiebbi lekerdezes tovabbra is hasznalhato, manualis valasztassal.
+
+Elso, iras nelkuli ERP-forrasellenorzes NORMAL PowerShellbol, servio fiokkal:
+C:\servio_work\preorder_partners\.venv-partnerpool\Scripts\python.exe C:\servio_work\preorder_partners\sync_partnerpool.py --config C:\servio_work\preorder_partners\partnerpool-sync.config.json
+
+Utana a teszt partnerpool kezi frissitese:
+C:\servio_work\preorder_partners\run-partnerpool-test.cmd
+
+Az uj Python ellenorzi, hogy a celadatbazis oszlopai rendelkezese allnak-e.
+Hianyzo migracional nem publikalt uj poolt; a meglevo pillanatkep megmarad.
+Az atveteli modal aktiv torzskodokra elore tolt, de mindent lehet modositani.
+Hianyzo/inaktiv/nem egyertelmu torzskod eseten figyelmeztetes lathato.
+A cimtipus csak tajekoztato adat; nem kerul a partnercim torzsbe.
+
+Az SQL both feltetele javitva: kulon AND feltetel a 62 es 64 bitmaszkra.
+A torolt ERP-partnereket tovabbra is kizartuk (sp.delstat=0).
+A cimtipusok torzse a tobbi ERP-tablaval azonos helyrol jon:
+[U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_typeline]

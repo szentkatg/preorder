@@ -17,12 +17,14 @@ class PartnerPool extends Model
         'partner_email', 'partner_phone', 'sales_rep_erp_partner_code', 'partner_active',
         'addrid', 'address_name', 'country', 'zip', 'city', 'street', 'contact_name',
         'address_email', 'address_phone', 'address_active', 'is_default',
-        'currency_code', 'language_code', 'price_list_code', 'source_extracted_at',
+        'currency_code', 'language_code', 'price_list_code', 'brand_codes', 'order_sheet_type_codes',
+        'address_type', 'source_extracted_at',
     ];
 
     protected function casts(): array
     {
-        return ['partner_active' => 'boolean', 'address_active' => 'boolean', 'is_default' => 'boolean', 'source_extracted_at' => 'datetime'];
+        return ['partner_active' => 'boolean', 'address_active' => 'boolean', 'is_default' => 'boolean',
+            'brand_codes' => 'array', 'order_sheet_type_codes' => 'array', 'source_extracted_at' => 'datetime'];
     }
 
     public function scopeCurrentSnapshot(Builder $query): Builder

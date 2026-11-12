@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasPricingColumnPreferences;
 use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
@@ -19,6 +20,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -29,6 +31,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -38,7 +41,11 @@ use Livewire\Attributes\Computed;
 class ErpPartnerPool extends Page implements HasTable
 {
     use HasPageShield;
-    use InteractsWithTable;
+    use HasPricingColumnPreferences, InteractsWithTable {
+        HasPricingColumnPreferences::loadTableColumnsFromSession insteadof InteractsWithTable;
+        HasPricingColumnPreferences::persistTableColumns insteadof InteractsWithTable;
+        HasPricingColumnPreferences::persistHasReorderedTableColumns insteadof InteractsWithTable;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cloud-arrow-down';
 
@@ -53,6 +60,12 @@ class ErpPartnerPool extends Page implements HasTable
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+        $this->pricingColumnWidths = $this->loadPricingColumnWidths();
+    }
+
+    protected function pricingPreferencePrefix(): string
+    {
+        return 'erp_partner_pool';
     }
 
     #[Computed]
@@ -72,6 +85,7 @@ class ErpPartnerPool extends Page implements HasTable
                     ->formatStateUsing(fn (string $state): string => ['customer' => 'Vevő', 'supplier' => 'Beszállító', 'both' => 'Mindkettő'][$state] ?? $state),
                 TextColumn::make('addrid')->label('Címkód')->searchable()->sortable(),
                 TextColumn::make('address_name')->label('Cím neve')->searchable()->sortable(),
+                TextColumn::make('address_type')->label('ERP címtípus')->placeholder('Nincs megadva'),
                 TextColumn::make('country')->label('ERP ország')->sortable(),
                 TextColumn::make('zip')->label('Irányítószám')->sortable(),
                 TextColumn::make('city')->label('Város')->searchable()->sortable(),
@@ -82,6 +96,11 @@ class ErpPartnerPool extends Page implements HasTable
                 TextColumn::make('partner_email')->label('Partner e-mail')->searchable()->sortable(),
                 TextColumn::make('partner_phone')->label('Partner telefon')->searchable()->sortable(),
                 TextColumn::make('sales_rep_erp_partner_code')->label('Képviselő ERP-kód')->searchable()->sortable(),
+                TextColumn::make('price_list_code')->label('Javasolt árlista')->placeholder('Nincs megadva'),
+                TextColumn::make('currency_code')->label('Javasolt pénznem')->placeholder('Nincs megadva'),
+                TextColumn::make('language_code')->label('Javasolt nyelv')->placeholder('Nincs megadva'),
+                TextColumn::make('brand_codes')->label('Javasolt márkák')->placeholder('Nincs megadva'),
+                TextColumn::make('order_sheet_type_codes')->label('Javasolt rendelőlaptípusok')->placeholder('Nincs megadva'),
                 IconColumn::make('is_default')->label('Alapcím')->boolean()->sortable(),
                 IconColumn::make('partner_active')->label('Partner aktív')->boolean()->sortable(),
                 IconColumn::make('address_active')->label('Cím aktív')->boolean()->sortable(),
@@ -96,6 +115,9 @@ class ErpPartnerPool extends Page implements HasTable
                 TernaryFilter::make('address_active')->label('Cím aktív'),
             ])
             ->recordActions([$this->importAction()])
+            ->recordActionsPosition(RecordActionsPosition::BeforeColumns)
+            ->recordActionsColumnLabel('Átvétel')
+            ->reorderableColumns()
             ->headerActions([Action::make('refreshPool')->label('Lista frissítése')->icon('heroicon-o-arrow-path')
                 ->action(function (): void {
                     abort_unless(static::canAccess(), 403);
@@ -124,7 +146,8 @@ class ErpPartnerPool extends Page implements HasTable
 
                 return ['source_batch_id' => $record->batch_id,
                     'erp_code_preview' => $record->erp_partner_code, 'name_preview' => $record->partner_name,
-                    'address_preview' => trim(($record->addrid ?? '').' — '.($record->address_name ?? '').' — '.($record->city ?? '').' '.($record->street ?? ''))]
+                    'address_preview' => trim(($record->addrid ?? '').' — '.($record->address_name ?? '').' — '.($record->city ?? '').' '.($record->street ?? '')),
+                    'address_type_preview' => $record->address_type]
                     + app(PartnerPoolImporter::class)->defaults($record, array_key_exists($record->partner_type, $targets)
                         ? $record->partner_type : array_key_first($targets));
             })
@@ -133,11 +156,15 @@ class ErpPartnerPool extends Page implements HasTable
                 TextInput::make('erp_code_preview')->label('ERP partnerkód')->disabled()->dehydrated(false),
                 TextInput::make('name_preview')->label('Partner neve')->disabled()->dehydrated(false),
                 TextInput::make('address_preview')->label('Kiválasztott ERP-cím')->disabled()->dehydrated(false),
+                TextInput::make('address_type_preview')->label('ERP címtípus (tájékoztató)')->disabled()->dehydrated(false)
+                    ->visible(fn (Get $get): bool => filled($get('address_type_preview'))),
                 Select::make('target_type')->label('Átvétel célja')->required()->live()
                     ->options(fn (PartnerPool $record): array => $this->allowedTargets($record)),
                 TextInput::make('country')->label('Kétbetűs országkód')->required()->regex('/^[A-Za-z]{2}$/D')
                     ->helperText('Például HU vagy CN. Belső ERP-országazonosító helyett a kétbetűs kódot add meg.'),
                 Section::make('Új vevőcím beállításai')->visible($customer)->columns(3)->schema([
+                    Textarea::make('suggestion_notice')->label('ERP-javaslatok ellenőrzése')->rows(2)->columnSpanFull()
+                        ->disabled()->dehydrated(false)->visible(fn (Get $get): bool => filled($get('suggestion_notice'))),
                     Select::make('price_list_id')->label('Árlista')->options(fn () => PriceList::where('active', true)->orderBy('code')->pluck('code', 'id'))
                         ->searchable()->required($customer),
                     Select::make('currency_id')->label('Pénznem')->options(fn () => Currency::where('active', true)->orderBy('code')->pluck('code', 'id'))

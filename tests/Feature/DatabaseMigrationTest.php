@@ -65,6 +65,7 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('pricing_calculation_rows'));
         $this->assertTrue(Schema::hasTable('pricing_calculation_errors'));
         $this->assertTrue(Schema::hasTable('admin_ui_preferences'));
+        $this->assertTrue(Schema::hasColumns('partnerpool', ['brand_codes', 'order_sheet_type_codes', 'address_type']));
         $this->assertTrue(Schema::hasColumns('admin_ui_preferences', [
             'user_id',
             'preference_key',

@@ -37,6 +37,7 @@ class FakeDatabase:
         self.rows = [{"batch_id": "old", "erp_partner_code": "OLD"} for _ in range(previous_count)]
         self.state = ["old", previous_count, "2026-11-09 01:00:00"]
         self.engines = [("InnoDB",), ("InnoDB",)]
+        self.columns = [(name,) for name in sync.COLUMNS]
         self.fail_insert = False
         self.committed = False
         self.result = None
@@ -66,6 +67,8 @@ class FakeDatabase:
             self.result = (self.database,)
         elif sql.startswith("SELECT ENGINE"):
             self.result = self.engines
+        elif sql.startswith("SELECT COLUMN_NAME"):
+            self.result = self.columns
         elif sql.startswith("SELECT active_batch_id"):
             self.result = self.state
         elif sql.startswith("SELECT COUNT(*) FROM partnerpool"):
@@ -93,6 +96,31 @@ class FakeDatabase:
 
 
 class NormalizeTests(unittest.TestCase):
+    def test_user_query_aliases_json_lists_and_informational_address_type(self):
+        row = normalized([source_row(Language="hu", Currency="huf", pricelist="Wholesale_HU",
+            brands='["HT", " DV ", "ht"]', ordersheets='["T", "S", "B"]', **{"address type": "Számlázási,Szállítási"})])[0]
+        self.assertEqual(row["language_code"], "HU")
+        self.assertEqual(row["currency_code"], "HUF")
+        self.assertEqual(row["price_list_code"], "Wholesale_HU")
+        self.assertEqual(json.loads(row["brand_codes"]), ["HT", "DV"])
+        self.assertEqual(json.loads(row["order_sheet_type_codes"]), ["T", "S", "B"])
+        self.assertEqual(row["address_type"], "Számlázási,Szállítási")
+
+    def test_previous_query_without_suggestions_remains_supported(self):
+        row = normalized()[0]
+        self.assertEqual(row["brand_codes"], "[]")
+        self.assertEqual(row["order_sheet_type_codes"], "[]")
+        self.assertIsNone(row["address_type"])
+
+    def test_invalid_or_ambiguous_suggestions_are_rejected_without_logging_values(self):
+        invalid = [source_row(brands='not-json'), source_row(brands='{"HT":true}'), source_row(brands='[1]'),
+            source_row(ordersheets='[""]'), source_row(brands=json.dumps(["X" * 101])),
+            source_row(brands=json.dumps([str(i) for i in range(201)])),
+            source_row(Language="HU", language_code="EN"), source_row(**{"address type": "X" * 4001})]
+        for row in invalid:
+            with self.subTest(keys=list(row)), self.assertRaises(sync.PoolValidationError):
+                normalized([row])
+
     def test_aliases_flags_and_leading_zero_codes(self):
         row = normalized()[0]
         self.assertEqual(row["addrid"], "000001")
@@ -131,6 +159,22 @@ class NormalizeTests(unittest.TestCase):
 
 
 class PublishTests(unittest.TestCase):
+    def test_missing_suggestion_columns_keep_the_previous_snapshot_intact(self):
+        db = FakeDatabase(); db.columns = [item for item in db.columns if item[0] != "brand_codes"]
+        before = copy.deepcopy((db.rows, db.state))
+        with self.assertRaisesRegex(sync.PoolValidationError, "schema migrations"):
+            sync.publish_snapshot(db, normalized(), database="test_pool")
+        self.assertEqual((db.rows, db.state), before)
+        self.assertFalse(db.committed)
+
+    def test_suggestions_and_address_type_are_stored_with_the_snapshot(self):
+        db = FakeDatabase()
+        rows = normalized([source_row(brands='["HT"]', ordersheets='["B"]', Language="HU", Currency="HUF",
+            pricelist="Wholesale_HU", **{"address type": "Szállítási"})])
+        sync.publish_snapshot(db, rows, database="test_pool")
+        self.assertEqual(db.rows, rows)
+        self.assertEqual(json.loads(db.rows[0]["brand_codes"]), ["HT"])
+
     def test_success_atomically_replaces_snapshot(self):
         db = FakeDatabase()
         rows = normalized()
@@ -260,6 +304,7 @@ class DriverAndCliTests(unittest.TestCase):
         self.assertLess(sql.index("THEN 'both'"), sql.index("THEN 'customer'"))
         self.assertIn("FROM [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_employee] em", sql)
         self.assertIn("ORDER BY em.empid", sql)
+        self.assertIn("INNER JOIN [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_typeline] t", sql)
 
 
 if __name__ == "__main__":

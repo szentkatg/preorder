@@ -2,8 +2,10 @@
 
 namespace App\Services\Imports;
 
+use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
+use App\Models\OrderSheetType;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerPool;
@@ -13,6 +15,7 @@ use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -20,13 +23,43 @@ class PartnerPoolImporter
 {
     public function defaults(PartnerPool $row, string $type): array
     {
+        $missing = [];
+        $ids = function (string $model, array $codes, string $label) use (&$missing): array {
+            $codes = collect($codes)->filter(fn ($code): bool => is_string($code) && trim($code) !== '')
+                ->map(fn (string $code): string => trim($code))->unique(fn (string $code): string => Str::lower($code));
+            if ($codes->isEmpty()) {
+                return [];
+            }
+            $matches = $model::where('active', true)
+                ->whereIn(DB::raw('LOWER(code)'), $codes->map(fn (string $code): string => Str::lower($code))->values()->all())
+                ->get(['id', 'code'])->groupBy(fn ($record): string => Str::lower($record->code));
+            $result = [];
+            foreach ($codes as $code) {
+                $options = $matches->get(Str::lower($code));
+                if ($options?->count() === 1) {
+                    $result[] = $options->first()->id;
+                } else {
+                    $missing[] = $label.': '.$code;
+                }
+            }
+
+            return $result;
+        };
+        $priceLists = $ids(PriceList::class, filled($row->price_list_code) ? [$row->price_list_code] : [], 'Árlista');
+        $currencies = $ids(Currency::class, filled($row->currency_code) ? [$row->currency_code] : [], 'Pénznem');
+        $languages = $ids(Language::class, filled($row->language_code) ? [$row->language_code] : [], 'Nyelv');
+        $brands = $ids(Brand::class, $row->brand_codes ?? [], 'Márka');
+        $sheets = $ids(OrderSheetType::class, $row->order_sheet_type_codes ?? [], 'Rendelőlaptípus');
+
         return [
             'target_type' => $type,
             'country' => preg_match('/^[A-Za-z]{2}$/D', (string) $row->country) ? strtoupper($row->country) : null,
-            'price_list_id' => PriceList::where('code', $row->price_list_code)->where('active', true)->value('id'),
-            'currency_id' => Currency::where('code', $row->currency_code)->where('active', true)->value('id'),
-            'language_id' => Language::where('code', $row->language_code)->where('active', true)->value('id'),
-            'brand_ids' => [], 'order_sheet_type_ids' => [], 'allow_assortment_ordering' => false,
+            'price_list_id' => $priceLists[0] ?? null,
+            'currency_id' => $currencies[0] ?? null,
+            'language_id' => $languages[0] ?? null,
+            'brand_ids' => $brands, 'order_sheet_type_ids' => $sheets, 'allow_assortment_ordering' => false,
+            'suggestion_notice' => $missing === [] ? null : 'Nem párosítható (hiányzó, inaktív vagy nem egyértelmű) ERP-javaslatok: '
+                .implode('; ', $missing).'. Válaszd ki a megfelelő törzsadatokat kézzel.',
         ];
     }
 

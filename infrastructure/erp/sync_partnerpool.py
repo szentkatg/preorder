@@ -34,12 +34,15 @@ TEXT_FIELDS = {
     "sales_rep_erp_partner_code": 50, "addrid": 100, "address_name": 255,
     "country": 64, "zip": 255, "city": 255, "street": 16000,
     "contact_name": 255, "address_email": 512, "address_phone": 255,
-    "currency_code": 3, "language_code": 10, "price_list_code": 100,
+    "currency_code": 3, "language_code": 10, "price_list_code": 100, "address_type": 4000,
 }
+CODE_LIST_FIELDS = ("brand_codes", "order_sheet_type_codes")
+FIELD_ALIASES = {"language": "language_code", "currency": "currency_code", "pricelist": "price_list_code",
+                 "brands": "brand_codes", "ordersheets": "order_sheet_type_codes", "address type": "address_type"}
 BOOL_FIELDS = ("partner_active", "address_active", "is_default")
-OPTIONAL = {"currency_code", "language_code", "price_list_code"}
+OPTIONAL = {"currency_code", "language_code", "price_list_code", "address_type"}
 REQUIRED_COLUMNS = (set(TEXT_FIELDS) - OPTIONAL) | {"partner_active", "address_active"}
-COLUMNS = ("batch_id", "row_key", *TEXT_FIELDS, *BOOL_FIELDS, "source_extracted_at")
+COLUMNS = ("batch_id", "row_key", *TEXT_FIELDS, *CODE_LIST_FIELDS, *BOOL_FIELDS, "source_extracted_at")
 HEADER_FIELDS = ("partner_name", "short_name", "partner_type", "partner_email",
                  "sales_rep_erp_partner_code", "partner_active")
 
@@ -70,17 +73,48 @@ def boolean(value: object, field: str) -> int:
     raise PoolValidationError(f"Invalid boolean in {field}")
 
 
+def code_list(value: object, field: str) -> str:
+    if value is None or value == "":
+        return "[]"
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, TypeError):
+            raise PoolValidationError(f"Invalid JSON code list in {field}") from None
+    if not isinstance(value, list) or len(value) > 200:
+        raise PoolValidationError(f"Invalid code list in {field}")
+    codes, seen = [], set()
+    for item in value:
+        if not isinstance(item, str) or not item.strip() or len(item.strip()) > 100 or "\x00" in item:
+            raise PoolValidationError(f"Invalid code in {field}")
+        item = item.strip()
+        if item.casefold() not in seen:
+            codes.append(item)
+            seen.add(item.casefold())
+    return json.dumps(codes, ensure_ascii=False)
+
+
 def normalize_rows(rows: Iterable[Mapping], *, batch_id: str, extracted_at: str,
                    country_map: Mapping | None = None) -> list[dict]:
     uuid.UUID(batch_id)
     result, seen, headers = [], set(), {}
     country_map = country_map or {}
     for number, incoming in enumerate(rows, 1):
-        raw = {str(key).casefold(): value for key, value in incoming.items()}
+        raw = {}
+        for key, value in incoming.items():
+            name = str(key).strip().casefold()
+            name = FIELD_ALIASES.get(name, name)
+            if name in raw:
+                raise PoolValidationError("Ambiguous ERP result column aliases")
+            raw[name] = value
         missing = REQUIRED_COLUMNS - raw.keys()
         if missing or not ({"default", "is_default"} & raw.keys()):
             raise PoolValidationError("Required ERP result columns missing")
         row = {field: text(raw.get(field), field) for field in TEXT_FIELDS}
+        row.update({field: code_list(raw.get(field), field) for field in CODE_LIST_FIELDS})
+        for field in ("currency_code", "language_code"):
+            if row[field]:
+                row[field] = row[field].upper()
         if not row["erp_partner_code"] or not row["partner_name"]:
             raise PoolValidationError("Partner code and name are required")
         row["partner_type"] = (row["partner_type"] or "").casefold()
@@ -399,6 +433,9 @@ def publish_snapshot(connection, rows: list[dict], *, database: str, min_rows: i
             engines = cursor.fetchall()
             if len(engines) != 2 or any(item[0].casefold() != "innodb" for item in engines):
                 raise PoolValidationError("Both pool tables must use InnoDB")
+            cursor.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='partnerpool'")
+            if set(COLUMNS) - {item[0] for item in cursor.fetchall()}:
+                raise PoolValidationError("Run the partnerpool schema migrations before publishing; required pool columns are missing")
             cursor.execute("SELECT active_batch_id,row_count,source_extracted_at FROM partnerpool_sync_state WHERE id=1 FOR UPDATE")
             state = cursor.fetchone()
             if state is None:
