@@ -179,6 +179,84 @@ class PartnerAccessTest extends TestCase
         );
     }
 
+    public function test_new_partners_addresses_and_orders_are_inherited_by_every_assigned_user_without_copying_links(): void
+    {
+        $data = $this->createAccessFixture();
+        $users = [
+            $this->createPartnerUser($data['partners']['d'], PartnerUser::ROLE_SALES_REP, 'first-rep@example.test'),
+            $this->createPartnerUser($data['partners']['d'], PartnerUser::ROLE_SALES_REP, 'second-rep@example.test'),
+        ];
+        foreach ($users as $user) {
+            $user->partners()->attach($data['partners']['c']);
+            $user->load('partners'); // A previously loaded relation must not freeze the portfolio.
+            $this->assertTrue($user->canAccessPartner($data['partners']['b']));
+            $this->assertFalse($user->canAccessPartner($data['partners']['a']));
+        }
+        for ($i = 1; $i <= 10; $i++) {
+            $partner = Partner::create(['erp_partner_code' => 'NEW-'.$i, 'name' => 'Új partner '.$i,
+                'sales_rep_erp_partner_code' => 'C', 'active' => true]);
+            $firstAddress = $this->createAddress($partner, 'NEW-'.$i.'-1');
+            $secondAddress = $this->createAddress($partner, 'NEW-'.$i.'-2');
+            $order = $this->createOrder($firstAddress, $data['season'], $data['brand'], $data['orderSheetType']);
+            foreach ($users as $user) {
+                $this->assertTrue($user->canAccessPartner($partner));
+                $this->assertTrue($user->canAccessAddress($firstAddress));
+                $this->assertTrue($user->canAccessAddress($secondAddress));
+                $this->assertTrue($user->canAccessOrder($order));
+            }
+        }
+        foreach ($users as $user) {
+            $this->assertSame(1, $user->partners()->count());
+            $this->assertSame(0, $user->addresses()->count());
+            $this->assertSame(12, $user->accessiblePartnersQuery()->count()); // Representative C, existing B, ten new partners.
+        }
+    }
+
+    public function test_reassignment_and_revocation_are_immediate_but_explicit_partner_grants_remain(): void
+    {
+        $data = $this->createAccessFixture();
+        $inherited = $this->createPartnerUser($data['partners']['d'], PartnerUser::ROLE_SALES_REP, 'inherited@example.test');
+        $explicit = $this->createPartnerUser($data['partners']['d'], PartnerUser::ROLE_SALES_REP, 'explicit@example.test');
+        $inherited->partners()->attach($data['partners']['c']);
+        $explicit->partners()->attach([$data['partners']['c']->id, $data['partners']['b']->id]);
+        $this->assertTrue($inherited->canAccessOrder($data['orders']['b1']));
+        $data['partners']['b']->update(['sales_rep_erp_partner_code' => 'A']);
+        $this->assertFalse($inherited->canAccessPartner($data['partners']['b']));
+        $this->assertFalse($inherited->canAccessAddress($data['addresses']['b1']));
+        $this->assertFalse($inherited->canAccessOrder($data['orders']['b1']));
+        $this->assertTrue($explicit->canAccessOrder($data['orders']['b1']));
+        foreach ([$inherited, $explicit] as $user) {
+            $user->partners()->detach($data['partners']['c']);
+            $this->assertFalse($user->canAccessOrder($data['orders']['c1']));
+        }
+        $this->assertTrue($explicit->canAccessOrder($data['orders']['b1']));
+    }
+
+    public function test_other_roles_do_not_inherit_a_representative_portfolio_from_the_pivot(): void
+    {
+        $data = $this->createAccessFixture();
+        foreach ([PartnerUser::ROLE_PARTNER_ADMIN, PartnerUser::ROLE_ADDRESS_USER] as $role) {
+            $user = $this->createPartnerUser($data['partners']['a'], $role, $role.'@example.test');
+            $user->partners()->attach($data['partners']['c']);
+            $this->assertFalse($user->canAccessPartner($data['partners']['b']));
+            $this->assertFalse($user->canAccessOrder($data['orders']['b1']));
+        }
+    }
+
+    public function test_empty_erp_codes_do_not_grant_a_portfolio_of_unassigned_partners(): void
+    {
+        $data = $this->createAccessFixture();
+        $user = $this->createPartnerUser($data['partners']['d'], PartnerUser::ROLE_SALES_REP, 'empty-code@example.test');
+        $user->partners()->attach($data['partners']['a']);
+        foreach (['', '  '] as $blankCode) {
+            $data['partners']['a']->update(['erp_partner_code' => $blankCode]);
+            $data['partners']['b']->update(['sales_rep_erp_partner_code' => $blankCode]);
+            $this->assertTrue($user->canAccessPartner($data['partners']['a']));
+            $this->assertFalse($user->canAccessPartner($data['partners']['b']));
+            $this->assertFalse($user->canAccessOrder($data['orders']['b1']));
+        }
+    }
+
     private function createAccessFixture(): array
     {
         $partners = [

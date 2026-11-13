@@ -109,17 +109,21 @@ class PartnerUserForm
                     ->helperText('Cím felhasználónál kötelező megadni, mely címekhez férhet hozzá.'),
 
                 Select::make('partners')
-                    ->label('Engedélyezett partnerek / képviselők')
+                    ->label('Engedélyezett partnerek és képviselői partnerkörök')
                     ->relationship(
                         name: 'partners',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $query->orderBy('name')
+                        modifyQueryUsing: fn ($query) => $query->withCount('representedPartners')->orderBy('name')
                     )
+                    ->getOptionLabelFromRecordUsing(fn (Partner $record): string =>
+                        (filled($record->erp_partner_code) ? $record->erp_partner_code.' - '.$record->name : $record->name)
+                        .(filled($record->erp_partner_code) && ($record->represented_partners_count ?? 0) > 0
+                            ? ' — teljes partnerkör ('.$record->represented_partners_count.' partner)' : ''))
                     ->multiple()
-                    ->searchable()
+                    ->searchable(['erp_partner_code', 'name'])
                     ->preload()
                     ->visible(fn ($get): bool => $get('role') === PartnerUser::ROLE_SALES_REP)
-                    ->helperText('Partner választásakor az adott partner, képviselő választásakor pedig az ERP-kódjához tartozó teljes partnerkör is elérhetővé válik.'),
+                    ->helperText('A kijelölt képviselő ERP-kódjához tartozó teljes partnerkör automatikusan elérhetővé válik, a később felvett partnerekkel együtt. Ugyanaz a képviselő több felhasználóhoz is hozzárendelhető. Az egyedi partnerkijelölések megmaradnak.'),
             ]);
     }
 }

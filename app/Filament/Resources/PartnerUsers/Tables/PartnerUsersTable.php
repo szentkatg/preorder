@@ -52,7 +52,8 @@ class PartnerUsersTable
                     ->sortable(),
 
                 TextColumn::make('partners_count')
-                    ->label('Partnerek / képviselők')
+                    ->label('Partner / képviselő kijelölések')
+                    ->tooltip('A közvetlen kijelölések száma; a képviselőn keresztül automatikusan elérhető teljes partnerkört nem kell külön hozzárendelni.')
                     ->counts('partners')
                     ->sortable(),
 

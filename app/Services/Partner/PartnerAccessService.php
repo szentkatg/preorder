@@ -129,6 +129,7 @@ class PartnerAccessService
                 'partners.sales_rep_erp_partner_code',
                 $user->partners()
                     ->whereNotNull('partners.erp_partner_code')
+                    ->whereRaw("TRIM(partners.erp_partner_code) <> ''")
                     ->select('partners.erp_partner_code')
             );
 
