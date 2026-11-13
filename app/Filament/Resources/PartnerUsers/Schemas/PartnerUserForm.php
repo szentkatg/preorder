@@ -5,9 +5,12 @@ namespace App\Filament\Resources\PartnerUsers\Schemas;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class PartnerUserForm
@@ -110,6 +113,23 @@ class PartnerUserForm
 
                 Select::make('partners')
                     ->label('Engedélyezett partnerek és képviselői partnerkörök')
+                    ->hintAction(
+                        Action::make('clearPartnerAssignments')
+                            ->label('Összes hozzárendelés törlése')
+                            ->icon('heroicon-o-trash')
+                            ->color('danger')
+                            ->visible(fn (Get $get, string $operation): bool =>
+                                in_array($operation, ['create', 'edit'], true)
+                                && $get('role') === PartnerUser::ROLE_SALES_REP)
+                            ->requiresConfirmation()
+                            ->modalHeading('Összes partner-hozzárendelés törlése?')
+                            ->modalDescription(fn (Get $get): string =>
+                                'Az összes ('.count((array) $get('partners')).' db) közvetlen partner- és képviselői partnerkör-kijelölést eltávolítod erről az adatlapról. '
+                                .'A törlés csak a Mentés gombbal válik véglegessé. A partnertörzs, a saját partner és a címhozzárendelések nem változnak; az ezekből eredő hozzáférés megmaradhat.')
+                            ->modalSubmitActionLabel('Összes kijelölés törlése')
+                            ->modalCancelActionLabel('Mégse')
+                            ->action(fn (Set $set) => $set('partners', []))
+                    )
                     ->relationship(
                         name: 'partners',
                         titleAttribute: 'name',

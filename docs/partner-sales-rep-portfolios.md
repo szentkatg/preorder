@@ -25,6 +25,23 @@ egy felhasználóhoz; ugyanaz a képviselő több felhasználóhoz is hozzárend
 
 ## Megmaradó szabályok
 
+### Összes partner-hozzárendelés törlése az adatlapon
+
+Az **Engedélyezett partnerek és képviselői partnerkörök** mező mellett az
+**Összes hozzárendelés törlése** művelet megerősítés után kiüríti a kijelöléseket.
+A megerősítő ablak a kijelölések darabszámát is mutatja. Ez az összes közvetlen
+partner- **és képviselői partnerkör-kijelölést** érinti, nem csak a redundánsakat.
+A módosítás csak az adatlap **Mentés** gombjával kerül az adatbázisba; a művelet
+vagy az adatlap elvetése nem törli a mentett kapcsolatokat. A lista kiürítése
+után rögtön ki lehet jelölni a megtartandó képviselőket, majd együtt menteni.
+
+A partnertörzs, a felhasználó saját partnere és a címhozzárendelések változatlanok.
+Az ezekből eredő hozzáférés ezért megmaradhat. Más felhasználók kijelöléseihez
+nem nyúlunk. A művelet csak létrehozáskor/szerkesztéskor, `sales_rep` szerepkörnél
+érhető el; a csak megtekintési jogosultság nem elegendő a módosításhoz.
+
+### Hozzáférési szabályok
+
 - Az alapműködés már korábban is létezett. Nem készül egyszer lemásolt vevőlista:
   a `PartnerAccessService` a törzsbeli aktuális képviselő-ERP-kódot vizsgálja.
 - A régi `partner_user_partners` hozzárendelés tárolja az egyedi partner- és a
