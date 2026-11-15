@@ -12,6 +12,8 @@ Az **Átvétel** művelet meglévő törzsadatot és címjogosultságot soha nem
 
 ## Kijelölt partnerek területi képviselőjének frissítése
 
+A listában a képviselő ERP-kódja mellett külön **Képviselő neve** oszlop jelenik meg. A nevet az aktuális pool-pillanatképben keressük, ezért a képviselőt nem szükséges előbb átvenni a törzsbe. Ha a poolból hiányzik, a partnertörzs neve az alternatíva; ismeretlen képviselőnél a kód megmarad, a név helyén „—” látható. A név kereshető, rendezhető és az Excel-exportban is szerepel. A több címmel szereplő képviselő nem többszörözi meg a lista sorait. Nincs új adatbázismező, migráció vagy ERP-szinkronmódosítás.
+
 1. Jelöld ki a frissítendő partnerek címsorait a listában.
 2. A **Csoportos műveletek → Területi képviselők frissítése a poolból** műveletnél válassz módot:
    - **Csak ahol nincs kitöltve a területi képviselő** (alapértelmezett): a `NULL`, üres vagy csak szóközös mezőket tölti ki.

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 class PartnerPool extends Model
 {
@@ -30,6 +32,34 @@ class PartnerPool extends Model
     public function scopeCurrentSnapshot(Builder $query): Builder
     {
         return $query->where('batch_id', PartnerPoolSyncState::select('active_batch_id')->whereKey(1));
+    }
+
+    public function scopeWithSalesRepresentativeName(Builder $query): Builder
+    {
+        return $query->addSelect('partnerpool.*')
+            ->selectSub(static::salesRepresentativeNameQuery(), 'sales_representative_name');
+    }
+
+    public static function salesRepresentativeNameQuery(): QueryBuilder
+    {
+        // Read the same snapshot, even if the representative has not been imported.
+        // Multiple address rows must not duplicate the customer in the list/export.
+        $pool = DB::table('partnerpool as representative')
+            ->select('representative.partner_name')
+            ->whereColumn('representative.batch_id', 'partnerpool.batch_id')
+            ->whereColumn('representative.erp_partner_code', 'partnerpool.sales_rep_erp_partner_code')
+            ->whereRaw("TRIM(representative.erp_partner_code) <> ''")
+            ->orderByDesc('representative.is_default')->orderBy('representative.id')->limit(1);
+        $master = DB::table('partners as representative_master')
+            ->select('representative_master.name')
+            ->whereColumn('representative_master.erp_partner_code', 'partnerpool.sales_rep_erp_partner_code')
+            ->whereRaw("TRIM(representative_master.erp_partner_code) <> ''")
+            ->orderBy('representative_master.id')->limit(1);
+
+        return DB::query()->selectRaw(
+            'COALESCE(('.$pool->toSql().'), ('.$master->toSql().'))',
+            [...$pool->getBindings(), ...$master->getBindings()],
+        );
     }
 
     public function customer(): BelongsTo

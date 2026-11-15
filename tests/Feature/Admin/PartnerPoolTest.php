@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Exports\AdminTableExport;
 use App\Filament\Pages\ErpPartnerPool;
 use App\Models\Brand;
 use App\Models\AdminUiPreference;
@@ -70,6 +71,62 @@ class PartnerPoolTest extends TestCase
     private function import(PartnerPool $row, array $override = []): array
     {
         return app(PartnerPoolImporter::class)->import($row->id, $this->batch, array_replace($this->input, $override));
+    }
+
+    public function test_representative_name_comes_from_the_same_snapshot_without_importing_or_duplicating_rows(): void
+    {
+        $customer = $this->row();
+        $this->row(['erp_partner_code' => 'P000444', 'partner_name' => 'Kovács Anna', 'is_default' => false]);
+        $this->row(['erp_partner_code' => 'P000444', 'partner_name' => 'Kovács Anna', 'addrid' => 'REP-2']);
+        $this->row(['batch_id' => (string) Str::uuid(), 'erp_partner_code' => 'P000444', 'partner_name' => 'Régi képviselő']);
+        Partner::create(['erp_partner_code' => 'P000444', 'name' => 'Korábbi törzsnév', 'active' => true]);
+
+        $page = Livewire::test(ErpPartnerPool::class)->assertSuccessful()
+            ->assertTableColumnStateSet('sales_representative_name', 'Kovács Anna', $customer);
+        $query = $page->instance()->getTableQueryForExport();
+        $this->assertCount(3, $query->get());
+        $columns = [$page->instance()->getTable()->getColumn('sales_rep_erp_partner_code'),
+            $page->instance()->getTable()->getColumn('sales_representative_name')];
+        $export = new AdminTableExport($query, $columns);
+        $this->assertSame(['Képviselő ERP-kód', 'Képviselő neve'], $export->headings());
+        $this->assertSame(['P000444', 'Kovács Anna'], $export->map($query->findOrFail($customer->id)));
+        $this->assertDatabaseCount('partners', 1);
+        $this->assertDatabaseCount('partnerpool_import_logs', 0);
+    }
+
+    public function test_representative_name_falls_back_to_master_and_handles_unknown_or_blank_codes(): void
+    {
+        Partner::create(['erp_partner_code' => 'P000444', 'name' => 'Törzsben lévő képviselő', 'active' => true]);
+        Partner::create(['erp_partner_code' => '', 'name' => 'Nem képviselő', 'active' => true]);
+        $known = $this->row();
+        $unknown = $this->row(['erp_partner_code' => 'P000002', 'sales_rep_erp_partner_code' => 'MISSING']);
+        $blank = $this->row(['erp_partner_code' => 'P000003', 'sales_rep_erp_partner_code' => '']);
+        $null = $this->row(['erp_partner_code' => 'P000004', 'sales_rep_erp_partner_code' => null]);
+        $this->row(['batch_id' => (string) Str::uuid(), 'erp_partner_code' => 'MISSING', 'partner_name' => 'Régi, már hiányzó képviselő']);
+
+        Livewire::test(ErpPartnerPool::class)->assertSuccessful()
+            ->assertTableColumnStateSet('sales_representative_name', 'Törzsben lévő képviselő', $known)
+            ->assertTableColumnStateSet('sales_representative_name', null, $unknown)
+            ->assertTableColumnStateSet('sales_representative_name', null, $blank)
+            ->assertTableColumnStateSet('sales_representative_name', null, $null);
+    }
+
+    public function test_representative_name_can_be_searched_and_sorted_in_the_table(): void
+    {
+        $alpha = $this->row(['erp_partner_code' => 'REP-A', 'partner_name' => 'Anna', 'sales_rep_erp_partner_code' => null]);
+        $zeta = $this->row(['erp_partner_code' => 'REP-Z', 'partner_name' => 'Zita', 'sales_rep_erp_partner_code' => null]);
+        $first = $this->row(['erp_partner_code' => 'P000001', 'sales_rep_erp_partner_code' => 'REP-Z']);
+        $second = $this->row(['erp_partner_code' => 'P000002', 'sales_rep_erp_partner_code' => 'REP-A']);
+
+        Livewire::test(ErpPartnerPool::class)->searchTableColumns(['sales_representative_name' => 'Anna'])
+            ->assertCanSeeTableRecords([$second])->assertCanNotSeeTableRecords([$first, $alpha, $zeta]);
+        session()->flush();
+        Livewire::test(ErpPartnerPool::class)->searchTableColumns(['sales_representative_name' => ''])
+            ->sortTable('sales_representative_name', 'asc')->assertCanSeeTableRecords([$second, $first], inOrder: true)
+            ->sortTable('sales_representative_name', 'desc')->assertCanSeeTableRecords([$first, $second], inOrder: true);
+        session()->flush();
+        Livewire::test(ErpPartnerPool::class)->searchTable('Zita')->assertCanSeeTableRecords([$first, $zeta])
+            ->assertCanNotSeeTableRecords([$second, $alpha]);
     }
 
     public function test_creates_customer_and_selected_address_without_accounts_or_unselected_addresses(): void

@@ -2,8 +2,8 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Actions\UpdatePartnerPoolSalesRepresentativesAction;
+use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingColumnPreferences;
 use App\Models\Brand;
 use App\Models\Currency;
@@ -21,8 +21,8 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -37,6 +37,7 @@ use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 
@@ -78,7 +79,7 @@ class ErpPartnerPool extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        $table->query(PartnerPool::currentSnapshot()->with(['customer', 'supplier']))
+        $table->query(PartnerPool::currentSnapshot()->withSalesRepresentativeName()->with(['customer', 'supplier']))
             ->columns([
                 TextColumn::make('erp_partner_code')->label('ERP partnerkód')->searchable()->sortable(),
                 TextColumn::make('partner_name')->label('Partner')->searchable()->sortable(),
@@ -98,6 +99,7 @@ class ErpPartnerPool extends Page implements HasTable
                 TextColumn::make('partner_email')->label('Partner e-mail')->searchable()->sortable(),
                 TextColumn::make('partner_phone')->label('Partner telefon')->searchable()->sortable(),
                 TextColumn::make('sales_rep_erp_partner_code')->label('Képviselő ERP-kód')->searchable()->sortable(),
+                TextColumn::make('sales_representative_name')->label('Képviselő neve')->placeholder('—'),
                 TextColumn::make('price_list_code')->label('Javasolt árlista')->placeholder('Nincs megadva'),
                 TextColumn::make('currency_code')->label('Javasolt pénznem')->placeholder('Nincs megadva'),
                 TextColumn::make('language_code')->label('Javasolt nyelv')->placeholder('Nincs megadva'),
@@ -130,7 +132,17 @@ class ErpPartnerPool extends Page implements HasTable
             ->defaultSort('erp_partner_code')->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500]);
 
-        return AdminResourceTable::configure($table, PartnerPool::class, false);
+        AdminResourceTable::configure($table, PartnerPool::class, false);
+        $table->getColumn('sales_representative_name')->searchable(
+            query: function (Builder $query, string $search): Builder {
+                $name = PartnerPool::salesRepresentativeNameQuery();
+
+                return $query->whereRaw('('.$name->toSql().') LIKE ?', [...$name->getBindings(), '%'.$search.'%']);
+            },
+            isIndividual: true,
+        );
+
+        return $table;
     }
 
     protected function importAction(): Action
