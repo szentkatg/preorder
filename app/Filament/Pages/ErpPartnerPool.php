@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Actions\UpdatePartnerPoolSalesRepresentativesAction;
 use App\Filament\Support\Concerns\HasPricingColumnPreferences;
 use App\Models\Brand;
 use App\Models\Currency;
@@ -17,6 +18,7 @@ use App\Models\Supplier;
 use App\Services\Imports\PartnerPoolImporter;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -117,6 +119,7 @@ class ErpPartnerPool extends Page implements HasTable
             ->recordActions([$this->importAction()])
             ->recordActionsPosition(RecordActionsPosition::BeforeColumns)
             ->recordActionsColumnLabel('Átvétel')
+            ->toolbarActions([BulkActionGroup::make([UpdatePartnerPoolSalesRepresentativesAction::make()])])
             ->reorderableColumns()
             ->headerActions([Action::make('refreshPool')->label('Lista frissítése')->icon('heroicon-o-arrow-path')
                 ->action(function (): void {

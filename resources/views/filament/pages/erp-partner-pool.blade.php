@@ -11,6 +11,7 @@
             Még nincs sikeresen betöltött ERP-pillanatkép. Az első ERP-frissítésig a lista üres.
         @endif
         Az átvétel csak a kiválasztott rekordot érinti; a pool frissítése nem módosítja a már átvett törzsadatokat.
+        A kijelölt partnerek képviselője külön csoportos művelettel frissíthető.
     </p>
     @include('filament.pricing.column-width-actions')
     <div

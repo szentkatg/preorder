@@ -8,7 +8,45 @@ A szinkron kizárólag a `partnerpool` és `partnerpool_sync_state` táblát mó
 
 Az adminmenüben: **Törzsadatok → ERP-partnerpool**. A listában a felhasználó kiválasztja a kívánt címsort, majd az **Átvétel** műveletet. Vevőnél az adott partner és az adott cím, beszállítónál az adott partnerhez tartozó egyetlen beszállítói rekord készül el. Más címek nem kerülnek be automatikusan. Egy partner több címét külön-külön lehet átvenni. Beszállítónál a kiválasztott sor címkódját és országát használjuk; az Alapcím oszlop segít a választásban.
 
-Meglévő törzsadatot és címjogosultságot soha nem írunk felül. Új címet meglévő partnerhez is fel lehet venni. Más partnerhez tartozó, azonos `addrid` esetén az átvétel hibával leáll; nem mozgatunk címet és nem hozunk létre globálisan ütköző címkódot. Partnerportál-felhasználó, jelszó, e-mail-értesítés nem készül automatikusan. Az átvétel a `partnerpool_import_logs` táblába naplózódik a végrehajtóval és a forráspillanatkép azonosítójával, teljes kapcsolattartói adattartalom másolása nélkül.
+Az **Átvétel** művelet meglévő törzsadatot és címjogosultságot soha nem ír felül. Új címet meglévő partnerhez is fel lehet venni. Más partnerhez tartozó, azonos `addrid` esetén az átvétel hibával leáll; nem mozgatunk címet és nem hozunk létre globálisan ütköző címkódot. Partnerportál-felhasználó, jelszó, e-mail-értesítés nem készül automatikusan. Az átvétel a `partnerpool_import_logs` táblába naplózódik a végrehajtóval és a forráspillanatkép azonosítójával, teljes kapcsolattartói adattartalom másolása nélkül.
+
+## Kijelölt partnerek területi képviselőjének frissítése
+
+1. Jelöld ki a frissítendő partnerek címsorait a listában.
+2. A **Csoportos műveletek → Területi képviselők frissítése a poolból** műveletnél válassz módot:
+   - **Csak ahol nincs kitöltve a területi képviselő** (alapértelmezett): a `NULL`, üres vagy csak szóközös mezőket tölti ki.
+   - **Minden kijelölt partner**: a már kitöltött képviselőmezőt is felülírja a pool értékével.
+3. Jelöld be a jóváhagyást, majd nyomd meg a **Képviselők frissítése** gombot. A Mégse nem módosít adatot.
+
+A párosítás ERP-partnerkód alapján történik, kis-/nagybetűtől függetlenül. Egy partner több kijelölt címe egyetlen frissítést jelent; egy cím kijelölése is a partner teljes törzsrekordjának képviselőmezőjére vonatkozik. A „mindent kijelöl” a szűrés és a kijelölés-visszavonások szerinti teljes listát kezeli, nem csak az aktuális lapot.
+
+Csak a `partners.sales_rep_erp_partner_code` változik (és a szokásos `updated_at`). Új partner/beszállító/cím/felhasználó nem készül; címjogosultságokat, közvetlen felhasználói hozzárendeléseket és más törzsmezőket nem írunk át. A törzsben nem lévő partnert kihagyjuk, az üres képviselő a poolban egyik módban sem töröl meglévő képviselőt. Az eredményjelzés partnerenként számolva mutatja a frissítetteket és a kihagyások okát.
+
+**A képviselő átírása megváltoztatja az automatikusan örökölt partnerportál-hozzáférést.** A külön megadott egyedi partner- és címengedélyek ettől megmaradnak.
+
+A művelethez `View:ErpPartnerPool`, `Import:PartnerPool` és `Update:Partner` szükséges; létrehozási jog nem kell, új jogosultsági objektum nincs. A szerver a mentéskor ismét ellenőrzi a jogokat, a kijelölést, az aktuális pool-pillanatképet és a partnertörzs aktuális értékeit. Ha a pool közben lecserélődött, vagy egy partner címsorainak képviselői ellentmondanak egymásnak, illetve több törzsrekord viseli ugyanazt az ERP-kódot, a teljes művelet visszagördül, részleges mentés nincs.
+
+Ehhez a bővítéshez nem kell migráció, Composer-telepítés, frontendbuild vagy kézi assetfeltöltés. A Windows ERP-szinkron nem változik, továbbra is csak a poolt tölti; a törzs módosítása kizárólag a fenti külön megerősített művelettel történik.
+
+### A képviselőfrissítés kihelyezési parancsai
+
+Az alábbiak előkészített parancsok, a fejlesztés részeként nem futnak automatikusan:
+
+```powershell
+git add -- app/Filament/Pages/ErpPartnerPool.php app/Filament/Support/Actions/UpdatePartnerPoolSalesRepresentativesAction.php app/Services/Imports/PartnerPoolSalesRepresentativeUpdater.php resources/views/filament/pages/erp-partner-pool.blade.php tests/Feature/Admin/PartnerPoolSalesRepresentativeUpdateTest.php docs/partnerpool.md
+git commit -m "Add selected partnerpool sales representative updates"
+git push origin feature/pricing-module
+```
+
+A megfelelő tárhelyi kiadási ág külön jóváhagyott frissítése után, az adott projekt könyvtárában:
+
+```bash
+git pull --ff-only
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+/opt/alt/php83/usr/bin/php artisan optimize
+```
+
+Ehhez az új csoportos művelethez nincs új migráció, `composer install`, `npm run build` vagy feltöltendő fájl. Normál szerepkörnél a fenti meglévő három jogosultságot szükség szerint engedélyezni kell.
 
 ## Adatbázis és jogosultságok
 
