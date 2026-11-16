@@ -43,9 +43,31 @@ A TOTAL képlete: változatlan + cserélt + törölt mennyiség. A Rendelt db a 
 
 Három mező: **Szezon**, **Régi cikkszám (SKU)**, **Új cikkszám vagy TÖRÖLT**. A cikkszámok az adott szezon létező SKU-i legyenek. A `TÖRÖLT` (kisbetűvel beírva is) az érintett mennyiséget kizárja az első munkalapról, és a törölt kategóriába számolja.
 
+Mindkét cikkszámmező kereshető választó: `SKU-kód – SKU-név` feliratot mutat, és a beírt kód- vagy névrészletet tartalmazó cikkekre szűkül, kis-/nagybetűtől függetlenül. A keresés szerveroldali, egyszerre legfeljebb 50 cikket ad vissza. A régi cikknél az adott szezonban már más cseresorhoz rendelt SKU-k nem választhatók; szerkesztéskor a megnyitott rekord saját régi SKU-ja megmarad. Az új cikknél nincs ilyen kizárás: több régi SKU ugyanarra az újra mutathat. A `TÖRÖLT` külön választható és kereshető. Szezonváltás törli a két korábbi cikkválasztást. A listában a régi és az új SKU neve külön oszlopban is látható, kereshető és rendezhető.
+
 Egy szezonban egy régi cikkszámhoz csak egy szabály tartozhat. A mentés ellenőrzi a hiányzó SKU-kat, a szezoneltérést, az önmagára mutató és körkörös cseréket. A szezon szintű adatbáziszár a párhuzamos ciklikus szabályfelvitelt is védi. Egyirányú cserelánc követhető a végső SKU-ig vagy TÖRÖLT-ig; egy mennyiséget a lánc hosszától függetlenül csak egyszer számolunk. Azonos cél-SKU-ra kerülő mennyiségek rendelésen belül összeadódnak; külön rendelések nem vonódnak össze.
 
 **Az eredeti rendelés, annak SKU-i, árai, státusza és ERP-azonosítója nem módosul.** Ez az export nem állít státuszt „ERP-be töltve” értékre; az ERP importálását később kell végrehajtani. A korábban letöltött fájlt az új szabályok nem módosítják.
+
+## Cikkcserék importálása Excelből
+
+A Cikkcserék lista tetején az **Importálás Excelből** gomb nyitja az importoldalt. Az **Excel-minta letöltése** három szöveges oszlopot tartalmaz:
+
+| season_code | old_sku_code | new_sku_code |
+| --- | --- | --- |
+| W27 | régi SKU-kód | új SKU-kód vagy TÖRÖLT |
+
+A példában szereplő SKU-k helyére létező kódokat kell írni. A cikkszámokat szövegként add meg, a vezető nullákat megőrizve. Egy fájlban több szezon is lehet; a két SKU-nak soronként ugyanahhoz a megadott szezonhoz kell tartoznia. Gyűjtőnél a saját gyűjtő-SKU szerepel, nincs felbontás.
+
+Az első munkalapot olvassuk, a fejléc alapján, nem oszlopsorrend szerint. A magyar `Szezon`, `Régi cikkszám`, `Új cikkszám / TÖRÖLT` fejlécek is használhatók. XLSX és XLS támogatott, legfeljebb 10 MB, 10 000 adatsor és 100 oszlop. Képletet nem értékelünk ki: az érintett kódcellákban képlet nem használható.
+
+1. Töltsd fel a fájlt, majd válassz ütközéskezelést. Alapból **Meglévő cserék kihagyása**; a **Meglévő cserék felülírása** külön választás, és módosítási jogosultságot igényel. Azonos célra mutató, már létező szabály változatlan marad.
+2. **Ellenőrzés és előnézet**: új, felülírandó, kihagyott és változatlan sorok száma, valamint a SKU-k nevei és a sorhibák. Legfeljebb az első 100 sor/hiba látható, de a teljes fájlt ellenőrizzük. Ez még nem ment.
+3. Hibátlan előnézet után **Importálás**, majd külön megerősítés. Bármely hiba esetén az egész csomag mentése elmarad. Ellenőrizzük a fájlon belüli ismétlődést, a hiányzó/más szezonbeli SKU-kat és a teljes végállapot csereláncait is.
+
+Mentéskor ismét beolvassuk és ellenőrizzük a fájlt. Ha az előnézet óta a fájl, az importmód vagy az érintett törzs megváltozott, új előnézet szükséges. A mentés egy tranzakcióban, szezonzárakkal történik; csak a cikkcsere-törzs változik, rendelési sor nem.
+
+Az importhoz a `ViewAny:SkuReplacement` és `Create:SkuReplacement`, felülíráshoz ezenfelül az `Update:SkuReplacement` jogosultság szükséges. Külön új jogosultság vagy adatbázis-migráció ehhez az importbővítéshez nem kell. Ellenőrző teszt: `SkuReplacementImportTest`, valódi XLSX/XLS-fájlokkal és a felületi feltöltés–előnézet–megerősítés folyamatával.
 
 ## Jogosultság és kiadás
 

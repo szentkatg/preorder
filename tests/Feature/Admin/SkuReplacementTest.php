@@ -14,6 +14,7 @@ use App\Models\Sku;
 use App\Models\SkuReplacement;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -55,6 +56,114 @@ class SkuReplacementTest extends TestCase
     private function mapping(string $old = 'W27-A', string $new = 'W27-B'): SkuReplacement
     {
         return SkuReplacement::create(['season_id' => $this->season->id, 'old_sku_code' => $old, 'new_sku_code' => $new]);
+    }
+
+    private function field($page, string $name): Select
+    {
+        $field = $page->instance()->form->getComponentByStatePath($name);
+        $this->assertInstanceOf(Select::class, $field);
+
+        return $field;
+    }
+
+    public function test_sku_selectors_search_substrings_in_both_codes_and_names_and_only_old_skus_exclude_existing_rules(): void
+    {
+        Sku::where('sku_code', 'W27-A')->update(['sku_name' => 'EMIRO BLACK M']);
+        Sku::where('sku_code', 'W27-B')->update(['sku_name' => 'EMIRO NAVY M']);
+        Sku::where('sku_code', 'W27-C')->update(['sku_name' => 'ENNIO BLACK L']);
+        Sku::where('sku_code', 'S27-A')->update(['sku_name' => 'EMIRO BLACK M']);
+        $this->mapping();
+        $page = Livewire::test(CreateSkuReplacement::class)->fillForm(['season_id' => $this->season->id]);
+        $old = $this->field($page, 'old_sku_code');
+        $new = $this->field($page, 'new_sku_code');
+        $this->assertSame(['W27-B' => 'W27-B – EMIRO NAVY M'], $old->getSearchResults('miro'));
+        $this->assertSame(['W27-C' => 'W27-C – ENNIO BLACK L'], $old->getSearchResults('nNi'));
+        $this->assertSame(['W27-C' => 'W27-C – ENNIO BLACK L'], $old->getSearchResults('w27-c'));
+        $this->assertSame(['W27-A' => 'W27-A – EMIRO BLACK M', 'W27-B' => 'W27-B – EMIRO NAVY M'], $new->getSearchResults('EMIRO'));
+        $this->assertSame([], $old->getSearchResults('S27'));
+        $this->assertSame(['TÖRÖLT' => 'TÖRÖLT'], $new->getSearchResults('tör'));
+        $this->assertSame([], $old->getSearchResults('tör'));
+        $page->fillForm(['old_sku_code' => 'W27-A', 'new_sku_code' => 'W27-C'])->call('create')
+            ->assertHasFormErrors(['old_sku_code']);
+        $this->assertDatabaseCount('sku_replacements', 1);
+    }
+
+    public function test_editing_preserves_current_sku_labels_but_excludes_other_mapped_old_skus(): void
+    {
+        $record = $this->mapping();
+        $this->mapping('W27-B', 'W27-C');
+        $page = Livewire::test(EditSkuReplacement::class, ['record' => $record->id]);
+        $old = $this->field($page, 'old_sku_code');
+        $new = $this->field($page, 'new_sku_code');
+        $this->assertSame('W27-A – A', $old->getOptionLabel());
+        $this->assertSame('W27-B – B', $new->getOptionLabel());
+        $this->assertArrayHasKey('W27-A', $old->getSearchResults('W27'));
+        $this->assertArrayNotHasKey('W27-B', $old->getSearchResults('W27'));
+        $this->assertArrayHasKey('W27-B', $new->getSearchResults('W27'));
+        $page->call('save')->assertHasNoFormErrors();
+        $this->assertSame('W27-A', $record->fresh()->old_sku_code);
+    }
+
+    public function test_multiple_old_skus_can_use_the_same_new_sku(): void
+    {
+        $this->mapping('W27-A', 'W27-C');
+        $page = Livewire::test(CreateSkuReplacement::class)->fillForm(['season_id' => $this->season->id]);
+        $this->assertArrayHasKey('W27-C', $this->field($page, 'new_sku_code')->getSearchResults('W27-C'));
+        // A code used as a target is still a valid source, unless it already has its own rule.
+        $this->assertArrayHasKey('W27-C', $this->field($page, 'old_sku_code')->getSearchResults('W27-C'));
+        $page->fillForm(['old_sku_code' => 'W27-B', 'new_sku_code' => 'W27-C'])->call('create')->assertHasNoFormErrors();
+        $this->assertSame(2, SkuReplacement::where('new_sku_code', 'W27-C')->count());
+    }
+
+    public function test_selectors_wait_for_a_season_and_clear_both_selections_when_it_changes(): void
+    {
+        $page = Livewire::test(CreateSkuReplacement::class);
+        $this->assertTrue($this->field($page, 'old_sku_code')->isDisabled());
+        $this->assertSame([], $this->field($page, 'new_sku_code')->getSearchResults(''));
+        $page->fillForm(['season_id' => $this->season->id, 'old_sku_code' => 'W27-A', 'new_sku_code' => 'W27-B'])
+            ->set('data.season_id', $this->otherSeason->id)->assertSet('data.old_sku_code', null)->assertSet('data.new_sku_code', null);
+        $this->assertSame([], $this->field($page, 'old_sku_code')->getSearchResults('W27'));
+        $this->assertArrayHasKey('S27-A', $this->field($page, 'old_sku_code')->getSearchResults('S27-A'));
+    }
+
+    public function test_search_results_are_bounded_but_codes_outside_the_first_page_can_be_selected_and_saved(): void
+    {
+        $template = Sku::where('sku_code', 'W27-A')->firstOrFail();
+        for ($index = 0; $index < 60; $index++) {
+            $template->replicate()->fill(['sku_code' => sprintf('ZZ-%03d', $index), 'sku_name' => 'Tömeges cikk '.$index])->save();
+        }
+        $page = Livewire::test(CreateSkuReplacement::class)->fillForm(['season_id' => $this->season->id]);
+        $this->assertCount(50, $this->field($page, 'old_sku_code')->getOptions());
+        $this->assertArrayNotHasKey('ZZ-059', $this->field($page, 'new_sku_code')->getOptions());
+        $this->assertSame(['ZZ-059' => 'ZZ-059 – Tömeges cikk 59'], $this->field($page, 'new_sku_code')->getSearchResults('cikk 59'));
+        $page->fillForm(['old_sku_code' => 'ZZ-058', 'new_sku_code' => 'ZZ-059']);
+        $this->assertSame('ZZ-059 – Tömeges cikk 59', $this->field($page, 'new_sku_code')->getOptionLabel());
+        $page->call('create')->assertHasNoFormErrors();
+        $this->assertDatabaseHas('sku_replacements', ['old_sku_code' => 'ZZ-058', 'new_sku_code' => 'ZZ-059']);
+    }
+
+    public function test_search_treats_percent_and_underscore_as_literal_characters(): void
+    {
+        Sku::where('sku_code', 'W27-A')->update(['sku_name' => '95% COTTON']);
+        Sku::where('sku_code', 'W27-B')->update(['sku_name' => '95X COTTON']);
+        Sku::where('sku_code', 'W27-C')->update(['sku_name' => 'A_B']);
+        $page = Livewire::test(CreateSkuReplacement::class)->fillForm(['season_id' => $this->season->id]);
+        $this->assertSame(['W27-A' => 'W27-A – 95% COTTON'], $this->field($page, 'old_sku_code')->getSearchResults('%'));
+        $this->assertSame(['W27-C' => 'W27-C – A_B'], $this->field($page, 'old_sku_code')->getSearchResults('_'));
+    }
+
+    public function test_list_displays_both_sku_names_and_supports_name_search_and_sorting(): void
+    {
+        Sku::where('sku_code', 'W27-A')->update(['sku_name' => 'EMIRO BLACK M']);
+        Sku::where('sku_code', 'W27-B')->update(['sku_name' => 'EMIRO NAVY M']);
+        $record = $this->mapping();
+        $deleted = $this->mapping('W27-C', 'TÖRÖLT');
+        $page = Livewire::test(ListSkuReplacements::class)
+            ->assertTableColumnStateSet('oldSku.sku_name', 'EMIRO BLACK M', $record)
+            ->assertTableColumnStateSet('newSku.sku_name', 'EMIRO NAVY M', $record)
+            ->assertTableColumnStateSet('newSku.sku_name', null, $deleted);
+        $page->searchTableColumns(['oldSku.sku_name' => 'BLACK'])->sortTable('newSku.sku_name')
+            ->assertCanSeeTableRecords([$record])->assertCanNotSeeTableRecords([$deleted]);
     }
 
     public function test_admin_can_create_edit_filter_and_delete_replacements(): void

@@ -20,6 +20,16 @@ class SkuReplacement extends Model
         return $this->belongsTo(Season::class);
     }
 
+    public function oldSku(): BelongsTo
+    {
+        return $this->belongsTo(Sku::class, 'old_sku_code', 'sku_code');
+    }
+
+    public function newSku(): BelongsTo
+    {
+        return $this->belongsTo(Sku::class, 'new_sku_code', 'sku_code');
+    }
+
     public function save(array $options = []): bool
     {
         return DB::transaction(function () use ($options): bool {
