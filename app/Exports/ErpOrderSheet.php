@@ -25,7 +25,7 @@ class ErpOrderSheet extends DefaultValueBinder implements FromArray, ShouldAutoS
 
     public function title(): string
     {
-        return 'ERP rendelés';
+        return 'Munka1';
     }
 
     public function headings(): array

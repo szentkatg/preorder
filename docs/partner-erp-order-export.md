@@ -8,7 +8,9 @@ A felugró ablakban megadható a közös **Megjegyzés** (legfeljebb 250 karakte
 
 Az ablak megnyitásakor rögzítjük a kijelölt rendelésazonosítókat; a letöltéskor a szerver frissen ellenőrzi a felhasználó szerepét, aktív állapotát, valamint az összes rendeléshez tartozó cím és szezon hozzáférhetőségét. Jogosulatlan vagy közben elérhetetlenné vált rendelés esetén az egész export leáll; nem készül részleges fájl. A fájl tartalma a friss rendelési sorokból, nem a képernyő gyorsítótárazott összesítéseiből készül.
 
-## Első munkalap: ERP rendelés
+## Első munkalap: Munka1
+
+A munkalap neve mindig pontosan `Munka1`, a felület nyelvétől és a tartalomtól függetlenül. Az ERP ezt a munkalapnevet keresi. A második munkalap neve továbbra is `Ellenőrzés`.
 
 Pontosan a minta 23 oszlopa, változatlan sorrendben:
 

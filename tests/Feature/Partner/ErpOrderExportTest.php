@@ -341,7 +341,7 @@ class ErpOrderExportTest extends TestCase
             // The XLSX reader must not reuse the export's identifier/formula binder.
             Cell::setValueBinder(new DefaultValueBinder);
             $book = IOFactory::load($path);
-            $this->assertSame(['ERP rendelés', 'Ellenőrzés'], $book->getSheetNames());
+            $this->assertSame(['Munka1', 'Ellenőrzés'], $book->getSheetNames());
             $sheet = $book->getSheet(0);
             $this->assertSame('W', $sheet->getHighestColumn());
             $this->assertSame('000021', $sheet->getCell('D2')->getValue());
