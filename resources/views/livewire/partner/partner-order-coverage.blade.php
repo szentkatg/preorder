@@ -32,17 +32,7 @@
                 class="rounded border-gray-300"
             >
 
-            <select wire:model.live="seasonId" class="rounded border-gray-300">
-                <option value="">
-                    {{ __('partner.all_seasons') }}
-                </option>
-
-                @foreach ($this->seasons as $season)
-                    <option value="{{ $season->id }}">
-                        {{ $season->name }}
-                    </option>
-                @endforeach
-            </select>
+            <x-partner-season-banner :season="$this->selectedSeason" />
 
             <label class="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm">
                 <input

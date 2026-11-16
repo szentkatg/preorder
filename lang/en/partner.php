@@ -2,6 +2,13 @@
 
 // lang/en/partner.php
 return [
+    'login_season_help' => 'The selected season applies to every menu. Use Change season to switch later without signing in again.',
+    'select_season_to_continue' => 'Select an available season to continue.',
+    'change_season' => 'Change season',
+    'cancel_season_change' => 'Cancel',
+    'change_season_help' => 'You stay signed in. Switching displays the new season and clears previous order selections and filters. Your orders are not changed.',
+    'use_selected_season' => 'Open selected season',
+    'no_available_seasons' => 'No seasons are currently available to partners.',
     'erp_export_selected' => 'ERP export of selected orders',
     'erp_export_description' => ':count selected orders. The note and delivery date apply to all exported lines. SKU replacements affect the export only; the original orders remain unchanged.',
     'erp_export_note' => 'Note (maximum 250 characters)',

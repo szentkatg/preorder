@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\SalesRepSummaryExport;
+use App\Livewire\Partner\Concerns\RequiresSelectedPartnerSeason;
 use App\Livewire\Partner\Concerns\SetsPartnerLocale;
 use App\Models\Brand;
 use App\Models\Language;
@@ -17,17 +18,20 @@ use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\Translation;
+use App\Services\Partner\PartnerSeasonContext;
 use App\Services\Partner\PartnerSeasonVisibility;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
 class OrderSelector extends Component
 {
+    use RequiresSelectedPartnerSeason;
     use SetsPartnerLocale;
 
     protected ?Collection $accessibleOrdersCache = null;
@@ -38,6 +42,7 @@ class OrderSelector extends Component
 
     protected float $requestStartedAt = 0.0;
 
+    #[Locked]
     public ?int $seasonId = null;
 
     public ?int $brandId = null;
@@ -101,7 +106,10 @@ class OrderSelector extends Component
 
     public function mount(): void
     {
-        $this->seasonId = session('partner_order_selector.season_id');
+        $this->seasonId = PartnerSeasonContext::id();
+        if (session()->has('partner_order_selector.season_id') && (int) session('partner_order_selector.season_id') !== $this->seasonId) {
+            session()->forget(['partner_order_selector', 'order_selector.open_order_id']);
+        }
         $this->brandId = session('partner_order_selector.brand_id');
         $this->partnerAddressId = session('partner_order_selector.partner_address_id');
         $this->orderSheetTypeId = session('partner_order_selector.order_sheet_type_id');
@@ -139,6 +147,7 @@ class OrderSelector extends Component
 
         $orders = $partnerUser
             ->accessibleOrdersQuery()
+            ->where('season_id', PartnerSeasonContext::id())
             ->with([
                 'season',
                 'brand',
@@ -170,6 +179,7 @@ class OrderSelector extends Component
     {
         return Season::query()
             ->visibleToPartners()
+            ->whereKey(PartnerSeasonContext::id())
             ->orderBy('name')
             ->get();
     }
@@ -481,9 +491,7 @@ class OrderSelector extends Component
 
     public function updatedSeasonId(): void
     {
-        if ($this->seasonId !== null) {
-            PartnerSeasonVisibility::assertVisible($this->seasonId);
-        }
+        PartnerSeasonContext::assertMatches($this->seasonId);
         $this->selectedOrderId = null;
         $this->brandId = null;
         $this->orderSheetTypeId = null;
@@ -533,6 +541,7 @@ class OrderSelector extends Component
 
     protected function createOrder(): Order
     {
+        PartnerSeasonContext::assertMatches($this->seasonId);
         PartnerSeasonVisibility::assertVisible($this->seasonId);
         $this->referenceNumber = trim($this->referenceNumber);
 
@@ -1143,7 +1152,6 @@ class OrderSelector extends Component
             ->all();
 
         if (! in_array((int) $this->partnerAddressId, $allowedAddressIds, true)) {
-            $this->seasonId = null;
             $this->brandId = null;
             $this->partnerAddressId = null;
             $this->orderSheetTypeId = null;

@@ -3,16 +3,21 @@
 namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderCoverageExport;
+use App\Livewire\Partner\Concerns\RequiresSelectedPartnerSeason;
 use App\Models\PartnerUser;
 use App\Models\Season;
-use App\Services\Partner\PartnerSeasonVisibility;
+use App\Services\Partner\PartnerSeasonContext;
 use App\Services\PartnerOrderCoverageService;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PartnerOrderCoverage extends Component
 {
+    use RequiresSelectedPartnerSeason;
+
+    #[Locked]
     public ?int $seasonId = null;
 
     public string $search = '';
@@ -23,6 +28,7 @@ class PartnerOrderCoverage extends Component
     {
         return Season::query()
             ->visibleToPartners()
+            ->whereKey(PartnerSeasonContext::id())
             ->orderByDesc('id')
             ->get();
     }
@@ -42,6 +48,7 @@ class PartnerOrderCoverage extends Component
 
     public function mount(): void
     {
+        $this->seasonId = PartnerSeasonContext::id();
         $this->authorizeAccess();
 
         if ($locale = request('locale')) {
@@ -119,8 +126,6 @@ class PartnerOrderCoverage extends Component
             auth('partner')->user()?->role === PartnerUser::ROLE_SALES_REP,
             403
         );
-        if ($this->seasonId !== null) {
-            PartnerSeasonVisibility::assertVisible($this->seasonId);
-        }
+        PartnerSeasonContext::assertMatches($this->seasonId);
     }
 }

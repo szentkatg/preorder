@@ -20,6 +20,7 @@ class SharedCatalogGroupOrder extends CatalogGroupOrder
         $this->shareLink = $shareLink;
 
         $this->order = $shareLink->order()->with([
+            'season', 'brand', 'orderSheetType',
             'partner',
             'partnerAddress.language',
             'priceList',

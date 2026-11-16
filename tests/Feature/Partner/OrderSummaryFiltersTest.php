@@ -68,6 +68,7 @@ class OrderSummaryFiltersTest extends TestCase
             'name' => 'Képviselő', 'email' => 'summary@example.test', 'password' => 'password', 'active' => true]);
         $this->user->partners()->attach(collect($this->partners)->except('denied')->pluck('id'));
         $this->actingAs($this->user, 'partner');
+        session(['partner.season_id' => $this->season->id]);
 
         $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska']);
         $product = Product::create(['season_id' => $this->season->id, 'item_main_group_id' => $group->id,
@@ -172,7 +173,7 @@ class OrderSummaryFiltersTest extends TestCase
     {
         $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');
         $this->mock(SalesRepOrderSummaryService::class)->shouldNotReceive('build');
-        $page->set('summarySeasonId', $this->season->id)->set('summaryBrandId', $this->brand->id)
+        $page->set('summaryBrandId', $this->brand->id)
             ->set('summaryOrderSheetTypeId', $this->type->id)->set('summaryCurrency', 'Ft')
             ->set('summaryFilledFilter', 'filled')->set('summarySearch', 'Partner a')
             ->set('summaryStatus', 'submitted')->set('summarySalesRepCode', 'P000444');

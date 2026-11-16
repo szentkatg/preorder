@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-screen-2xl p-6">
+<div class="w-full min-w-0 max-w-none p-6">
     <div
         x-data="{ open: true }"
         class="sticky top-0 z-50 -mx-6 bg-gray-100 px-6 pb-2 pt-6"
@@ -22,9 +22,10 @@
                 @endif
             </div>
 
-            <h1 class="text-center text-2xl font-bold">
-                {{ __('partner.order_selection') }}
-            </h1>
+            <div class="min-w-0 space-y-2">
+                <h1 class="text-center text-2xl font-bold">{{ __('partner.order_selection') }}</h1>
+                <x-partner-season-banner :season="$this->selectedSeason" />
+            </div>
 
             <div class="flex items-center gap-2 justify-self-start md:justify-self-end">
                 <form method="POST" action="{{ route('partner.logout') }}">

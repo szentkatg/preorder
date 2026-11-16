@@ -6,32 +6,7 @@
         <div class="grid gap-4 md:grid-cols-6">
 
             {{-- 1. sor --}}
-            <div class="md:col-span-2">
-                <div class="mb-2">
-                    <input
-                        type="text"
-                        disabled
-                        class="w-full rounded border-gray-300 opacity-0"
-                        tabindex="-1"
-                    >
-                </div>
-
-                <label class="mb-1 block text-sm font-medium">
-                    {{ __('partner.season') }}
-                </label>
-
-                <select wire:model.live="seasonId" class="w-full rounded border-gray-300 bg-yellow-100">
-                    <option value="">{{ __('partner.select_season') }}</option>
-
-                    @foreach ($this->seasons as $season)
-                        <option value="{{ $season['id'] }}">
-                            {{ $season['name'] }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="md:col-span-4">
+            <div class="md:col-span-6">
                 <label class="mb-1 block text-sm font-medium">
                     {{ __('partner.address_search') }}
                 </label>

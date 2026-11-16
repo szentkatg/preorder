@@ -11,6 +11,7 @@ use App\Livewire\Partner\OrderSelector;
 use App\Livewire\Partner\OrderSummary;
 use App\Livewire\Partner\PartnerOrderCoverage;
 use App\Livewire\Partner\ProductList;
+use App\Livewire\Partner\SeasonSelector;
 use App\Livewire\Partner\SeasonShow;
 use App\Livewire\Partner\SharedCatalogGroupOrder;
 use Illuminate\Http\Request;
@@ -69,7 +70,11 @@ Route::prefix('partner')
             SharedCatalogGroupOrder::class
         )->name('shared-catalog-group-order');
 
-        Route::middleware('auth:partner')
+        Route::get('/select-season', SeasonSelector::class)
+            ->middleware('auth:partner')
+            ->name('seasons.select');
+
+        Route::middleware(['auth:partner', 'partner.season'])
             ->group(function () {
                 Route::get('/orders/select', OrderSelector::class)
                     ->name('orders.select');

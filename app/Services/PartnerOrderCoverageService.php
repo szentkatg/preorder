@@ -5,16 +5,15 @@ namespace App\Services;
 use App\Models\Brand;
 use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
-use App\Services\Partner\PartnerSeasonVisibility;
+use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Support\Collection;
 
 class PartnerOrderCoverageService
 {
     public function build(?int $seasonId = null): array
     {
-        if ($seasonId !== null) {
-            PartnerSeasonVisibility::assertVisible($seasonId);
-        }
+        $seasonId ??= PartnerSeasonContext::id();
+        PartnerSeasonContext::assertMatches($seasonId);
         $flatColumns = $this->buildFlatColumns();
 
         $partnerUser = auth('partner')->user();

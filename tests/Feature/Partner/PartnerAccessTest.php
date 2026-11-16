@@ -116,6 +116,7 @@ class PartnerAccessTest extends TestCase
         $addressUser->addresses()->attach($data['addresses']['a1']);
 
         $this->actingAs($addressUser, 'partner');
+        session(['partner.season_id' => $data['season']->id]);
 
         Livewire::test(AddressShow::class, [
             'season' => $data['season'],

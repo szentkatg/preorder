@@ -84,13 +84,6 @@
                     class="rounded border"
                 >
 
-                <select wire:model.live="summarySeasonId" class="rounded border">
-                    <option value="">{{ __('partner.all_seasons') }}</option>
-                    @foreach ($summarySeasons as $season)
-                        <option value="{{ $season['id'] }}">{{ $season['name'] }}</option>
-                    @endforeach
-                </select>
-
                 <select wire:model.live="summaryBrandId" class="rounded border">
                     <option value="">{{ __('partner.all_brands') }}</option>
                     @foreach ($summaryBrands as $brand)

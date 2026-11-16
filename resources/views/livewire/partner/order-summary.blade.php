@@ -21,6 +21,7 @@
     @endif
 
     <div class="flex items-center gap-6 text-sm">
+        <a href="{{ route('partner.seasons.select') }}" wire:navigate class="rounded border bg-amber-50 px-3 py-2 font-semibold">{{ __('partner.change_season') }}</a>
         <a
             href="{{ route('partner.orders.select') }}"
             class="font-semibold text-blue-600 hover:underline"

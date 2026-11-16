@@ -63,6 +63,7 @@ class ErpOrderExportTest extends TestCase
         session(['partner.locale' => 'hu']);
         $this->travelTo(CarbonImmutable::parse('2026-11-16 23:30:00', 'UTC'));
         $this->season = Season::create(['code' => 'W27', 'name' => 'Tél', 'visible_to_partners' => true]);
+        session(['partner.season_id' => $this->season->id]);
         $brand = Brand::create(['code' => 'HT', 'name' => 'Heavy Tools']);
         $sheet = OrderSheetType::create(['code' => 'BAG', 'name' => 'Táska']);
         $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint']);
@@ -244,8 +245,7 @@ class ErpOrderExportTest extends TestCase
     public function test_hidden_seasons_and_disabled_users_cannot_be_exported(): void
     {
         $this->season->update(['visible_to_partners' => false]);
-        Livewire::test(SalesRepOrderSummary::class)->set('selectedSummaryOrderIds', [(string) $this->order->id])
-            ->call('openErpExport')->assertForbidden();
+        Livewire::test(SalesRepOrderSummary::class)->assertNotFound();
         $this->season->update(['visible_to_partners' => true]);
         $page = Livewire::test(SalesRepOrderSummary::class)->set('selectedSummaryOrderIds', [(string) $this->order->id])
             ->call('openErpExport');

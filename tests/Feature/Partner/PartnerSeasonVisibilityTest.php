@@ -44,6 +44,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
@@ -92,6 +93,7 @@ class PartnerSeasonVisibilityTest extends TestCase
         $this->user = PartnerUser::create(['partner_id' => $partner->id, 'role' => 'partner_admin', 'name' => 'Partner',
             'email' => 'partner@example.test', 'password' => 'password', 'active' => true]);
         $this->actingAs($this->user, 'partner');
+        session(['partner.season_id' => $this->visible->id]);
         $this->brand = Brand::create(['code' => 'HT', 'name' => 'HT', 'active' => true]);
         $this->type = OrderSheetType::create(['code' => 'B', 'name' => 'Táska', 'active' => true]);
         $this->address->brands()->attach($this->brand);
@@ -191,10 +193,11 @@ class PartnerSeasonVisibilityTest extends TestCase
         $page = Livewire::test(OrderSelector::class);
         $ids = $page->instance()->seasons->modelKeys();
         $this->assertContains($this->visible->id, $ids);
-        $this->assertContains($this->historical->id, $ids);
+        $this->assertNotContains($this->historical->id, $ids);
         $this->assertNotContains($this->hidden->id, $ids);
-        $this->assertEqualsCanonicalizing([$this->orders['visible']->id, $this->orders['historical']->id],
+        $this->assertEqualsCanonicalizing([$this->orders['visible']->id],
             $page->instance()->accessibleOrders->modelKeys());
+        session(['partner.season_id' => $this->historical->id]);
         Livewire::test(SeasonShow::class, ['season' => $this->historical])->assertSuccessful();
     }
 
@@ -230,9 +233,11 @@ class PartnerSeasonVisibilityTest extends TestCase
             'summary' => "/partner/orders/summary/$season/$brand/$type",
         };
         $this->hidden->update(['visible_to_partners' => true]);
+        session(['partner.season_id' => $this->hidden->id]);
         $response = $this->get($url);
         $page === 'products' ? $response->assertRedirect(route('partner.orders.select')) : $response->assertOk();
         $this->hidden->update(['visible_to_partners' => false]);
+        session(['partner.season_id' => $this->visible->id]);
         $this->get($url)->assertNotFound();
     }
 
@@ -244,7 +249,13 @@ class PartnerSeasonVisibilityTest extends TestCase
     public function test_forged_selector_season_cannot_create_an_order(): void
     {
         $count = Order::count();
-        Livewire::test(OrderSelector::class)->set('seasonId', $this->hidden->id)->assertNotFound();
+        $page = Livewire::test(OrderSelector::class);
+        try {
+            $page->set('seasonId', $this->hidden->id);
+            $this->fail('The season property was not locked.');
+        } catch (CannotUpdateLockedPropertyException) {
+            $this->assertSame($this->visible->id, session('partner.season_id'));
+        }
         $this->assertSame($count, Order::count());
     }
 
@@ -337,7 +348,12 @@ class PartnerSeasonVisibilityTest extends TestCase
         $this->user->partners()->attach($this->address->partner_id);
         $page = Livewire::test(PartnerOrderCoverage::class);
         $this->assertNotContains($this->hidden->id, $page->instance()->seasons->modelKeys());
-        $page->set('seasonId', $this->hidden->id)->assertNotFound();
+        try {
+            $page->set('seasonId', $this->hidden->id);
+            $this->fail('The coverage season property was not locked.');
+        } catch (CannotUpdateLockedPropertyException) {
+            $this->assertSame($this->visible->id, session('partner.season_id'));
+        }
         $this->expectException(HttpException::class);
         app(PartnerOrderCoverageService::class)->build($this->hidden->id);
     }
@@ -346,7 +362,7 @@ class PartnerSeasonVisibilityTest extends TestCase
     {
         $this->user->update(['role' => 'sales_rep']);
         $this->user->partners()->attach($this->address->partner_id);
-        Cache::put('order-selector:sales-rep-summary:v2:'.$this->user->id.':hu', [
+        Cache::put('order-selector:sales-rep-summary:v3:'.$this->user->id.':'.$this->visible->id.':hu', [
             ['order_id' => $this->orders['visible']->id, 'season_id' => $this->visible->id, 'season_name' => 'Visible S27'],
             ['order_id' => $this->orders['hidden']->id, 'season_id' => $this->hidden->id, 'season_name' => 'Hidden W27'],
         ]);

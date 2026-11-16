@@ -24,6 +24,7 @@ class ErpOrderExportService
         ], ['selectedSummaryOrderIds.required' => __('partner.select_at_least_one_order_for_summary')])->validate();
         $ids = array_values(array_unique(array_map('intval', $ids)));
         $orders = $user->accessibleOrdersQuery()->whereKey($ids)
+            ->where('season_id', PartnerSeasonContext::id())
             ->with(['season', 'partner', 'partnerAddress', 'orderType'])->get();
         // Never silently export only the accessible subset of a tampered/stale selection.
         abort_unless($orders->count() === count($ids), 403);

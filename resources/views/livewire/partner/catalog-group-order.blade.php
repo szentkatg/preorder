@@ -362,13 +362,14 @@
 
 
     <div class="sticky top-0 z-40 bg-white pb-4 shadow-sm">    
+        <x-partner-season-banner :season="$order->season" :brand="$order->brand" :order-sheet-type="$order->orderSheetType" :allow-season-change="! $sharedMode" />
         @if (session('success'))
             <div class="rounded bg-green-100 p-3 text-green-800">
                 {{ session('success') }}
             </div>
         @endif
     
-    <div class="sticky top-0 z-40 flex items-center justify-between gap-6 border-b bg-white py-2 text-sm">
+    <div class="z-40 flex items-center justify-between gap-6 border-b bg-white py-2 text-sm">
         <div class="flex items-center gap-6">
             @if($previousCatalogGroup)
                 <button

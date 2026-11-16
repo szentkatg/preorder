@@ -3,14 +3,19 @@
 namespace App\Livewire\Partner\Auth;
 
 use App\Models\Language;
+use App\Models\Season;
 use App\Services\LanguageResolver;
+use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class Login extends Component
 {
     public ?int $languageId = null;
+
+    public ?int $seasonId = null;
 
     public string $email = '';
 
@@ -23,6 +28,8 @@ class Login extends Component
         );
 
         $this->applyLanguage($language);
+        $seasons = Season::query()->visibleToPartners()->get();
+        $this->seasonId = $seasons->count() === 1 ? (int) $seasons->first()->id : null;
     }
 
     public function boot(): void
@@ -47,7 +54,8 @@ class Login extends Component
         $this->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
-        ]);
+            'seasonId' => ['required', 'integer', Rule::exists('seasons', 'id')->where('visible_to_partners', true)],
+        ], ['seasonId.required' => __('partner.select_season_to_continue'), 'seasonId.exists' => __('partner.select_season_to_continue')]);
 
         if (! Auth::guard('partner')->attempt([
             'email' => $this->email,
@@ -62,13 +70,7 @@ class Login extends Component
             return;
         }
 
-        session()->forget([
-            'partner_order_selector.season_id',
-            'partner_order_selector.brand_id',
-            'partner_order_selector.partner_address_id',
-            'partner_order_selector.order_sheet_type_id',
-            'partner_order_selector.order_id',
-        ]);
+        PartnerSeasonContext::select($this->seasonId);
         session()->regenerate();
 
         $this->redirectRoute(
@@ -85,6 +87,7 @@ class Login extends Component
                 ->whereIn('code', $this->availableLocaleCodes())
                 ->orderBy('id')
                 ->get(),
+            'seasons' => Season::query()->visibleToPartners()->orderByDesc('id')->get(),
         ]);
     }
 

@@ -18,10 +18,51 @@ Az árprojekt szerkeszthetőségét továbbra is a projekt státusza határozza 
 nem a szezon aktív vagy látható jelzője. A termékek a kalkulációhoz aktívak
 maradhatnak; elrejtéshez nem kell azokat inaktiválni.
 
-Az `Aktív` meglévő működése megmarad: a partner főoldalán csak az aktív ÉS
-látható szezonok jelennek meg. A rendelésválasztóban a látható, de már inaktív
-szezonok is megmaradnak a régi rendelések eléréséhez. A láthatóság kikapcsolása
-ezzel szemben az adott szezon minden partneroldali hozzáférését letiltja.
+Belépéskor a partner a **látható** szezonok közül választ. A látható, de már
+inaktív szezon is választható a régi rendelések eléréséhez. A partner főoldala
+és minden további menüpont csak a belépéskor kiválasztott szezont használja.
+A láthatóság kikapcsolása az adott szezon minden partneroldali hozzáférését letiltja.
+
+## Belépéshez kötött szezonválasztás
+
+- A bejelentkezéshez e-mail, jelszó, nyelv és szezon tartozik. Egyetlen elérhető
+  szezon esetén előre kiválasztjuk; többnél választani kell. Rejtett szezon
+  módosított kérésben sem fogadható el. Hibás belépés nem ment szezont.
+- A választást a munkamenet `partner.season_id` kulcsa tárolja. Belépéskor
+  töröljük a korábbi rendelésválasztást és összesítőszűrőket; kijelentkezéskor
+  a szezon is törlődik, a nyelv viszont megmarad.
+- A fejléc **Szezonváltás** gombja a `/partner/select-season` oldalra visz.
+  Itt új jelszómegadás nélkül lehet elérhető szezont választani. Csak a
+  **Kiválasztott szezon megnyitása** gomb váltja át a munkamenetet és törli a
+  korábbi rendeléskijelölést/szűrőket; az oldal megnyitása vagy a **Mégse** nem.
+  A bejelentkezés és a nyelv megmarad, rendelést és rendelési tételt nem módosítunk.
+  Az oldal bejelentkezést igényel, de még kiválasztott szezon nélkül is elérhető.
+  Inaktív felhasználóval vagy időközben elrejtett szezonnal nem lehet váltani.
+- A rendelésválasztó kitölti a rendelkezésre álló képernyőszélességet. A szezon
+  jól látható fejlécben szerepel; új rendelésnél, összesítésnél és lefedettségnél
+  nincs külön szezonválasztó. Az új rendelés automatikusan a belépési szezonba kerül.
+- A rendelőlap tetején a szezon kódja/neve, a márka és a rendelőlaptípus szerepel.
+  A márka és a típus neve a meglévő fordítási rendszerből, a választott nyelven jön.
+- A `RequirePartnerSeason` middleware minden védett partneroldalon és az onnan
+  érkező Livewire-kéréseken is érvényes. Hiányzó/elrejtett/törölt választásnál
+  a szezonválasztó oldalra irányítunk, nem kérünk új bejelentkezést. A már megnyitott lapok szezonját és a közvetlen
+  hivatkozásokat is ellenőrizzük. A böngésző a Livewire szezonmezőit nem írhatja át.
+- A listák, összesítések, Excel-exportok és az import célrendelései is csak a
+  kiválasztott szezonhoz tartozhatnak. Az összesítés-cache felhasználó, szezon és
+  nyelv szerint különül el. A partner/cím jogosultságok ettől függetlenül megmaradnak.
+- A tokenes, jelszó nélkül megosztott rendelőlap kivétel: mindig a megosztott
+  rendelés saját szezonját használja, nem igényel belépési szezonválasztást, és
+  nem módosítja a bejelentkezett partner munkamenetének szezonját. A láthatóság,
+  lejárat és visszavonás ellenőrzése változatlanul érvényes rá.
+
+Ehhez a munkamenetes bővítéshez nincs új adatbázismező vagy migráció, jogosultság,
+függőség vagy frontend build. Az alkalmazás/route/view cache frissítendő.
+A korábbi, szezonválasztás nélküli nyitott munkamenetek a szezonválasztó oldalra
+jutnak, új belépés nélkül. Valódi kijelentkezés vagy lejárt munkamenet esetén
+továbbra is szükséges a belépés. Másik szezonban nyitva hagyott lapról nem
+engedünk utólag menteni az aktuális szezonváltás után.
+Automatizált ellenőrzés: `PartnerSeasonContextTest` és a meglévő partner-,
+szezonláthatósági, rendelésösszesítő-, ERP-export- és adminregressziós tesztek.
 
 ## Védelem
 

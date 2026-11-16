@@ -10,6 +10,7 @@ use App\Models\OrderSheetType;
 use App\Models\PartnerAddress;
 use App\Models\Season;
 use App\Models\Translation;
+use App\Services\Partner\PartnerSeasonContext;
 use App\Services\Partner\PartnerSeasonVisibility;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
@@ -428,6 +429,7 @@ trait HandlesMultiAddressExcelImport
 
         $season = Season::query()
             ->visibleToPartners()
+            ->whereKey(PartnerSeasonContext::id())
             ->where(fn ($query) => $query->where('code', $header['season'])->orWhere('name', $header['season']))
             ->first();
 

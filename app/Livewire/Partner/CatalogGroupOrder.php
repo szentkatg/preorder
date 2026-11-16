@@ -272,6 +272,7 @@ class CatalogGroupOrder extends Component
         abort_unless($partnerUser && $partnerUser->canAccessOrder($order), 403);
 
         $this->order = $order->load([
+            'season', 'brand', 'orderSheetType',
             'partner',
             'partnerAddress.language',
             'priceList',

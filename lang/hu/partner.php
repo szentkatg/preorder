@@ -2,6 +2,13 @@
 
 // lang/hu/partner.php
 return [
+    'login_season_help' => 'A kiválasztott szezon minden menüpontban érvényes. Később a Szezonváltás gombbal módosíthatod, új bejelentkezés nélkül.',
+    'select_season_to_continue' => 'Válassz elérhető szezont a folytatáshoz.',
+    'change_season' => 'Szezonváltás',
+    'cancel_season_change' => 'Mégse',
+    'change_season_help' => 'Bejelentkezve maradsz. A választás után az új szezon rendelései jelennek meg; a korábbi rendeléskijelölés és szűrők törlődnek. A rendeléseket nem módosítjuk.',
+    'use_selected_season' => 'Kiválasztott szezon megnyitása',
+    'no_available_seasons' => 'Jelenleg nincs a partnerek számára elérhető szezon.',
     'erp_export_selected' => 'Kijelölt rendelések ERP-exportja',
     'erp_export_description' => ':count kijelölt rendelés. A megjegyzés és a szállítási dátum minden exportált sorra érvényes. A cikkcserék csak az exportban érvényesülnek; a rendelések nem változnak.',
     'erp_export_note' => 'Megjegyzés (legfeljebb 250 karakter)',

@@ -1,4 +1,5 @@
 <div class="max-w-6xl mx-auto p-6">
+    <x-partner-season-banner :season="$this->selectedSeason" />
 
     <div class="mb-8">
         <h1 class="text-3xl font-bold">

@@ -3,10 +3,12 @@
 namespace App\Livewire\Partner;
 
 use App\Exports\SalesRepSummaryExport;
+use App\Livewire\Partner\Concerns\RequiresSelectedPartnerSeason;
 use App\Models\Order;
 use App\Models\Partner;
 use App\Models\PartnerUser;
 use App\Services\Partner\ErpOrderExportService;
+use App\Services\Partner\PartnerSeasonContext;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -17,6 +19,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SalesRepOrderSummary extends Component
 {
+    use RequiresSelectedPartnerSeason;
+
     protected ?Collection $accessibleOrdersCache = null;
 
     protected ?Collection $salesRepOrderSummariesCache = null;
@@ -27,6 +31,7 @@ class SalesRepOrderSummary extends Component
 
     public string $summarySearch = '';
 
+    #[Locked]
     public ?int $summarySeasonId = null;
 
     public ?int $summaryBrandId = null;
@@ -100,7 +105,7 @@ class SalesRepOrderSummary extends Component
         $filters = session('order_selector.summary_filters', []);
 
         $this->summarySearch = $filters['search'] ?? '';
-        $this->summarySeasonId = $filters['season_id'] ?? null;
+        $this->summarySeasonId = PartnerSeasonContext::id();
         $this->summaryBrandId = $filters['brand_id'] ?? null;
         $this->summaryOrderSheetTypeId = $filters['order_sheet_type_id'] ?? null;
         $this->summaryCurrency = $filters['currency'] ?? null;
@@ -156,6 +161,7 @@ class SalesRepOrderSummary extends Component
 
         return $this->accessibleOrdersCache = $partnerUser
             ->accessibleOrdersQuery()
+            ->where('season_id', PartnerSeasonContext::id())
             ->with([
                 'season',
                 'brand',
@@ -465,7 +471,6 @@ class SalesRepOrderSummary extends Component
 
     protected function summaryCacheKey(): string
     {
-        // Versioned because summary rows now include the partner's representative.
-        return 'order-selector:sales-rep-summary:v2:'.(int) auth('partner')->id().':'.app()->getLocale();
+        return 'order-selector:sales-rep-summary:v3:'.(int) auth('partner')->id().':'.PartnerSeasonContext::id().':'.app()->getLocale();
     }
 }

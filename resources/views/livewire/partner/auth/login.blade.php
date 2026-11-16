@@ -20,6 +20,22 @@
     <form wire:submit="login" class="space-y-4 rounded-xl bg-white/90 p-6 shadow-lg backdrop-blur-sm">
         <h1 class="text-2xl font-bold">{{ __('partner.login_title') }}</h1>
 
+        @if (session('partner_season_notice'))
+            <p role="status" class="text-sm text-amber-800">{{ session('partner_season_notice') }}</p>
+        @endif
+        <div>
+            <label for="partner-season">{{ __('partner.season') }}</label>
+            <select id="partner-season" wire:model="seasonId" required class="w-full rounded border p-2">
+                <option value="">{{ __('partner.select_season') }}</option>
+                @foreach ($seasons as $season)
+                    <option value="{{ $season->id }}">{{ $season->code }} — {{ $season->name }}</option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-sm text-slate-600">{{ __('partner.login_season_help') }}</p>
+            @error('seasonId') <div class="text-sm text-red-600">{{ $message }}</div> @enderror
+            @if ($seasons->isEmpty()) <p class="text-sm text-red-600">{{ __('partner.no_available_seasons') }}</p> @endif
+        </div>
+
         <div>
             <label for="partner-email">{{ __('partner.email') }}</label>
             <input
