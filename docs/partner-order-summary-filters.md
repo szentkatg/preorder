@@ -7,6 +7,8 @@ A partnerportál rendelésválasztó oldalán, a **Rendelések összesítése** 
 
 Mindkét szűrő alapból minden rendelést enged át, együtt érvényesül a meglévő kereséssel és szűrőkkel, és a munkamenetben megmarad. A képviselő nélküli partnerek rendelései szűretlen állapotban szintén láthatók. A lehetőségek az összes hozzáférhető rendelésből származnak, nem szűkülnek le a már kiválasztott státuszra/képviselőre.
 
+A rendeléslista **Területi képviselő** oszlopa a partner oszlopa mellett jelenik meg, és ugyanazt az ERP-kód + név feliratot mutatja, mint a képviselőszűrő. Ismeretlen képviselőnévnél az ERP-kód, üres hozzárendelésnél „—” látható. A nevek a szűrővel közös, egyetlen lekérdezésből származnak, nem soronként töltődnek be. Ez a megjelenítési bővítés az Excel-export oszlopszerkezetét és a hozzáférési szabályokat nem módosítja.
+
 A képernyő összesítései, a „mindent kijelöl” és az Excel-export is a szűrt listát követi. Szűrőváltáskor a korábbi kijelölést töröljük. A szűrés a meglévő gyorsítótárazott összesítést használja, nem számolja újra a rendelési tételeket.
 
 A gyorsítótár felhasználónként és felületi nyelvenként különül el; a sorformátum verziózott. A gyorsítótárból visszaolvasott rendelések hozzáférését ismét ellenőrizzük, ezért egy később elrejtett szezon vagy visszavont partner-hozzárendelés adatai és képviselői sem szivárognak át a listába vagy az exportba.

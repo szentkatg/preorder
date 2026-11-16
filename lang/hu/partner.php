@@ -2,6 +2,20 @@
 
 // lang/hu/partner.php
 return [
+    'erp_export_selected' => 'Kijelölt rendelések ERP-exportja',
+    'erp_export_description' => ':count kijelölt rendelés. A megjegyzés és a szállítási dátum minden exportált sorra érvényes. A cikkcserék csak az exportban érvényesülnek; a rendelések nem változnak.',
+    'erp_export_note' => 'Megjegyzés (legfeljebb 250 karakter)',
+    'erp_export_delivery' => 'Kért szállítási határidő',
+    'erp_export_cancel' => 'Mégse',
+    'erp_export_download' => 'ERP Excel letöltése',
+    'erp_export_note_max' => 'A megjegyzés legfeljebb 250 karakter lehet.',
+    'erp_export_date_required' => 'Add meg a szállítási határidőt.',
+    'erp_export_date_invalid' => 'Adj meg érvényes dátumot (ÉÉÉÉ-HH-NN vagy ÉÉÉÉ.HH.NN).',
+    'erp_export_error_order' => 'A(z) :code rendelésből hiányzik az ERP-kód, címkód, rendeléstípus vagy hivatkozás, illetve hibás a partner és a cím kapcsolata.',
+    'erp_export_error_sku' => 'Hiányzó vagy a rendelés szezonjától eltérő SKU: :code. Az export nem készült el.',
+    'erp_export_error_cycle' => 'Körkörös cikkcsere: :code. Javítsd a cikkcsere-törzset.',
+    'erp_export_error_duplicate' => 'Egy szezonban több csere tartozik ugyanahhoz a cikkszámhoz. Javítsd a cikkcsere-törzset.',
+    'erp_export_error_quantity' => 'A(z) :code rendelés exportált és ellenőrző mennyisége nem egyezik. Az export nem készült el.',
     'login' => 'Bejelentkezés',
     'email' => 'E-mail cím',
     'password' => 'Jelszó',

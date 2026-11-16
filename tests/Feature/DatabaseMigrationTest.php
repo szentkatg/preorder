@@ -54,6 +54,7 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('model_has_permissions'));
         $this->assertTrue(Schema::hasTable('role_has_permissions'));
         $this->assertTrue(Schema::hasTable('order_types'));
+        $this->assertTrue(Schema::hasColumns('sku_replacements', ['season_id', 'old_sku_code', 'new_sku_code']));
         $this->assertTrue(Schema::hasTable('order_share_links'));
         $this->assertTrue(Schema::hasTable('pricing_projects'));
         $this->assertTrue(Schema::hasColumns('pricing_projects', ['closed_at', 'closed_by']));

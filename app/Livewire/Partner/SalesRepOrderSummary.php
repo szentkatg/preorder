@@ -5,9 +5,12 @@ namespace App\Livewire\Partner;
 use App\Exports\SalesRepSummaryExport;
 use App\Models\Order;
 use App\Models\Partner;
+use App\Models\PartnerUser;
+use App\Services\Partner\ErpOrderExportService;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -39,6 +42,53 @@ class SalesRepOrderSummary extends Component
     public ?string $summaryCurrency = null;
 
     public bool $summaryLoaded = false;
+
+    public bool $showErpExportModal = false;
+
+    public string $erpExportNote = '';
+
+    public string $erpExportDeliveryDate = '';
+
+    #[Locked]
+    public array $erpExportOrderIds = [];
+
+    public function getCanExportErpProperty(): bool
+    {
+        $user = auth('partner')->user();
+
+        return $user?->active && $user->role === PartnerUser::ROLE_SALES_REP;
+    }
+
+    public function openErpExport(): void
+    {
+        $orders = app(ErpOrderExportService::class)->selectedOrders($this->selectedSummaryOrderIds);
+        $this->resetValidation();
+        $this->erpExportOrderIds = $orders->pluck('id')->all();
+        $this->erpExportNote = '';
+        $this->erpExportDeliveryDate = '';
+        $this->showErpExportModal = true;
+    }
+
+    public function closeErpExport(): void
+    {
+        $this->showErpExportModal = false;
+        $this->erpExportOrderIds = [];
+        $this->erpExportNote = '';
+        $this->erpExportDeliveryDate = '';
+        $this->resetValidation();
+    }
+
+    public function exportErpOrders()
+    {
+        $export = app(ErpOrderExportService::class)->build($this->erpExportOrderIds, [
+            'erpExportNote' => $this->erpExportNote,
+            'erpExportDeliveryDate' => $this->erpExportDeliveryDate,
+        ]);
+        $download = Excel::download($export, 'ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx');
+        $this->closeErpExport();
+
+        return $download;
+    }
 
     public function boot(): void
     {
@@ -350,6 +400,7 @@ class SalesRepOrderSummary extends Component
         $summaries = $this->summaryLoaded
             ? $this->salesRepOrderSummaries
             : collect();
+        $salesReps = $this->salesRepOptions($summaries);
 
         return view('livewire.partner.sales-rep-order-summary', [
             'summarySeasons' => $this->summaryOptions(
@@ -374,7 +425,8 @@ class SalesRepOrderSummary extends Component
                 ])
                 ->filter(fn (array $option): bool => $option['code'] !== '')
                 ->unique('code')->sortBy('name')->values(),
-            'summarySalesReps' => $this->salesRepOptions($summaries),
+            'summarySalesReps' => $salesReps,
+            'summarySalesRepLabels' => $salesReps->pluck('name', 'code'),
         ]);
     }
 

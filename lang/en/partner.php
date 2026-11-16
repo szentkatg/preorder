@@ -2,6 +2,20 @@
 
 // lang/en/partner.php
 return [
+    'erp_export_selected' => 'ERP export of selected orders',
+    'erp_export_description' => ':count selected orders. The note and delivery date apply to all exported lines. SKU replacements affect the export only; the original orders remain unchanged.',
+    'erp_export_note' => 'Note (maximum 250 characters)',
+    'erp_export_delivery' => 'Requested delivery date',
+    'erp_export_cancel' => 'Cancel',
+    'erp_export_download' => 'Download ERP Excel',
+    'erp_export_note_max' => 'The note may contain at most 250 characters.',
+    'erp_export_date_required' => 'Enter the requested delivery date.',
+    'erp_export_date_invalid' => 'Enter a valid date (YYYY-MM-DD or YYYY.MM.DD).',
+    'erp_export_error_order' => 'Order :code is missing an ERP code, address code, document type or reference, or its partner/address link is inconsistent.',
+    'erp_export_error_sku' => 'Missing SKU or SKU from a different season: :code. No export was generated.',
+    'erp_export_error_cycle' => 'Circular SKU replacement: :code. Please correct the replacement rules.',
+    'erp_export_error_duplicate' => 'Multiple replacements exist for the same SKU and season. Please correct the replacement rules.',
+    'erp_export_error_quantity' => 'Export and reconciliation quantities do not match for order :code. No export was generated.',
     'login' => 'Login',
     'email' => 'Email address',
     'password' => 'Password',

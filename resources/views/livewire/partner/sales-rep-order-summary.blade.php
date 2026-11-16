@@ -33,6 +33,13 @@
                             {{ __('partner.excel_export') }}
                         </button>
 
+                        @if ($this->canExportErp)
+                            <button type="button" wire:click="openErpExport" wire:loading.attr="disabled"
+                                class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
+                                {{ __('partner.erp_export_selected') }}
+                            </button>
+                        @endif
+
                         <a
                             href="{{ route('partner.order-coverage', ['locale' => app()->getLocale()]) }}"
                             class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
@@ -150,6 +157,7 @@
                                 >
                             </th>
                             <th class="min-w-[150px] bg-white px-3 py-2">{{ __('partner.partner') }}</th>
+                            <th class="bg-white px-3 py-2">{{ __('partner.sales_representative') }}</th>
                             <th class="min-w-[200px] bg-white px-3 py-2">{{ __('partner.address') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.season') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.brand') }}</th>
@@ -185,6 +193,9 @@
                                 <td class="px-3 py-2 font-medium">
                                     {{ trim(($summary['partner_code'] ? $summary['partner_code'] . ' - ' : '') . $summary['partner_name']) }}
                                 </td>
+                                <td class="px-3 py-2" data-order-sales-representative>
+                                    {{ $summarySalesRepLabels->get($summary['sales_rep_erp_partner_code'] ?? '') ?? '—' }}
+                                </td>
                                 <td class="px-3 py-2">
                                     {{ collect([$summary['address_name'], $summary['address']])->filter()->implode(' - ') }}
                                 </td>
@@ -215,7 +226,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="15" class="px-3 py-6 text-center text-gray-500">
+                                <td colspan="16" class="px-3 py-6 text-center text-gray-500">
                                     {{ __('partner.no_orders') }}
                                 </td>
                             </tr>
@@ -226,7 +237,7 @@
                         @foreach ($this->filteredSalesRepOrderSummaries->groupBy('currency') as $currency => $rows)
                             <tr class="border-t bg-gray-50 font-semibold">
                                 <td></td>
-                                <td colspan="9" class="px-3 py-2">
+                                <td colspan="10" class="px-3 py-2">
                                     {{ __('partner.total') }} – {{ $currency }}
                                 </td>
                                 <td class="px-3 py-2 text-right">
@@ -262,4 +273,36 @@
             {{ __('partner.prepare') }}
         </div>
     </div>
+
+    @if ($showErpExportModal && $this->canExportErp)
+        <div class="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+            wire:key="erp-export-modal" x-on:keydown.escape.window="$wire.closeErpExport()">
+            <section role="dialog" aria-modal="true" aria-labelledby="erp-export-heading"
+                class="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+                <h2 id="erp-export-heading" class="text-lg font-semibold">{{ __('partner.erp_export_selected') }}</h2>
+                <p class="mt-2 text-sm text-gray-600">{{ __('partner.erp_export_description', ['count' => count($erpExportOrderIds)]) }}</p>
+                <form wire:submit="exportErpOrders" class="mt-4 space-y-4">
+                    <div>
+                        <label for="erp-export-note" class="block text-sm font-medium">{{ __('partner.erp_export_note') }}</label>
+                        <textarea id="erp-export-note" wire:model="erpExportNote" maxlength="250" rows="3"
+                            class="mt-1 w-full rounded border"></textarea>
+                        @error('erpExportNote') <p class="text-sm text-red-700">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label for="erp-export-delivery" class="block text-sm font-medium">{{ __('partner.erp_export_delivery') }}</label>
+                        <input id="erp-export-delivery" type="date" wire:model="erpExportDeliveryDate" required class="mt-1 w-full rounded border">
+                        @error('erpExportDeliveryDate') <p class="text-sm text-red-700">{{ $message }}</p> @enderror
+                    </div>
+                    @error('erpExport') <p role="alert" class="text-sm text-red-700">{{ $message }}</p> @enderror
+                    @error('selectedSummaryOrderIds') <p role="alert" class="text-sm text-red-700">{{ $message }}</p> @enderror
+                    <div class="flex justify-end gap-2">
+                        <button type="button" wire:click="closeErpExport" class="rounded border px-4 py-2">{{ __('partner.erp_export_cancel') }}</button>
+                        <button type="submit" wire:loading.attr="disabled" class="rounded bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+                            {{ __('partner.erp_export_download') }}
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    @endif
 </div>

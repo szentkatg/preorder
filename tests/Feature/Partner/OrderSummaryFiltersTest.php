@@ -98,6 +98,49 @@ class OrderSummaryFiltersTest extends TestCase
         return collect($keys)->map(fn ($key) => $this->orders[$key]->id)->sort()->values()->all();
     }
 
+    private function representativeCell($page, string $orderKey): string
+    {
+        $html = new \DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $html->loadHTML('<?xml encoding="UTF-8">'.$page->html());
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $xpath = new \DOMXPath($html);
+        $cells = $xpath->query('//tr[@*[name()="wire:key"]="summary-order-row-'.$this->orders[$orderKey]->id.'"]/td[@data-order-sales-representative]');
+        $this->assertSame(1, $cells->length);
+
+        return trim($cells->item(0)->textContent);
+    }
+
+    public function test_order_rows_display_the_partners_representative_and_handle_missing_names_and_assignments(): void
+    {
+        $this->partners['b']->update(['sales_rep_erp_partner_code' => 'REP-UNKNOWN']);
+        $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');
+
+        $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-draft'));
+        $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-submitted'));
+        $this->assertSame('REP-UNKNOWN', $this->representativeCell($page, 'b-draft'));
+        $this->assertSame('—', $this->representativeCell($page, 'c-empty'));
+        $page->assertDontSee('Tiltott képviselő')->assertDontSee('P000666');
+        $page->set('summarySalesRepCode', 'P000444');
+        $this->assertSame($this->expectedIds(['a-draft', 'a-submitted', 'a-editing']), $this->ids($page));
+        $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-draft'));
+    }
+
+    public function test_representative_column_uses_the_current_name_without_rebuilding_cached_order_totals(): void
+    {
+        Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');
+        Partner::where('erp_partner_code', 'P000444')->update(['name' => 'Frissített képviselő']);
+        $this->mock(SalesRepOrderSummaryService::class)->shouldNotReceive('build');
+        $page = Livewire::test(SalesRepOrderSummary::class)->set('summaryLoaded', true);
+
+        $this->assertSame('P000444 – Frissített képviselő', $this->representativeCell($page, 'a-draft'));
+        $this->assertCount(6, $this->ids($page));
+    }
+
     public function test_status_filter_supports_draft_submitted_and_legacy_editing_orders(): void
     {
         $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');
@@ -213,7 +256,9 @@ class OrderSummaryFiltersTest extends TestCase
     {
         foreach (['hu' => ['Minden rendelésstátusz', 'Minden területi képviselő'], 'en' => ['All order statuses', 'All sales representatives']] as $locale => [$status, $rep]) {
             session(['partner.locale' => $locale]);
-            Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')->assertSee($status)->assertSee($rep);
+            $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')->assertSee($status)->assertSee($rep)
+                ->assertSee('<th class="bg-white px-3 py-2">'.__('partner.sales_representative').'</th>', false);
+            $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-draft'));
         }
     }
 }
