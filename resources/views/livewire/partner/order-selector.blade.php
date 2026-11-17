@@ -27,7 +27,8 @@
                 <x-partner-season-banner :season="$this->selectedSeason" />
             </div>
 
-            <div class="flex items-center gap-2 justify-self-start md:justify-self-end">
+            <div class="flex flex-wrap items-center gap-2 justify-self-start md:justify-self-end">
+                <x-partner-language-selector />
                 <form method="POST" action="{{ route('partner.logout') }}">
                     @csrf
                     <button
@@ -89,102 +90,4 @@
 
     <livewire:partner.sales-rep-order-summary />
 
-    @if ($this->selectedOrder)
-        <div class="mt-4 rounded-lg border bg-white p-6 shadow-sm">
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-lg font-semibold">
-                        {{ __('partner.catalog_groups') }}
-                    </h2>
-
-                    <div class="mt-1 text-sm text-gray-600">
-                        {{ __('partner.status') }}:
-                        <strong>
-                            {{ $this->selectedOrder->isSubmitted()
-                                ? __('partner.status_submitted')
-                                : __('partner.status_draft') }}
-                        </strong>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    @if (! $this->selectedOrder->isSubmitted())
-                        <button
-                            type="button"
-                            wire:click="submitSelectedOrder"
-                            wire:confirm="{{ __('partner.confirm_submit_order') }}"
-                            class="rounded bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600"
-                        >
-                            {{ __('partner.submit_order') }}
-                        </button>
-                    @elseif ($this->isSalesRep)
-                        <button
-                            type="button"
-                            wire:click="resetSelectedOrderToDraft"
-                            wire:confirm="{{ __('partner.confirm_reset_order_to_draft') }}"
-                            class="rounded bg-yellow-600 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-500"
-                        >
-                            {{ __('partner.reset_order_to_draft') }}
-                        </button>
-                    @endif
-                </div>
-            </div>
-
-            @if ($this->catalogGroups->isEmpty())
-                <div class="text-sm text-gray-500">
-                    {{ __('partner.no_catalog_groups') }}
-                </div>
-            @else
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead>
-                            <tr class="text-left text-gray-700">
-                                <th class="px-3 py-2">{{ __('partner.catalog_group') }}</th>
-                                <th class="px-3 py-2 text-right">{{ __('partner.total_quantity') }}</th>
-                                <th class="whitespace-nowrap px-3 py-2 text-right">{{ __('partner.total_wholesale_value') }}</th>
-                                <th class="whitespace-nowrap px-3 py-2 text-right">{{ __('partner.total_retail_value') }}</th>
-                            </tr>
-                        </thead>
-
-                        <tbody class="divide-y divide-gray-100">
-                            @foreach ($this->catalogGroups as $group)
-                                <tr
-                                    wire:click="openCatalogGroup(@js($group['name']))"
-                                    class="cursor-pointer hover:bg-gray-50"
-                                >
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        {{ $group['name'] }}
-                                    </td>
-                                    <td class="px-3 py-2 text-right">
-                                        {{ number_format((int) $group['quantity'], 0, ',', ' ') }}
-                                    </td>
-                                    <td class="whitespace-nowrap px-3 py-2 text-right">
-                                        {{ number_format((float) $group['wholesale_value'], 0, ',', ' ') }}
-                                    </td>
-                                    <td class="whitespace-nowrap px-3 py-2 text-right">
-                                        {{ number_format((float) $group['retail_value'], 0, ',', ' ') }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-
-                        <tfoot>
-                            <tr class="border-t bg-gray-50 font-semibold">
-                                <td class="px-3 py-2">{{ __('partner.total') }}</td>
-                                <td class="px-3 py-2 text-right">
-                                    {{ number_format((int) $this->catalogGroups->sum('quantity'), 0, ',', ' ') }}
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-2 text-right">
-                                    {{ number_format((float) $this->catalogGroups->sum('wholesale_value'), 0, ',', ' ') }}
-                                </td>
-                                <td class="whitespace-nowrap px-3 py-2 text-right">
-                                    {{ number_format((float) $this->catalogGroups->sum('retail_value'), 0, ',', ' ') }}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @endif
 </div>

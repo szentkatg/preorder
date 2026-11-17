@@ -1,8 +1,6 @@
-        <p class="mt-1 text-sm text-red-600">
-            {{ __('partner.order_selection_description') }}
-        </p>
-
-    <div class="rounded-lg border bg-white p-6 shadow-sm">
+    <div data-order-selection-panel class="rounded-lg border border-sky-300 bg-sky-50 p-6 shadow-sm" style="background-color: #f0f9ff; border-color: #7dd3fc;">
+        <h2 class="mb-2 text-lg font-semibold text-sky-950">{{ __('partner.order_selection') }}</h2>
+        <p class="mb-4 text-sm text-sky-900">{{ __('partner.order_selection_description') }}</p>
         <div class="grid gap-4 md:grid-cols-6">
 
             {{-- 1. sor --}}
@@ -179,22 +177,25 @@
                     @error('orderTypeId')
                         <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
                     @enderror
+                    @if ($this->orderTypes->isEmpty())
+                        <p class="mt-1 text-sm text-red-700">{{ __('partner.no_allowed_order_types') }}</p>
+                    @endif
                 </div>
 
                 <div class="flex items-end justify-end md:col-span-2">
-                    @if ($this->canProceed)
+                    @if ($this->orderTypes->isNotEmpty())
                         <button
                             type="button"
+                            @if ($this->canProceed)
                             wire:click="proceed"
-                            class="whitespace-nowrap rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
-                        >
-                            {{ __('partner.create_order') }}
-                        </button>
-                    @else
-                        <button
-                            type="button"
+                            @else
                             disabled
-                            class="whitespace-nowrap rounded-lg bg-slate-300 px-5 py-2.5 text-sm font-semibold text-white"
+                            @endif
+                            @class([
+                                'whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold text-white',
+                                'bg-slate-900 shadow hover:bg-slate-800' => $this->canProceed,
+                                'bg-slate-300' => ! $this->canProceed,
+                            ])
                         >
                             {{ __('partner.create_order') }}
                         </button>

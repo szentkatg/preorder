@@ -61,6 +61,11 @@ class PartnerAddress extends Model
         return $this->belongsToMany(OrderSheetType::class, 'partner_address_order_sheet_type');
     }
 
+    public function orderTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(OrderType::class, 'partner_address_order_type');
+    }
+
     public static function exportColumns(): array
     {
         return [

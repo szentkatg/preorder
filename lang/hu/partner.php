@@ -2,6 +2,13 @@
 
 // lang/hu/partner.php
 return [
+    'portal_unavailable_title' => 'A partnerportál átmenetileg nem elérhető',
+    'portal_unavailable_default_message' => 'Kérjük, próbálkozz később.',
+    'portal_retry' => 'Újrapróbálás',
+    'no_allowed_order_types' => 'Ehhez a címhez nincs aktív rendeléstípus engedélyezve. Új rendeléshez kérj beállítást az adminisztrátortól.',
+    'back_to_orders' => 'Vissza a rendelésekhez',
+    'aggregated_data' => 'Összesített adatok',
+    'language_not_available' => 'Ez a nyelv nem választható.',
     'login_season_help' => 'A kiválasztott szezon minden menüpontban érvényes. Később a Szezonváltás gombbal módosíthatod, új bejelentkezés nélkül.',
     'select_season_to_continue' => 'Válassz elérhető szezont a folytatáshoz.',
     'change_season' => 'Szezonváltás',
@@ -142,7 +149,7 @@ return [
 
     // OrderSelector fordítása
 
-    'order_selection_description' => 'Válaszd ki a szezont, márkát, címet és rendelőlapot egy oldalon.',
+    'order_selection_description' => 'Válassz címet, márkát és rendelőlapot. Meglévő rendelést nyithatsz meg, vagy új rendelést hozhatsz létre a kiválasztott szezonra.',
     'order_selection' => 'Rendelés kiválasztása',
     'select_season' => 'Válassz szezont',
     'select_brand' => 'Válassz márkát',

@@ -25,13 +25,24 @@
         @endif
         <div>
             <label for="partner-season">{{ __('partner.season') }}</label>
-            <select id="partner-season" wire:model="seasonId" required class="w-full rounded border p-2">
+            <select
+                id="partner-season"
+                wire:model="seasonId"
+                required
+                title="{{ __('partner.select_season') }}"
+                aria-describedby="partner-season-help"
+                data-required-message="{{ __('partner.select_season_to_continue') }}"
+                oninvalid="this.setCustomValidity(this.value ? '' : this.dataset.requiredMessage)"
+                oninput="this.setCustomValidity('')"
+                onchange="this.setCustomValidity('')"
+                class="w-full rounded border p-2"
+            >
                 <option value="">{{ __('partner.select_season') }}</option>
                 @foreach ($seasons as $season)
                     <option value="{{ $season->id }}">{{ $season->code }} — {{ $season->name }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-sm text-slate-600">{{ __('partner.login_season_help') }}</p>
+            <p id="partner-season-help" class="mt-1 text-sm text-slate-600">{{ __('partner.login_season_help') }}</p>
             @error('seasonId') <div class="text-sm text-red-600">{{ $message }}</div> @enderror
             @if ($seasons->isEmpty()) <p class="text-sm text-red-600">{{ __('partner.no_available_seasons') }}</p> @endif
         </div>

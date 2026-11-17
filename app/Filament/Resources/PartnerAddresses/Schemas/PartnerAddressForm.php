@@ -86,6 +86,12 @@ class PartnerAddressForm
                     ->searchable()
                     ->preload(),
 
+                Select::make('orderTypes')->label('Engedélyezett rendeléstípusok')
+                    ->relationship('orderTypes', 'name', modifyQueryUsing: fn ($query) => $query->where('active', true))
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->code.' – '.$record->name)
+                    ->multiple()->searchable()->preload()
+                    ->helperText('Új partneroldali rendelés csak ezekkel a típusokkal készíthető. Üresen egyikkel sem. A meglévő rendelések elérhetősége nem változik.'),
+
                 Toggle::make('allow_assortment_ordering')
                     ->label('Gyűjtős rendelés engedélyezett')
                     ->default(true),

@@ -40,12 +40,14 @@
                             </button>
                         @endif
 
-                        <a
-                            href="{{ route('partner.order-coverage', ['locale' => app()->getLocale()]) }}"
-                            class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
-                        >
-                            {{ __('partner.partner_order_coverage') }}
-                        </a>
+                        @if ($this->canExportErp)
+                            <a
+                                href="{{ route('partner.order-coverage', ['locale' => app()->getLocale()]) }}"
+                                class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+                            >
+                                {{ __('partner.partner_order_coverage') }}
+                            </a>
+                        @endif
                     </div>
 
                     <button
@@ -77,12 +79,12 @@
             </div>
 
             <div x-show="open" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="summarySearch"
-                    placeholder="{{ __('partner.search') }}"
-                    class="rounded border"
-                >
+                <select wire:model.live="summarySalesRepCode" aria-label="{{ __('partner.sales_representative') }}" class="rounded border">
+                    <option value="">{{ __('partner.all_sales_representatives') }}</option>
+                    @foreach ($summarySalesReps as $representative)
+                        <option value="{{ $representative['code'] }}">{{ $representative['name'] }}</option>
+                    @endforeach
+                </select>
 
                 <select wire:model.live="summaryBrandId" class="rounded border">
                     <option value="">{{ __('partner.all_brands') }}</option>
@@ -118,12 +120,12 @@
                     @endforeach
                 </select>
 
-                <select wire:model.live="summarySalesRepCode" aria-label="{{ __('partner.sales_representative') }}" class="rounded border">
-                    <option value="">{{ __('partner.all_sales_representatives') }}</option>
-                    @foreach ($summarySalesReps as $representative)
-                        <option value="{{ $representative['code'] }}">{{ $representative['name'] }}</option>
-                    @endforeach
-                </select>
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="summarySearch"
+                    placeholder="{{ __('partner.search') }}"
+                    class="rounded border"
+                >
             </div>
         </div>
 

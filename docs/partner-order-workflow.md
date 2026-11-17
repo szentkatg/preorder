@@ -1,0 +1,108 @@
+# Partneroldali rendeléskezelés és címenkénti rendeléstípusok
+
+## Felület
+
+A rendelésválasztó világoskék, keretezett paneljén lehet címet, márkát,
+rendelőlapot és új rendelés adatait választani. Ez a rész vizuálisan elkülönül
+az alatta látható rendeléslistától. A szezon továbbra is a munkamenetben választott.
+
+A rendelésválasztó aljáról kikerült a kiválasztott rendelés katalóguscsoportos
+összesítése. A rendelőlap navigációja sorrendben:
+
+1. **Vissza a rendelésekhez** – rendelésválasztó.
+2. **Összesített adatok** – az adott rendelés külön összesítőoldala.
+3. Előző katalóguscsoport neve, ha van.
+4. Következő katalóguscsoport neve, ha van.
+
+Az összesítőoldal (`/partner/orders/{order}/overview`) tartalmazza a korábbi
+csoportonkénti mennyiségeket, nagyker-/kiskerértékeket és végösszegeket,
+a csoport megnyitását, a rendelés beküldését és a képviselői visszanyitást.
+Csak a kiválasztott szezonban és engedélyezett címre szóló rendelés nyitható meg;
+a hozzáférés visszavonását a további kéréseken is ellenőrizzük.
+
+A **Partner rendelés lefedettség** és az ERP-export gomb csak aktív területi
+képviselőnél jelenik meg. A visszanyitás a szerveren is képviselői művelet.
+A megosztott, belépés nélküli rendelőlap nem ad átjárást a belső rendeléslistához
+vagy összesítőoldalhoz; ott csak a csoportnavigáció marad.
+
+## Engedélyezett rendeléstípusok
+
+Az adminban a **Partner Addresses / Partnercímek** szerkesztésénél, illetve a
+partner adatlapjának címkezelőjében az **Engedélyezett rendeléstípusok** többválasztós
+mező állítható. A címek listája kódokkal is mutatja a hozzárendelést.
+
+Tárolás: `partner_address_order_type` kapcsolótábla, egyedi cím/típus párral.
+Csak a címhez rendelt, aktív `order_types` választhatók új rendeléskor, minden
+partneroldali szerepkörnél. A szerver is ellenőrzi az engedélyt. Üres lista
+esetén nincs új rendelés; a korábbi rendeléseket ettől még lehet olvasni/exportálni.
+
+Elsődleges alapérték a VRELO, ha engedélyezett; egyetlen más engedélyezett
+típus esetén azt választjuk. Több másik lehetőségnél választani kell.
+Címváltáskor az előző cím típusa nem maradhat jogosulatlanul kiválasztva.
+
+Migráció: `2026_11_16_150000_add_address_order_types_and_pool_suggestions`.
+A jóváhagyott induló beállítás szerint a migráció a már meglévő címekhez
+csak az aktív VRELO típust rendeli; az új címekhez
+nincs automatikus engedély. Rendelési adatot és más címbeállítást nem ír át.
+Az aktív VRELO hiánya esetén a migráció leáll, nem választ másik típust.
+
+A címek listájában és a partner adatlapjának címlistájában a kijelölt sorok
+csoportos művelete: **Rendeléstípusok frissítése a poolból**. Két módja van:
+minden kijelölt cím meglévő típusainak cseréje, vagy csak az üres beállítások
+kitöltése. Alapértelmezett a csere, amely külön jóváhagyást kér. Partner ERP-kód
+és címkód alapján párosít; azonos címkód más partnernél nem találat. A pool
+üres javaslata, hiányzó vagy inaktív/nem vevői forrás esetén kihagyja a címet,
+nem töröl engedélyt. Ismeretlen/inaktív típus, többértelmű forrás, megváltozott
+pillanatkép vagy kijelölés esetén semmit sem módosít. Csak a címtípus-kapcsolatok
+változnak, a rendelési és egyéb törzsadatok nem. A művelethez a címek
+megtekintési/módosítási és a partnerpool megtekintési/átvételi jogosultsága kell.
+Ugyanez az ERP-partnerpool csoportos műveletei között is elérhető: ilyenkor
+csak a kijelölt poolsorokhoz párosítható, már meglévő partnercímek frissülnek.
+Új cím vagy partner nem készül; a nem párosítható sorokat külön összesítjük.
+
+## ERP-partnerpool
+
+Új javaslatmező: `partnerpool.order_type_codes` (JSON-tömb).
+SQL-alias: `ordertypes`, szabványos JSON-tömbbel:
+
+```sql
+'["VRELO","VRBELO"]' AS [ordertypes],
+```
+
+A mellékelt `infrastructure/erp/partnerpool.sql` a `[U4 LIVE]` ERP
+`ols_warehouse` táblájából, `addrid` alapján képezi a javaslatot:
+`whtype & 2` → `["VRBELO"]`, `whtype & 8` → `["VRZELO"]`, találat nélkül
+`["VRELO"]`. A megadott `CASE`/`MIN` szabály szerint egy címhez egy típus kerül:
+ha mindkettő előfordul, a VRBELO az elsődleges. Az alkalmazás ettől függetlenül
+több típust is támogat a JSON-tömbben. A korábbi `both` bitmaszkjavítás, a
+teljes linked-server elérési utak és a `sp.delstat=0` védelem megmaradtak.
+Nem a rendelőlaptípus (`ordersheets`) mezőt
+kell módosítani: az attól független, továbbra is pl. T/S/B kódokat tartalmaz.
+
+Az admin átvételi ablak kód alapján előre kijelöli az aktív, párosítható
+rendeléstípusokat; mentés előtt módosíthatók. Üresen is átvehető a cím, de így
+új rendelés nem hozható létre rajta. Ismeretlen/inaktív kód figyelmeztetést ad, nem lesz belőle
+automatikus jogosultság. Meglévő címen semmit nem ír felül. Beszállítónál nincs
+partneroldali címtípus-engedélyezés.
+
+Régebbi SQL-lekérdezés új mező nélkül továbbra is beolvasható, ilyenkor a
+rendeléstípus-javaslat üres, és az adminnak kézzel kell választania. A Python
+szinkron továbbra is csak a poolt frissíti, nem rendel hozzá jogosultságot a törzshöz.
+
+Frissítési sorrend: alkalmazás és migráció NAS/teszt/tárhely célrendszeren,
+majd az SQL-szerveren a `sync_partnerpool.py` és `partnerpool.sql` frissítése a
+`C:\servio_work\preorder_partners` mappában. A konfigurációt, kulcsokat és mentett
+jelszavakat nem kell cserélni. Új Python-csomag nem szükséges.
+
+## Ellenőrzés
+
+`PartnerSeasonContextTest`: navigáció, összesítő, hozzáférés, képviselői gombok,
+tiltott rendeléstípus, címváltás, meglévő rendelések és migráció.
+`PartnerPoolTest`: javaslatok, kézi eltérítés, admin szerkesztés, hibák,
+meglévő címek változatlansága. `tests/Python/test_partnerpool_sync.py`: JSON-tömb,
+alias, korábbi lekérdezés, hibás értékek és tranzakciós publikálás.
+
+`PartnerPoolAddressOrderTypeUpdateTest`: mindkét listából indítható frissítés,
+csere és üres mód, visszavonás, megerősítés, jogosultságok, szűrt kijelölés több
+oldalon, kihagyott kijelölések, pontos címkódpárosítás, hiányzó/üres/inaktív forrás,
+hibás adatok teljes visszagörgetése és megváltozott pool/kijelölés tiltása.

@@ -255,6 +255,7 @@ return [
     */
 
     'custom_permissions' => [
+        'Update:PartnerPortalAvailability' => 'Partnerportál elérhetősége – Ki-/bekapcsolás és üzenet módosítása',
         'Import:PartnerPool' => 'ERP-partnerpool – Partner átvétele a törzsbe',
         'Publish:PricingProjectLifecycle' => 'Árprojekt életciklus – Lezárás és árak publikálása',
         'Reopen:PricingProjectLifecycle' => 'Árprojekt életciklus – Visszanyitás',

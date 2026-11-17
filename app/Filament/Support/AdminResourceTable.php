@@ -5,6 +5,7 @@ namespace App\Filament\Support;
 use App\Exports\AdminTableExport;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PricingCalculationRow;
 use App\Models\Translation;
@@ -221,6 +222,15 @@ class AdminResourceTable
                     ),
                     isIndividual: true,
                 );
+        }
+
+        if ($modelClass === PartnerAddress::class && $column->getName() === 'orderTypes.code') {
+            $column->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                DB::table('order_types')->selectRaw('MIN(order_types.code)')
+                    ->join('partner_address_order_type', 'partner_address_order_type.order_type_id', '=', 'order_types.id')
+                    ->whereColumn('partner_address_order_type.partner_address_id', 'partner_addresses.id'),
+                $direction,
+            ));
         }
 
         if ($modelClass === PartnerUser::class) {

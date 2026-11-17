@@ -2,6 +2,13 @@
 
 // lang/en/partner.php
 return [
+    'portal_unavailable_title' => 'The partner portal is temporarily unavailable',
+    'portal_unavailable_default_message' => 'Please try again later.',
+    'portal_retry' => 'Try again',
+    'no_allowed_order_types' => 'No active order types are allowed for this address. Contact an administrator to enable new orders.',
+    'back_to_orders' => 'Back to orders',
+    'aggregated_data' => 'Aggregated data',
+    'language_not_available' => 'This language is not available.',
     'login_season_help' => 'The selected season applies to every menu. Use Change season to switch later without signing in again.',
     'select_season_to_continue' => 'Select an available season to continue.',
     'change_season' => 'Change season',
@@ -142,7 +149,7 @@ return [
 
     // OrderSelector fordítása
 
-    'order_selection_description' => 'Please select season, brand, address and order type.',
+    'order_selection_description' => 'Select an address, brand and order sheet. Open an existing order or create a new order for the selected season.',
     'order_selection' => 'Order Selection',
     'select_season' => 'Select season',
     'select_brand' => 'Select brand',

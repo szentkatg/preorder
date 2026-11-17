@@ -1,13 +1,24 @@
 <div class="mx-auto max-w-lg px-4 py-8">
     <form wire:submit="selectSeason" class="space-y-4 rounded-xl border bg-white p-6 shadow-lg">
         <h1 class="text-2xl font-bold">{{ __('partner.change_season') }}</h1>
-        <p class="text-sm text-slate-600">{{ __('partner.change_season_help') }}</p>
+        <p id="selected-partner-season-help" class="text-sm text-slate-600">{{ __('partner.change_season_help') }}</p>
         @if (session('partner_season_notice'))
             <p role="status" class="text-sm text-amber-800">{{ session('partner_season_notice') }}</p>
         @endif
         <div>
             <label for="selected-partner-season" class="mb-1 block font-medium">{{ __('partner.season') }}</label>
-            <select id="selected-partner-season" wire:model="seasonId" required class="w-full rounded border p-2">
+            <select
+                id="selected-partner-season"
+                wire:model="seasonId"
+                required
+                title="{{ __('partner.select_season') }}"
+                aria-describedby="selected-partner-season-help"
+                data-required-message="{{ __('partner.select_season_to_continue') }}"
+                oninvalid="this.setCustomValidity(this.value ? '' : this.dataset.requiredMessage)"
+                oninput="this.setCustomValidity('')"
+                onchange="this.setCustomValidity('')"
+                class="w-full rounded border p-2"
+            >
                 <option value="">{{ __('partner.select_season') }}</option>
                 @foreach ($seasons as $season)
                     <option value="{{ $season->id }}">{{ $season->code }} — {{ $season->name }}</option>

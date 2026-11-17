@@ -26,6 +26,7 @@ SELECT
     cp.wsemail AS partner_email,
     pa.tel AS partner_phone,
     rep.ref1 AS sales_rep_erp_partner_code,
+    sp.type AS [type],
     1 AS partner_active,
     pa.addrid AS addrid,
     pa.name AS address_name,
@@ -52,7 +53,8 @@ SELECT
         WHEN cp.invlngid <> 'hu-HU' AND (sp.type & 58) > 0 AND spc.curid = 'EUR' THEN 'Wholesale_EU'
         WHEN cp.invlngid <> 'hu-HU' AND (sp.type & 4) > 0 AND spc.curid = 'EUR' THEN 'Distributor_EUR'
     END AS [pricelist],
-    tl.address_types AS [address type]
+    tl.address_types AS [address type],
+    ISNULL('["' + STRING_ESCAPE(types.ordertype, 'json') + '"]', '["VRELO"]') AS [ordertypes]
 FROM [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_partner] sp
 LEFT JOIN #addresses pa ON pa.partnid = sp.partnid
 LEFT JOIN [U4 LIVE].[HTO_ERP_LIVE].[dbo].[olc_partner] cp ON cp.partnid = sp.partnid
@@ -66,6 +68,18 @@ LEFT JOIN (
         ON (address_flags.type & t.value) = t.value AND t.typegrpid = 2 AND t.delstat = 0
     GROUP BY address_flags.type
 ) tl ON pa.type = tl.type
+LEFT JOIN (
+    -- Preserve the supplied single-type priority: shop before consignment.
+    -- MIN also keeps multiple warehouses from duplicating a partner/address row.
+    SELECT wh.addrid,
+        MIN(CASE
+            WHEN (wh.whtype & 2) > 0 THEN 'VRBELO'
+            WHEN (wh.whtype & 8) > 0 THEN 'VRZELO'
+        END) AS ordertype
+    FROM [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_warehouse] wh
+    WHERE (wh.whtype & 2) > 0 OR (wh.whtype & 8) > 0
+    GROUP BY wh.addrid
+) types ON types.addrid = pa.addrid
 WHERE (sp.type & 126) > 0 AND sp.delstat = 0;
 
 -- If countryid is an internal ID, resolve it to an ISO alpha-2 code above,

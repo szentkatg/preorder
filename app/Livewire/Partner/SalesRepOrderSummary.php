@@ -202,6 +202,19 @@ class SalesRepOrderSummary extends Component
         $this->loadSummary();
     }
 
+    #[On('partner-interface-language-changed')]
+    public function refreshInterfaceLanguage(?string $locale = null): void
+    {
+        // The session is authoritative; the event payload cannot select a language.
+        app()->setLocale((string) session('partner.locale', 'hu'));
+        if ($this->summaryLoaded) {
+            $this->accessibleOrdersCache = null;
+            $this->salesRepOrderSummariesCache = null;
+            $this->filteredSummariesCache = null;
+            $this->loadSummary();
+        }
+    }
+
     public function getSalesRepOrderSummariesProperty(): Collection
     {
         if ($this->salesRepOrderSummariesCache instanceof Collection) {

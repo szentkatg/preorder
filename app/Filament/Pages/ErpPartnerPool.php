@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Support\Actions\UpdateAddressOrderTypesFromPoolAction;
 use App\Filament\Support\Actions\UpdatePartnerPoolSalesRepresentativesAction;
 use App\Filament\Support\AdminResourceTable;
 use App\Filament\Support\Concerns\HasPricingColumnPreferences;
@@ -9,6 +10,7 @@ use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\OrderSheetType;
+use App\Models\OrderType;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerPool;
@@ -105,6 +107,7 @@ class ErpPartnerPool extends Page implements HasTable
                 TextColumn::make('language_code')->label('Javasolt nyelv')->placeholder('Nincs megadva'),
                 TextColumn::make('brand_codes')->label('Javasolt márkák')->placeholder('Nincs megadva'),
                 TextColumn::make('order_sheet_type_codes')->label('Javasolt rendelőlaptípusok')->placeholder('Nincs megadva'),
+                TextColumn::make('order_type_codes')->label('Javasolt rendeléstípusok')->placeholder('Nincs megadva'),
                 IconColumn::make('is_default')->label('Alapcím')->boolean()->sortable(),
                 IconColumn::make('partner_active')->label('Partner aktív')->boolean()->sortable(),
                 IconColumn::make('address_active')->label('Cím aktív')->boolean()->sortable(),
@@ -121,7 +124,10 @@ class ErpPartnerPool extends Page implements HasTable
             ->recordActions([$this->importAction()])
             ->recordActionsPosition(RecordActionsPosition::BeforeColumns)
             ->recordActionsColumnLabel('Átvétel')
-            ->toolbarActions([BulkActionGroup::make([UpdatePartnerPoolSalesRepresentativesAction::make()])])
+            ->toolbarActions([BulkActionGroup::make([
+                UpdatePartnerPoolSalesRepresentativesAction::make(),
+                UpdateAddressOrderTypesFromPoolAction::make(fromPool: true),
+            ])])
             ->reorderableColumns()
             ->headerActions([Action::make('refreshPool')->label('Lista frissítése')->icon('heroicon-o-arrow-path')
                 ->action(function (): void {
@@ -190,6 +196,9 @@ class ErpPartnerPool extends Page implements HasTable
                         ->searchable()->required($customer),
                     Select::make('order_sheet_type_ids')->label('Engedélyezett rendelőlaptípusok')->multiple()
                         ->options(fn () => OrderSheetType::where('active', true)->orderBy('name')->pluck('name', 'id'))->searchable()->required($customer),
+                    Select::make('order_type_ids')->label('Engedélyezett rendeléstípusok')->multiple()
+                        ->options(fn () => OrderType::where('active', true)->orderBy('code')->get()->mapWithKeys(fn ($type) => [$type->id => $type->code.' – '.$type->name]))
+                        ->searchable()->helperText('Üresen a címhez nem lehet új partneroldali rendelést létrehozni.'),
                     Toggle::make('allow_assortment_ordering')->label('Gyűjtős rendelés engedélyezett')->default(false),
                 ]),
             ])

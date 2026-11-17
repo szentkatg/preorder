@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PartnerAddresses\Tables;
 
+use App\Filament\Support\Actions\UpdateAddressOrderTypesFromPoolAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -41,6 +42,8 @@ class PartnerAddressesTable
                 TextColumn::make('language.code')
                     ->label('Nyelv'),
 
+                TextColumn::make('orderTypes.code')->label('Engedélyezett rendeléstípusok')->badge()->placeholder('Nincs engedélyezve'),
+
                 IconColumn::make('allow_assortment_ordering')
                     ->label('GY')
                     ->boolean(),
@@ -56,6 +59,7 @@ class PartnerAddressesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    UpdateAddressOrderTypesFromPoolAction::make(),
                     DeleteBulkAction::make(),
                 ]),
             ]);

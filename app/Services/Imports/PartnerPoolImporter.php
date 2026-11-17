@@ -6,6 +6,7 @@ use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\OrderSheetType;
+use App\Models\OrderType;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerPool;
@@ -50,6 +51,7 @@ class PartnerPoolImporter
         $languages = $ids(Language::class, filled($row->language_code) ? [$row->language_code] : [], 'Nyelv');
         $brands = $ids(Brand::class, $row->brand_codes ?? [], 'Márka');
         $sheets = $ids(OrderSheetType::class, $row->order_sheet_type_codes ?? [], 'Rendelőlaptípus');
+        $types = $ids(OrderType::class, $row->order_type_codes ?? [], 'Rendeléstípus');
 
         return [
             'target_type' => $type,
@@ -57,7 +59,7 @@ class PartnerPoolImporter
             'price_list_id' => $priceLists[0] ?? null,
             'currency_id' => $currencies[0] ?? null,
             'language_id' => $languages[0] ?? null,
-            'brand_ids' => $brands, 'order_sheet_type_ids' => $sheets, 'allow_assortment_ordering' => false,
+            'brand_ids' => $brands, 'order_sheet_type_ids' => $sheets, 'order_type_ids' => $types, 'allow_assortment_ordering' => false,
             'suggestion_notice' => $missing === [] ? null : 'Nem párosítható (hiányzó, inaktív vagy nem egyértelmű) ERP-javaslatok: '
                 .implode('; ', $missing).'. Válaszd ki a megfelelő törzsadatokat kézzel.',
         ];
@@ -102,6 +104,7 @@ class PartnerPoolImporter
                     'language_id' => ['required', 'integer', Rule::exists('languages', 'id')->where('active', true)],
                     'brand_ids' => ['required', 'array', 'min:1'], 'brand_ids.*' => ['integer', 'distinct', Rule::exists('brands', 'id')->where('active', true)],
                     'order_sheet_type_ids' => ['required', 'array', 'min:1'], 'order_sheet_type_ids.*' => ['integer', 'distinct', Rule::exists('order_sheet_types', 'id')->where('active', true)],
+                    'order_type_ids' => ['present', 'array'], 'order_type_ids.*' => ['integer', 'distinct', Rule::exists('order_types', 'id')->where('active', true)],
                     'allow_assortment_ordering' => ['required', 'boolean'],
                 ];
             }
@@ -149,6 +152,7 @@ class PartnerPoolImporter
                         'language_id' => $data['language_id'], 'allow_assortment_ordering' => $data['allow_assortment_ordering'], 'active' => true]);
                     $address->brands()->sync($data['brand_ids']);
                     $address->orderSheetTypes()->sync($data['order_sheet_type_ids']);
+                    $address->orderTypes()->sync($data['order_type_ids']);
                     $created[] = 'address';
                 }
             }

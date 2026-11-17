@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsurePartnerPortalIsAvailable;
 use App\Http\Middleware\RequirePartnerSeason;
 use App\Http\Middleware\SetPartnerLocale;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,8 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'partner.locale' => SetPartnerLocale::class,
+            'partner.available' => EnsurePartnerPortalIsAvailable::class,
             'partner.season' => RequirePartnerSeason::class,
         ]);
+        // Closed portal links should show the notice before auth redirects or
+        // route-model binding, while still resolving the visitor's language.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, SetPartnerLocale::class);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsurePartnerPortalIsAvailable::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

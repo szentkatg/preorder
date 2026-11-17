@@ -98,23 +98,26 @@ class FakeDatabase:
 class NormalizeTests(unittest.TestCase):
     def test_user_query_aliases_json_lists_and_informational_address_type(self):
         row = normalized([source_row(Language="hu", Currency="huf", pricelist="Wholesale_HU",
-            brands='["HT", " DV ", "ht"]', ordersheets='["T", "S", "B"]', **{"address type": "Számlázási,Szállítási"})])[0]
+            brands='["HT", " DV ", "ht"]', ordersheets='["T", "S", "B"]', ordertypes='["VRELO", " VRBELO ", "vrelo"]', **{"address type": "Számlázási,Szállítási"})])[0]
         self.assertEqual(row["language_code"], "HU")
         self.assertEqual(row["currency_code"], "HUF")
         self.assertEqual(row["price_list_code"], "Wholesale_HU")
         self.assertEqual(json.loads(row["brand_codes"]), ["HT", "DV"])
         self.assertEqual(json.loads(row["order_sheet_type_codes"]), ["T", "S", "B"])
+        self.assertEqual(json.loads(row["order_type_codes"]), ["VRELO", "VRBELO"])
         self.assertEqual(row["address_type"], "Számlázási,Szállítási")
 
     def test_previous_query_without_suggestions_remains_supported(self):
         row = normalized()[0]
         self.assertEqual(row["brand_codes"], "[]")
         self.assertEqual(row["order_sheet_type_codes"], "[]")
+        self.assertEqual(row["order_type_codes"], "[]")
         self.assertIsNone(row["address_type"])
 
     def test_invalid_or_ambiguous_suggestions_are_rejected_without_logging_values(self):
         invalid = [source_row(brands='not-json'), source_row(brands='{"HT":true}'), source_row(brands='[1]'),
-            source_row(ordersheets='[""]'), source_row(brands=json.dumps(["X" * 101])),
+            source_row(ordersheets='[""]'), source_row(ordertypes='[1]'), source_row(ordertypes='not-json'),
+            source_row(ordertypes='["VRELO"]', order_type_codes='["TSHARE"]'), source_row(brands=json.dumps(["X" * 101])),
             source_row(brands=json.dumps([str(i) for i in range(201)])),
             source_row(Language="HU", language_code="EN"), source_row(**{"address type": "X" * 4001})]
         for row in invalid:
@@ -305,6 +308,27 @@ class DriverAndCliTests(unittest.TestCase):
         self.assertIn("FROM [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_employee] em", sql)
         self.assertIn("ORDER BY em.empid", sql)
         self.assertIn("INNER JOIN [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_typeline] t", sql)
+        self.assertIn("WHEN (sp.type & 62) > 0 AND (sp.type & 64) > 0 THEN 'both'", sql)
+        self.assertIn("AND sp.delstat = 0", sql)
+
+    def test_sql_uses_address_warehouse_type_priority_and_vrelo_json_fallback(self):
+        sql = (ROOT / "infrastructure/erp/partnerpool.sql").read_text(encoding="utf-8")
+        self.assertIn("FROM [U4 LIVE].[HTO_ERP_LIVE].[dbo].[ols_warehouse] wh", sql)
+        self.assertIn("MIN(CASE", sql)
+        self.assertIn("WHEN (wh.whtype & 2) > 0 THEN 'VRBELO'", sql)
+        self.assertIn("WHEN (wh.whtype & 8) > 0 THEN 'VRZELO'", sql)
+        self.assertLess(sql.index("THEN 'VRBELO'"), sql.index("THEN 'VRZELO'"))
+        self.assertIn("GROUP BY wh.addrid", sql)
+        self.assertIn(") types ON types.addrid = pa.addrid", sql)
+        self.assertIn("ISNULL('[\"' + STRING_ESCAPE(types.ordertype, 'json') + '\"]', '[\"VRELO\"]') AS [ordertypes]", sql)
+
+    def test_warehouse_order_type_suggestions_can_differ_between_addresses_of_one_partner(self):
+        rows = normalized([source_row(addrid=f"0000{i}", ordertypes=json.dumps([code]), type=126)
+                           for i, code in enumerate(["VRELO", "VRBELO", "VRZELO"], 1)])
+        self.assertEqual([["VRELO"], ["VRBELO"], ["VRZELO"]],
+                         [json.loads(row["order_type_codes"]) for row in rows])
+        self.assertEqual(["00001", "00002", "00003"], [row["addrid"] for row in rows])
+        self.assertTrue(all("type" not in row for row in rows))
 
 
 if __name__ == "__main__":

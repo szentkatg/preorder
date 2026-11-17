@@ -4,11 +4,13 @@ namespace Tests\Feature\Admin;
 
 use App\Exports\AdminTableExport;
 use App\Filament\Pages\ErpPartnerPool;
-use App\Models\Brand;
+use App\Filament\Resources\PartnerAddresses\Pages\EditPartnerAddress;
 use App\Models\AdminUiPreference;
+use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\OrderSheetType;
+use App\Models\OrderType;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerPool;
@@ -21,8 +23,8 @@ use Filament\Facades\Filament;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -54,7 +56,7 @@ class PartnerPoolTest extends TestCase
         $sheet = OrderSheetType::create(['code' => 'B', 'name' => 'Táska', 'active' => true]);
         $this->input = ['target_type' => 'customer', 'country' => 'hu', 'price_list_id' => $list->id,
             'currency_id' => $currency->id, 'language_id' => $language->id, 'brand_ids' => [$brand->id],
-            'order_sheet_type_ids' => [$sheet->id], 'allow_assortment_ordering' => false];
+            'order_sheet_type_ids' => [$sheet->id], 'order_type_ids' => [OrderType::where('code', 'VRELO')->value('id')], 'allow_assortment_ordering' => false];
     }
 
     private function row(array $attributes = []): PartnerPool
@@ -65,7 +67,7 @@ class PartnerPoolTest extends TestCase
             'sales_rep_erp_partner_code' => 'P000444', 'addrid' => '000123', 'address_name' => 'ERP üzlet', 'country' => 'HU',
             'zip' => '0123', 'city' => 'Budapest', 'street' => 'Minta utca 1.', 'contact_name' => 'Kapcsolattartó',
             'address_email' => 'bolt@example.invalid', 'address_phone' => '006789', 'address_active' => true,
-            'is_default' => true, 'source_extracted_at' => now()], $attributes));
+            'is_default' => true, 'order_type_codes' => ['VRELO'], 'source_extracted_at' => now()], $attributes));
     }
 
     private function import(PartnerPool $row, array $override = []): array
@@ -204,6 +206,51 @@ class PartnerPoolTest extends TestCase
         $this->assertSame(['partner', 'address'], $this->import($row)['created']);
     }
 
+    public function test_order_type_suggestions_are_prefilled_editable_and_saved_only_for_the_new_address(): void
+    {
+        $retail = OrderType::where('code', 'VRBELO')->firstOrFail();
+        $normal = OrderType::where('code', 'VRELO')->firstOrFail();
+        $row = $this->row(['order_type_codes' => ['vrelo', 'VRBELO']]);
+        $page = Livewire::test(ErpPartnerPool::class)->mountTableAction('importPartner', $row)
+            ->assertTableActionDataSet(['order_type_ids' => [$normal->id, $retail->id]]);
+        $this->assertDatabaseCount('partner_addresses', 0);
+        $page->set('mountedActions.0.data.target_type', 'customer')
+            ->set('mountedActions.0.data.price_list_id', $this->input['price_list_id'])
+            ->set('mountedActions.0.data.currency_id', $this->input['currency_id'])
+            ->set('mountedActions.0.data.language_id', $this->input['language_id'])
+            ->set('mountedActions.0.data.brand_ids', $this->input['brand_ids'])
+            ->set('mountedActions.0.data.order_sheet_type_ids', $this->input['order_sheet_type_ids'])
+            ->set('mountedActions.0.data.order_type_ids', [$retail->id])->callMountedTableAction()->assertHasNoTableActionErrors();
+        $address = PartnerAddress::firstOrFail();
+        $this->assertSame([$retail->id], $address->orderTypes()->pluck('order_types.id')->all());
+        $this->import($row, ['order_type_ids' => [$normal->id]]);
+        $this->assertSame([$retail->id], $address->orderTypes()->pluck('order_types.id')->all());
+        Livewire::test(EditPartnerAddress::class, ['record' => $address->id])->fillForm(['orderTypes' => [$normal->id, $retail->id]])
+            ->call('save')->assertHasNoFormErrors();
+        $this->assertEqualsCanonicalizing([$normal->id, $retail->id], $address->orderTypes()->pluck('order_types.id')->all());
+    }
+
+    public function test_unknown_inactive_or_missing_order_types_cannot_silently_grant_permissions(): void
+    {
+        OrderType::where('code', 'TSHARE')->update(['active' => false]);
+        $row = $this->row(['order_type_codes' => ['VRELO', 'TSHARE', 'UNKNOWN']]);
+        $defaults = app(PartnerPoolImporter::class)->defaults($row, 'customer');
+        $this->assertSame($this->input['order_type_ids'], $defaults['order_type_ids']);
+        $this->assertStringContainsString('Rendeléstípus: TSHARE', $defaults['suggestion_notice']);
+        $this->assertStringContainsString('Rendeléstípus: UNKNOWN', $defaults['suggestion_notice']);
+        foreach ([[99999], [OrderType::where('code', 'TSHARE')->value('id')]] as $ids) {
+            try {
+                $this->import($row, ['order_type_ids' => $ids]);
+                $this->fail('Invalid order type permission was imported.');
+            } catch (ValidationException) {
+                $this->assertDatabaseCount('partner_addresses', 0);
+            }
+        }
+        $this->assertSame([], app(PartnerPoolImporter::class)->defaults($this->row(['addrid' => 'OTHER', 'order_type_codes' => null]), 'customer')['order_type_ids']);
+        $result = $this->import($row, ['order_type_ids' => []]);
+        $this->assertCount(0, PartnerAddress::findOrFail($result['address_id'])->orderTypes);
+    }
+
     public function test_import_action_is_first_and_layout_preferences_survive_reentry_per_user(): void
     {
         $this->row(['address_type' => 'Szállítási', 'brand_codes' => ['HT'], 'order_sheet_type_codes' => ['B']]);
@@ -216,7 +263,9 @@ class PartnerPoolTest extends TestCase
         $this->assertTrue($table->hasAction('exportExcel'));
         $columns = array_reverse($page->instance()->tableColumns);
         foreach ($columns as &$column) {
-            if ($column['name'] === 'address_type') $column['isToggled'] = false;
+            if ($column['name'] === 'address_type') {
+                $column['isToggled'] = false;
+            }
         }
         unset($column);
         $widths = ['erp-partner-code' => 130, 'partner-name' => 220];
@@ -228,8 +277,10 @@ class PartnerPoolTest extends TestCase
         $this->assertSame(array_column($columns, 'name'), array_column($fresh->instance()->tableColumns, 'name'));
         $this->assertTrue($fresh->instance()->isTableColumnToggledHidden('address_type'));
         $this->assertNotNull(AdminUiPreference::where('user_id', auth()->id())->where('preference_key', 'erp_partner_pool_column_widths')->first());
-        $user = User::factory()->create(); $user->assignRole(Role::findOrCreate('super_admin', 'web'));
-        $this->actingAs($user); session()->flush();
+        $user = User::factory()->create();
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($user);
+        session()->flush();
         Livewire::test(ErpPartnerPool::class)->assertSet('pricingColumnWidths', []);
     }
 

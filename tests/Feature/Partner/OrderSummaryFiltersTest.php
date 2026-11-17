@@ -262,4 +262,14 @@ class OrderSummaryFiltersTest extends TestCase
             $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-draft'));
         }
     }
+
+    public function test_representative_filter_and_partner_search_have_swapped_positions(): void
+    {
+        $html = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')->html();
+        preg_match_all('/wire:model\.live(?:\.debounce\.300ms)?="(summary[^"]+)"/', $html, $matches);
+        $this->assertSame([
+            'summarySalesRepCode', 'summaryBrandId', 'summaryOrderSheetTypeId',
+            'summaryCurrency', 'summaryFilledFilter', 'summaryStatus', 'summarySearch',
+        ], $matches[1]);
+    }
 }

@@ -36,9 +36,9 @@ TEXT_FIELDS = {
     "contact_name": 255, "address_email": 512, "address_phone": 255,
     "currency_code": 3, "language_code": 10, "price_list_code": 100, "address_type": 4000,
 }
-CODE_LIST_FIELDS = ("brand_codes", "order_sheet_type_codes")
+CODE_LIST_FIELDS = ("brand_codes", "order_sheet_type_codes", "order_type_codes")
 FIELD_ALIASES = {"language": "language_code", "currency": "currency_code", "pricelist": "price_list_code",
-                 "brands": "brand_codes", "ordersheets": "order_sheet_type_codes", "address type": "address_type"}
+                 "brands": "brand_codes", "ordersheets": "order_sheet_type_codes", "ordertypes": "order_type_codes", "address type": "address_type"}
 BOOL_FIELDS = ("partner_active", "address_active", "is_default")
 OPTIONAL = {"currency_code", "language_code", "price_list_code", "address_type"}
 REQUIRED_COLUMNS = (set(TEXT_FIELDS) - OPTIONAL) | {"partner_active", "address_active"}

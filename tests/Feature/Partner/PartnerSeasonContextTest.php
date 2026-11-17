@@ -5,6 +5,7 @@ namespace Tests\Feature\Partner;
 use App\Livewire\Partner\Auth\Login;
 use App\Livewire\Partner\CatalogGroupOrder;
 use App\Livewire\Partner\Dashboard;
+use App\Livewire\Partner\OrderOverview;
 use App\Livewire\Partner\OrderSelector;
 use App\Livewire\Partner\PartnerOrderCoverage;
 use App\Livewire\Partner\SalesRepOrderSummary;
@@ -33,6 +34,8 @@ use App\Models\Translation;
 use App\Services\Partner\ErpOrderExportService;
 use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -82,6 +85,7 @@ class PartnerSeasonContextTest extends TestCase
         $address->brands()->attach($this->brand);
         $address->orderSheetTypes()->attach($this->type);
         $document = OrderType::firstOrCreate(['code' => 'VRELO'], ['name' => 'Előrendelés', 'active' => true]);
+        $address->orderTypes()->attach($document);
         $this->user = PartnerUser::create(['partner_id' => $partner->id, 'name' => 'User', 'email' => 'season@example.test',
             'password' => 'password', 'role' => 'sales_rep', 'active' => true]);
         $this->user->partners()->attach($partner);
@@ -110,6 +114,44 @@ class PartnerSeasonContextTest extends TestCase
         auth('partner')->logout();
         Livewire::test(Login::class)->assertSee('Selected winter')->assertSee('Other summer')
             ->assertDontSee('Unpublished next season')->assertSet('seasonId', null);
+    }
+
+    public function test_login_season_tooltip_and_validation_follow_language_changes_without_resetting_selection(): void
+    {
+        auth('partner')->logout();
+        $huId = Language::where('code', 'HU')->value('id');
+        $page = Livewire::test(Login::class)->set('seasonId', $this->season->id);
+        foreach ([[$this->english->id, 'Select season', 'Select an available season to continue.'],
+            [$huId, 'Válassz szezont', 'Válassz elérhető szezont a folytatáshoz.']] as [$languageId, $title, $message]) {
+            $page->set('languageId', $languageId)->assertSet('seasonId', $this->season->id)
+                ->assertSeeHtml('title="'.$title.'"')->assertSeeHtml('data-required-message="'.$message.'"')
+                ->assertSeeHtml('oninvalid="this.setCustomValidity(this.value ? \'\' : this.dataset.requiredMessage)"')
+                ->assertSeeHtml('oninput="this.setCustomValidity(\'\')"')->assertSeeHtml('onchange="this.setCustomValidity(\'\')"');
+            $page->set('seasonId', null)->set('email', $this->user->email)->set('password', 'password')->call('login')
+                ->assertHasErrors('seasonId')->assertSee($message)->set('seasonId', $this->season->id);
+            $this->assertGuest('partner');
+        }
+    }
+
+    #[DataProvider('tooltipLanguages')]
+    public function test_authenticated_season_selection_uses_the_selected_language_for_tooltips(string $locale, string $title, string $message): void
+    {
+        $languageId = Language::where('code', strtoupper($locale))->value('id');
+        session(['partner.locale' => $locale, 'partner.language_id' => $languageId]);
+        Livewire::test(SeasonSelector::class)->assertSeeHtml('title="'.$title.'"')
+            ->assertSeeHtml('data-required-message="'.$message.'"')
+            ->assertSeeHtml('oninvalid="this.setCustomValidity(this.value ? \'\' : this.dataset.requiredMessage)"')
+            ->assertSeeHtml('oninput="this.setCustomValidity(\'\')"')->assertSeeHtml('onchange="this.setCustomValidity(\'\')"')
+            ->set('seasonId', null)->call('selectSeason')->assertHasErrors('seasonId')->assertSee($message);
+        $this->assertSame($this->season->id, session(PartnerSeasonContext::SESSION_KEY));
+    }
+
+    public static function tooltipLanguages(): array
+    {
+        return [
+            'Hungarian' => ['hu', 'Válassz szezont', 'Válassz elérhető szezont a folytatáshoz.'],
+            'English' => ['en', 'Select season', 'Select an available season to continue.'],
+        ];
     }
 
     public function test_login_sets_session_season_and_language_and_discards_previous_order_filters(): void
@@ -341,5 +383,236 @@ class PartnerSeasonContextTest extends TestCase
             'snapshot' => $snapshot, 'updates' => [], 'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
         ]]])->assertRedirect(route('partner.seasons.select'));
         $this->assertAuthenticatedAs($this->user, 'partner');
+    }
+
+    public static function languageSelectorPages(): array
+    {
+        return [[OrderSelector::class], [CatalogGroupOrder::class], [SharedCatalogGroupOrder::class]];
+    }
+
+    #[DataProvider('languageSelectorPages')]
+    public function test_header_language_switch_preserves_the_season_order_and_business_data(string $component): void
+    {
+        $order = $this->orders[$this->season->id];
+        session(['partner_order_selector.season_id' => $this->season->id,
+            'partner_order_selector.partner_address_id' => $order->partner_address_id,
+            'partner_order_selector.brand_id' => $order->brand_id,
+            'partner_order_selector.order_sheet_type_id' => $order->order_sheet_type_id,
+            'partner_order_selector.order_id' => $order->id]);
+        Translation::create(['entity' => 'brand', 'entity_code' => $this->brand->code, 'field' => 'name', 'language_id' => $this->english->id, 'value' => 'English brand']);
+        Translation::create(['entity' => 'order_sheet_type', 'entity_code' => $this->type->code, 'field' => 'name', 'language_id' => $this->english->id, 'value' => 'English bags']);
+        $params = $component === OrderSelector::class ? [] : ['order' => $order, 'catalogGroupName' => 'Bags'];
+        if ($component === SharedCatalogGroupOrder::class) {
+            $link = OrderShareLink::create(['order_id' => $order->id, 'token' => str_repeat('d', 64),
+                'price_list_id' => $order->price_list_id, 'expires_at' => now()->addDay(), 'created_by_partner_user_id' => $this->user->id]);
+            $params = ['shareLink' => $link, 'catalogGroupName' => 'Bags'];
+            auth('partner')->logout();
+            session()->forget(PartnerSeasonContext::SESSION_KEY);
+        }
+        $beforeOrders = Order::orderBy('id')->get()->toArray();
+        $beforeItems = OrderItem::orderBy('id')->get()->toArray();
+        $huId = Language::where('code', 'HU')->value('id');
+        $page = Livewire::test($component, $params)->assertSuccessful()->assertSet('interfaceLanguageId', $huId)
+            ->assertSeeHtml('wire:model.live="interfaceLanguageId"');
+        if ($component === OrderSelector::class) {
+            $page->set('referenceNumber', 'UNSAVED-REFERENCE');
+        }
+        $page->set('interfaceLanguageId', $this->english->id)->assertHasNoErrors()->assertSee('Language')
+            ->assertSee('English brand')->assertSee('English bags')
+            ->assertDispatched('partner-interface-language-changed', locale: 'en');
+        $this->assertSame('en', session('partner.locale'));
+        $this->assertSame($this->english->id, session('partner.language_id'));
+        $this->assertSame('en', Cookie::queued('partner_locale')->getValue());
+        $this->assertSame($component === SharedCatalogGroupOrder::class ? null : $this->season->id, session(PartnerSeasonContext::SESSION_KEY));
+        if ($component === OrderSelector::class) {
+            $page->assertSet('selectedOrderId', $order->id)->assertSet('referenceNumber', 'UNSAVED-REFERENCE');
+        } else {
+            $page->assertSet('order.id', $order->id);
+        }
+        $page->set('interfaceLanguageId', $huId)->assertHasNoErrors()->assertSee('Nyelv');
+        $this->assertSame($beforeOrders, Order::orderBy('id')->get()->toArray());
+        $this->assertSame($beforeItems, OrderItem::orderBy('id')->get()->toArray());
+    }
+
+    public function test_header_language_options_exclude_inactive_and_unsupported_languages(): void
+    {
+        $inactive = Language::create(['code' => 'SK', 'name' => 'Inactive', 'active' => false]);
+        $unsupported = Language::create(['code' => 'FR', 'name' => 'Unsupported', 'active' => true]);
+        $page = Livewire::test(OrderSelector::class);
+        $this->assertSame(['HU', 'EN'], $page->instance()->interfaceLanguages->pluck('code')->all());
+        foreach ([null, 99999, $inactive->id, $unsupported->id] as $id) {
+            $page->set('interfaceLanguageId', $id)->assertHasErrors('interfaceLanguageId');
+            $this->assertSame('hu', session('partner.locale'));
+            $this->assertSame($this->season->id, session(PartnerSeasonContext::SESSION_KEY));
+        }
+    }
+
+    public function test_language_event_refreshes_summary_translations_without_losing_filters_or_selected_orders(): void
+    {
+        Translation::create(['entity' => 'order_sheet_type', 'entity_code' => $this->type->code,
+            'field' => 'name', 'language_id' => $this->english->id, 'value' => 'English bags']);
+        $orderId = (string) $this->orders[$this->season->id]->id;
+        $summary = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')->set('summaryStatus', 'draft')
+            ->set('selectedSummaryOrderIds', [$orderId]);
+        Livewire::test(OrderSelector::class)->set('interfaceLanguageId', $this->english->id)
+            ->assertDispatched('partner-interface-language-changed', locale: 'en');
+        $summary->dispatch('partner-interface-language-changed', locale: 'hu')->assertSuccessful()
+            ->assertSee('English bags')->assertSet('summaryStatus', 'draft')->assertSet('selectedSummaryOrderIds', [$orderId]);
+        $this->assertSame('English bags', $summary->instance()->filteredSalesRepOrderSummaries->first()['type']);
+        $this->assertSame('en', session('partner.locale'));
+        $this->get(route('partner.seasons.select'))->assertOk()->assertSee('Change season');
+    }
+
+    public function test_language_events_do_not_eagerly_load_the_summary(): void
+    {
+        Livewire::test(SalesRepOrderSummary::class)->assertSet('summaryLoaded', false)
+            ->dispatch('partner-interface-language-changed', locale: 'en')->assertSet('summaryLoaded', false);
+    }
+
+    public function test_order_sheet_footer_has_scroll_space_and_wrapping_buttons_in_normal_and_shared_views(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $link = OrderShareLink::create(['order_id' => $order->id, 'token' => str_repeat('e', 64),
+            'price_list_id' => $order->price_list_id, 'expires_at' => now()->addDay(), 'created_by_partner_user_id' => $this->user->id]);
+        foreach ([
+            [CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags']],
+            [SharedCatalogGroupOrder::class, ['shareLink' => $link, 'catalogGroupName' => 'Bags']],
+        ] as [$component, $params]) {
+            $html = Livewire::test($component, $params)->assertSuccessful()->html();
+            $this->assertStringContainsString('data-partner-order-sheet', $html);
+            $this->assertStringContainsString('padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));', $html);
+            $this->assertSame(1, preg_match('/<div data-partner-order-actions class="([^"]+)">/', $html, $actions));
+            $this->assertContains('flex-wrap', explode(' ', $actions[1]));
+            $this->assertNotContains('fixed', explode(' ', $actions[1]));
+            $this->assertStringContainsString('wire:click="save"', $html);
+            if ($component === CatalogGroupOrder::class) {
+                $this->assertStringContainsString('wire:click="exportExcel"', $html);
+                $this->assertStringContainsString('id="excelFiles"', $html);
+            }
+        }
+    }
+
+    public function test_catalog_summary_is_separate_and_navigation_has_the_requested_order(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $product = $this->skus[$this->season->id]->product;
+        $product->update(['catalog_group_sort' => 2]);
+        foreach ([['PREV', 'Previous category', 1], ['NEXT', 'Next category', 3]] as [$code, $name, $sort]) {
+            $product->replicate()->fill(['model_code' => $code, 'catalog_group_name_hu' => $name, 'catalog_group_sort' => $sort])->save();
+        }
+        session(['partner_order_selector.season_id' => $this->season->id, 'partner_order_selector.order_id' => $order->id,
+            'partner_order_selector.partner_address_id' => $order->partner_address_id, 'partner_order_selector.brand_id' => $order->brand_id,
+            'partner_order_selector.order_sheet_type_id' => $order->order_sheet_type_id]);
+        Livewire::test(OrderSelector::class)->assertSeeHtml('data-order-selection-panel')->assertSeeHtml('background-color: #f0f9ff;')
+            ->assertDontSeeHtml('wire:click="submitSelectedOrder"')->assertDontSeeHtml('wire:click="openCatalogGroup(');
+        $html = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])->assertSuccessful()->html();
+        $navigation = substr($html, strpos($html, 'data-order-navigation'));
+        $this->assertLessThan(strpos($navigation, 'Összesített adatok'), strpos($navigation, 'Vissza a rendelésekhez'));
+        $this->assertLessThan(strpos($navigation, 'Previous category'), strpos($navigation, 'Összesített adatok'));
+        $this->assertLessThan(strpos($navigation, 'Next category'), strpos($navigation, 'Previous category'));
+        $page = Livewire::test(OrderOverview::class, ['order' => $order->id])->assertSuccessful()->assertSee('Összesített adatok')
+            ->assertSee('Bags')->assertSee('Previous category')->assertSee('Next category')->assertSeeHtml('wire:click="submitSelectedOrder"');
+        $this->assertSame(2, $page->instance()->catalogGroups->sum('quantity'));
+        $this->assertEquals(200, $page->instance()->catalogGroups->sum('wholesale_value'));
+        $page->call('openCatalogGroup', 'Bags')->assertRedirect(route('partner.catalog-group-order', ['order' => $order, 'catalogGroupName' => 'Bags']));
+    }
+
+    public function test_overview_blocks_other_seasons_and_revoked_address_access(): void
+    {
+        Livewire::test(OrderOverview::class, ['order' => $this->orders[$this->other->id]->id])->assertNotFound();
+        $page = Livewire::test(OrderOverview::class, ['order' => $this->orders[$this->season->id]->id])->assertSuccessful();
+        $this->user->partners()->detach();
+        $this->user->addresses()->detach();
+        $page->call('openOrder')->assertForbidden();
+    }
+
+    #[DataProvider('roles')]
+    public function test_only_sales_reps_see_coverage_and_may_reopen_an_order(string $role): void
+    {
+        $this->user->update(['role' => $role]);
+        $summary = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');
+        $coverage = 'href="'.route('partner.order-coverage', ['locale' => 'hu']).'"';
+        $role === 'sales_rep' ? $summary->assertSeeHtml($coverage) : $summary->assertDontSeeHtml($coverage);
+        $order = $this->orders[$this->season->id];
+        $order->update(['status' => 'submitted']);
+        $overview = Livewire::test(OrderOverview::class, ['order' => $order->id])->assertSuccessful();
+        if ($role === 'sales_rep') {
+            $overview->assertSeeHtml('wire:click="resetSelectedOrderToDraft"')->call('resetSelectedOrderToDraft');
+            $this->assertSame('draft', $order->fresh()->status);
+        } else {
+            $overview->assertDontSeeHtml('wire:click="resetSelectedOrderToDraft"')->call('resetSelectedOrderToDraft')->assertForbidden();
+            $this->assertSame('submitted', $order->fresh()->status);
+        }
+    }
+
+    public function test_address_type_permissions_restrict_choices_and_update_when_switching_addresses(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $address = $order->partnerAddress;
+        $alternativeType = OrderType::where('code', 'VRBELO')->firstOrFail();
+        $secondAddress = $address->replicate()->fill(['addrid' => 'A02', 'name' => 'Second address']);
+        $secondAddress->save();
+        $secondAddress->brands()->attach($this->brand);
+        $secondAddress->orderSheetTypes()->attach($this->type);
+        $secondAddress->orderTypes()->attach($alternativeType);
+        $page = Livewire::test(OrderSelector::class)->set('partnerAddressId', $address->id);
+        $this->assertSame(['VRELO'], $page->instance()->orderTypes->pluck('code')->all());
+        $page->set('partnerAddressId', $secondAddress->id)->assertSet('orderTypeId', $alternativeType->id);
+        $this->assertSame(['VRBELO'], $page->instance()->orderTypes->pluck('code')->all());
+        $page->set('brandId', $this->brand->id)->set('orderSheetTypeId', $this->type->id)->set('referenceNumber', 'BOLT-REF')
+            ->call('proceed')->assertHasNoErrors();
+        $this->assertDatabaseHas('orders', ['reference_number' => 'BOLT-REF', 'partner_address_id' => $secondAddress->id, 'order_type_id' => $alternativeType->id]);
+    }
+
+    public function test_removed_type_permission_blocks_creation_but_does_not_hide_existing_orders(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $page = Livewire::test(OrderSelector::class)->set('referenceNumber', 'NOT-ALLOWED');
+        $order->partnerAddress->orderTypes()->detach();
+        $count = Order::count();
+        $page->call('proceed')->assertStatus(422);
+        $this->assertSame($count, Order::count());
+        Livewire::test(OrderSelector::class)->assertSee('REFW27')->assertSee(__('partner.no_allowed_order_types'))->assertDontSee(__('partner.create_order'));
+        Livewire::test(OrderOverview::class, ['order' => $order->id])->assertSuccessful();
+    }
+
+    public function test_server_validation_rejects_a_forged_order_type_even_if_it_is_active(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $probe = new class extends OrderSelector
+        {
+            public function attemptCreate(): Order
+            {
+                return $this->createOrder();
+            }
+        };
+        $probe->seasonId = $this->season->id;
+        $probe->partnerAddressId = $order->partner_address_id;
+        $probe->brandId = $order->brand_id;
+        $probe->orderSheetTypeId = $order->order_sheet_type_id;
+        $probe->referenceNumber = 'FORGED';
+        $probe->orderTypeId = OrderType::where('code', 'VRBELO')->value('id');
+        try {
+            $probe->attemptCreate();
+            $this->fail('An order type without address permission was accepted.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('orderTypeId', $error->errors());
+            $this->assertDatabaseMissing('orders', ['reference_number' => 'FORGED']);
+        }
+    }
+
+    public function test_migration_grants_only_vrelo_to_existing_addresses_and_no_implicit_grants_to_new_addresses(): void
+    {
+        $before = Order::orderBy('id')->get()->toArray();
+        OrderType::where('code', 'TSHARE')->update(['active' => false]);
+        $migration = require database_path('migrations/2026_11_16_150000_add_address_order_types_and_pool_suggestions.php');
+        $migration->down();
+        $migration->up();
+        $address = $this->orders[$this->season->id]->partnerAddress;
+        $this->assertSame(['VRELO'], $address->orderTypes()->pluck('code')->all());
+        $new = $address->replicate()->fill(['addrid' => 'NEW-ADDRESS']);
+        $new->save();
+        $this->assertCount(0, $new->orderTypes);
+        $this->assertSame($before, Order::orderBy('id')->get()->toArray());
     }
 }

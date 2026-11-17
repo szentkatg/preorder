@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderMatrixExport;
 use App\Livewire\Partner\Concerns\HandlesMultiAddressExcelImport;
+use App\Livewire\Partner\Concerns\HasPartnerLanguageSelector;
 use App\Livewire\Partner\Concerns\RequiresVisiblePartnerSeason;
 use App\Models\Catalog;
 use App\Models\Order;
@@ -22,6 +23,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class CatalogGroupOrder extends Component
 {
     use HandlesMultiAddressExcelImport;
+    use HasPartnerLanguageSelector;
     use RequiresVisiblePartnerSeason;
     use WithFileUploads;
 

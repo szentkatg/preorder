@@ -1,5 +1,9 @@
 
-<div class="space-y-8 pl-4">
+<div
+    data-partner-order-sheet
+    class="space-y-8 pl-4"
+    style="padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));"
+>
     <style>
         .matrix-scroll::-webkit-scrollbar {
             height: 16px;
@@ -362,37 +366,31 @@
 
 
     <div class="sticky top-0 z-40 bg-white pb-4 shadow-sm">    
-        <x-partner-season-banner :season="$order->season" :brand="$order->brand" :order-sheet-type="$order->orderSheetType" :allow-season-change="! $sharedMode" />
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="min-w-0 flex-1">
+                <x-partner-season-banner :season="$order->season" :brand="$order->brand" :order-sheet-type="$order->orderSheetType" :allow-season-change="! $sharedMode" />
+            </div>
+            <x-partner-language-selector />
+        </div>
         @if (session('success'))
             <div class="rounded bg-green-100 p-3 text-green-800">
                 {{ session('success') }}
             </div>
         @endif
     
-    <div class="z-40 flex items-center justify-between gap-6 border-b bg-white py-2 text-sm">
-        <div class="flex items-center gap-6">
-            @if($previousCatalogGroup)
-                <button
-                    type="button"
-                    wire:click="navigateToCatalogGroup(@js($previousCatalogGroup))"
-                    class="text-blue-600 hover:underline"
-                >
-                    ← {{ $previousCatalogGroup }}
-                </button>
-            @endif
-    
+    <div class="z-40 flex flex-wrap items-center justify-between gap-6 border-b bg-white py-2 text-sm" data-order-navigation>
+        <div class="flex flex-wrap items-center gap-3">
             @if (! $sharedMode)
-                <button
-                    type="button"
-                    wire:click="backToCatalogGroups"
-                    class="font-semibold text-blue-600 hover:underline"
-                >
-                    {{ __('partner.catalog_groups') }}
-                </button>
+                <a href="{{ route('partner.orders.select') }}" wire:navigate class="rounded border border-slate-300 bg-slate-50 px-3 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
+                <a href="{{ route('partner.orders.overview', $order) }}" wire:navigate class="rounded border border-sky-300 bg-sky-50 px-3 py-2 font-semibold">{{ __('partner.aggregated_data') }}</a>
             @else
                 <span class="font-semibold text-gray-700">
                     {{ __('partner.shared_order_sheet') }}
                 </span>
+            @endif
+
+            @if($previousCatalogGroup)
+                <button type="button" wire:click="navigateToCatalogGroup(@js($previousCatalogGroup))" class="text-blue-600 hover:underline">← {{ $previousCatalogGroup }}</button>
             @endif
     
             @if($nextCatalogGroup)
@@ -906,7 +904,7 @@
     @endforeach
 
 
-    <div class="flex items-start gap-3">
+    <div data-partner-order-actions class="flex flex-wrap items-start gap-3 py-2">
         <button
             type="button"
             wire:click="save"
@@ -941,7 +939,7 @@
             />
 
             @if (! empty($excelFiles))
-                <div class="flex items-start gap-3">
+                <div class="flex flex-wrap items-start gap-3">
                     <div class="text-sm text-gray-700">
                         @foreach ($excelFiles as $file)
                             <div>{{ $file->getClientOriginalName() }}</div>

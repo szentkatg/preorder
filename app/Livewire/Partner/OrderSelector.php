@@ -4,6 +4,7 @@ namespace App\Livewire\Partner;
 
 use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\SalesRepSummaryExport;
+use App\Livewire\Partner\Concerns\HasPartnerLanguageSelector;
 use App\Livewire\Partner\Concerns\RequiresSelectedPartnerSeason;
 use App\Livewire\Partner\Concerns\SetsPartnerLocale;
 use App\Models\Brand;
@@ -11,7 +12,6 @@ use App\Models\Language;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSheetType;
-use App\Models\OrderType;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PriceListItem;
@@ -31,6 +31,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class OrderSelector extends Component
 {
+    use HasPartnerLanguageSelector;
     use RequiresSelectedPartnerSeason;
     use SetsPartnerLocale;
 
@@ -394,7 +395,10 @@ class OrderSelector extends Component
 
     public function getOrderTypesProperty(): Collection
     {
-        $types = OrderType::query()
+        if (! $this->selectedAddress) {
+            return collect();
+        }
+        $types = $this->selectedAddress->orderTypes()
             ->where('active', true)
             ->orderBy('code')
             ->get();
@@ -568,7 +572,8 @@ class OrderSelector extends Component
                 'required',
                 'integer',
                 Rule::exists('order_types', 'id')
-                    ->where('active', true),
+                    ->where('active', true)
+                    ->whereIn('id', $address->orderTypes()->pluck('order_types.id')->all()),
             ],
         ], [
             'referenceNumber.required' => __('partner.reference_number_required'),
@@ -623,6 +628,7 @@ class OrderSelector extends Component
             && $this->orderSheetTypeId
             && filled($this->referenceNumber)
             && $this->orderTypeId
+            && $this->orderTypes->contains('id', $this->orderTypeId)
         );
     }
 
@@ -1011,6 +1017,7 @@ class OrderSelector extends Component
 
     public function resetSelectedOrderToDraft(): void
     {
+        abort_unless($this->isSalesRep, 403);
 
         $order = $this->selectedOrder();
 
@@ -1204,9 +1211,8 @@ class OrderSelector extends Component
             $this->orderSheetTypeId = $this->orderSheetTypes->first()->id;
         }
 
-        if (! $this->orderTypeId) {
-            $this->orderTypeId = (int) ($this->orderTypes
-                ->firstWhere('code', 'VRELO')?->id ?? 0) ?: null;
+        if (! $this->orderTypes->contains('id', $this->orderTypeId)) {
+            $this->orderTypeId = $this->defaultOrderTypeId();
         }
 
         $this->storeSelection();
@@ -1228,8 +1234,13 @@ class OrderSelector extends Component
     protected function resetNewOrderFields(): void
     {
         $this->referenceNumber = '';
-        $this->orderTypeId = (int) ($this->orderTypes
-            ->firstWhere('code', 'VRELO')?->id ?? 0) ?: null;
+        $this->orderTypeId = $this->defaultOrderTypeId();
+    }
+
+    protected function defaultOrderTypeId(): ?int
+    {
+        return $this->orderTypes->firstWhere('code', 'VRELO')?->id
+            ?? ($this->orderTypes->count() === 1 ? $this->orderTypes->first()->id : null);
     }
 
     public function render()

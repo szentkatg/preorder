@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Filament\Support\AdminTableState;
+use App\Http\Middleware\EnsurePartnerPortalIsAvailable;
 use App\Http\Middleware\RequirePartnerSeason;
 use App\Models\User;
 use BezhanSalleh\FilamentShield\Facades\FilamentShield;
@@ -28,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Livewire::addPersistentMiddleware([RequirePartnerSeason::class]);
+        Livewire::addPersistentMiddleware([EnsurePartnerPortalIsAvailable::class, RequirePartnerSeason::class]);
         Table::configureUsing(AdminTableState::configure(...));
         FilamentShield::prohibitDestructiveCommands($this->app->isProduction());
 

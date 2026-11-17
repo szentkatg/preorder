@@ -7,6 +7,7 @@ use App\Livewire\Partner\Auth\ResetPassword;
 use App\Livewire\Partner\BrandShow;
 use App\Livewire\Partner\CatalogGroupOrder;
 use App\Livewire\Partner\Dashboard;
+use App\Livewire\Partner\OrderOverview;
 use App\Livewire\Partner\OrderSelector;
 use App\Livewire\Partner\OrderSummary;
 use App\Livewire\Partner\PartnerOrderCoverage;
@@ -54,7 +55,7 @@ Route::get('/reset-password/{token}', function (string $token) {
 
 Route::prefix('partner')
     ->name('partner.')
-    ->middleware('partner.locale')
+    ->middleware(['partner.locale', 'partner.available'])
     ->group(function () {
         Route::get('/login', Login::class)
             ->name('login');
@@ -78,6 +79,9 @@ Route::prefix('partner')
             ->group(function () {
                 Route::get('/orders/select', OrderSelector::class)
                     ->name('orders.select');
+
+                Route::get('/orders/{order}/overview', OrderOverview::class)
+                    ->name('orders.overview');
 
                 Route::get('/order-coverage', PartnerOrderCoverage::class)
                     ->name('order-coverage');

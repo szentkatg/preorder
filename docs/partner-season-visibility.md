@@ -43,6 +43,16 @@ A láthatóság kikapcsolása az adott szezon minden partneroldali hozzáférés
   nincs külön szezonválasztó. Az új rendelés automatikusan a belépési szezonba kerül.
 - A rendelőlap tetején a szezon kódja/neve, a márka és a rendelőlaptípus szerepel.
   A márka és a típus neve a meglévő fordítási rendszerből, a választott nyelven jön.
+- A rendelésválasztó és a rendelőlap fejlécében külön **Nyelv** választó is van,
+  a belépésnél elérhető aktív felületi nyelvekkel (jelenleg HU/EN). A váltás
+  azonnali, nem navigál el: megtartja a szezont, rendelést, szűrőket és kijelölést,
+  illetve az új rendelés még el nem mentett hivatkozási számát is. A nyelvet a
+  munkamenet és a korábbi `partner_locale` cookie megjegyzi; a következő oldalak
+  is ezt használják. Rendelés, cím és partner törzsben tárolt nyelvét nem írjuk át.
+  A külön rendelésösszesítő a nyelvfüggő feliratokat és adatokat újrarajzolja,
+  de a betöltést továbbra is csak akkor végzi el, ha már be volt töltve.
+  A megosztott rendelőlapon is váltható a felület nyelve belépés nélkül;
+  ez nem módosítja a megosztást vagy a munkamenet szezonját.
 - A `RequirePartnerSeason` middleware minden védett partneroldalon és az onnan
   érkező Livewire-kéréseken is érvényes. Hiányzó/elrejtett/törölt választásnál
   a szezonválasztó oldalra irányítunk, nem kérünk új bejelentkezést. A már megnyitott lapok szezonját és a közvetlen
