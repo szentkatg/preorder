@@ -2,6 +2,7 @@
 
 // lang/hu/partner.php
 return [
+    'erp_export_too_many_rows' => 'A kijelölt rendelések túllépik egy Excel-munkalap sorkorlátját. Exportáld őket kisebb csoportokban.',
     'login_select_season_title' => 'Válassz szezont a folytatáshoz',
     'login_select_season_help' => 'Sikeres bejelentkezés. Válaszd ki, melyik szezon rendeléseivel szeretnél dolgozni, majd nyomd meg a Kiválasztott szezon megnyitása gombot.',
     'back_to_login' => 'Vissza a belépéshez',

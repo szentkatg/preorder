@@ -24,18 +24,18 @@ use App\Models\Size;
 use App\Models\Sku;
 use App\Models\SkuReplacement;
 use App\Services\Partner\ErpOrderExportService;
+use App\Services\Partner\ErpOrderXlsxWriter;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
-use Maatwebsite\Excel\Excel as ExcelFormat;
-use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class ErpOrderExportTest extends TestCase
@@ -228,18 +228,16 @@ class ErpOrderExportTest extends TestCase
 
     public function test_export_reads_updated_quantities_after_the_modal_was_opened(): void
     {
-        Excel::fake();
         $this->item('black-M', 3);
         $page = Livewire::test(SalesRepOrderSummary::class)->set('selectedSummaryOrderIds', [(string) $this->order->id])
             ->call('openErpExport');
         OrderItem::where('order_id', $this->order->id)->update(['quantity' => 9]);
         $page->set('erpExportDeliveryDate', '2027-02-01')->call('exportErpOrders')->assertHasNoErrors();
-        Excel::assertDownloaded('ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx', function (ErpOrderExport $export): bool {
-            $this->assertSame(9, $export->rows[0][18]);
-            $this->assertSame(9, $export->auditRows[0][12]);
-
-            return true;
-        });
+        $page->assertFileDownloaded('ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx');
+        $book = $this->downloadedWorkbook($page);
+        $this->assertEquals(9, $book->getSheet(0)->getCell('S2')->getValue());
+        $this->assertEquals(9, $book->getSheet(1)->getCell('M2')->getValue());
+        $book->disconnectWorksheets();
     }
 
     public function test_hidden_seasons_and_disabled_users_cannot_be_exported(): void
@@ -298,7 +296,6 @@ class ErpOrderExportTest extends TestCase
 
     public function test_modal_validates_note_and_date_and_exports_only_the_frozen_selection(): void
     {
-        Excel::fake();
         $this->item('black-M', 3);
         $this->item('navy-M', 5, $this->otherOrder);
         $page = Livewire::test(SalesRepOrderSummary::class)->call('openErpExport')
@@ -309,13 +306,12 @@ class ErpOrderExportTest extends TestCase
             ->call('exportErpOrders')->assertHasErrors(['erpExportNote']);
         $page->set('erpExportNote', str_repeat('á', 250))->set('selectedSummaryOrderIds', [(string) $this->otherOrder->id])
             ->call('exportErpOrders')->assertHasNoErrors()->assertSet('showErpExportModal', false);
-        Excel::assertDownloaded('ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx', function (ErpOrderExport $export): bool {
-            $this->assertSame(3, $export->rows[0][18]);
-            $this->assertCount(1, $export->auditRows);
-            $this->assertSame($this->order->id, $export->auditRows[0][0]);
-
-            return true;
-        });
+        $page->assertFileDownloaded('ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx');
+        $book = $this->downloadedWorkbook($page);
+        $this->assertEquals(3, $book->getSheet(0)->getCell('S2')->getValue());
+        $this->assertSame(3, $book->getSheet(1)->getHighestRow()); // Header + selected order + total.
+        $this->assertEquals($this->order->id, $book->getSheet(1)->getCell('A2')->getValue());
+        $book->disconnectWorksheets();
     }
 
     public function test_cancel_changes_nothing_and_empty_orders_are_reconciled_as_zero(): void
@@ -334,10 +330,11 @@ class ErpOrderExportTest extends TestCase
         $this->item('black-XL', 2);
         $this->replacement('black-M', 'navy-M');
         $this->replacement('black-XL', 'TÖRÖLT');
-        $path = tempnam(sys_get_temp_dir(), 'erp-order-export-');
+        $response = app(ErpOrderExportService::class)->download([$this->order->id],
+            array_replace($this->input, ['erpExportNote' => '=1+1']));
+        $path = $response->getFile()->getPathname();
         $previousBinder = Cell::getValueBinder();
         try {
-            file_put_contents($path, Excel::raw($this->export(input: ['erpExportNote' => '=1+1']), ExcelFormat::XLSX));
             // The XLSX reader must not reuse the export's identifier/formula binder.
             Cell::setValueBinder(new DefaultValueBinder);
             $book = IOFactory::load($path);
@@ -358,6 +355,10 @@ class ErpOrderExportTest extends TestCase
             $this->assertSame('yyyy.mm.dd', $sheet->getStyle('C2')->getNumberFormat()->getFormatCode());
             $this->assertSame('2026.11.17', $sheet->getCell('C2')->getFormattedValue());
             $this->assertSame('2027.02.01', $sheet->getCell('W2')->getFormattedValue());
+            $this->assertSame('F2', $sheet->getFreezePane());
+            $this->assertSame('A1:W2', $sheet->getAutoFilter()->getRange());
+            $this->assertEquals(40, $sheet->getColumnDimension('L')->getWidth());
+            $this->assertTrue($sheet->getStyle('L2')->getAlignment()->getWrapText());
             $audit = $book->getSheet(1);
             $this->assertEquals(5, $audit->getCell('L2')->getOldCalculatedValue());
             $this->assertEquals(5, $audit->getCell('L2')->getCalculatedValue());
@@ -366,10 +367,132 @@ class ErpOrderExportTest extends TestCase
             $this->assertEquals(5, $audit->getCell('L3')->getCalculatedValue());
             $this->assertEquals(5, $audit->getCell('L3')->getOldCalculatedValue());
             $this->assertEquals(0, $audit->getCell('N3')->getCalculatedValue());
+            $this->assertSame('I2', $audit->getFreezePane());
+            $this->assertSame('A1:N2', $audit->getAutoFilter()->getRange());
             $book->disconnectWorksheets();
         } finally {
             Cell::setValueBinder($previousBinder);
             unlink($path);
         }
+    }
+
+    private function downloadedWorkbook($page): Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'erp-download-test-');
+        $previousBinder = Cell::getValueBinder();
+        try {
+            file_put_contents($path, base64_decode($page->effects['download']['content'], true));
+            Cell::setValueBinder(new DefaultValueBinder);
+
+            return IOFactory::load($path);
+        } finally {
+            Cell::setValueBinder($previousBinder);
+            unlink($path);
+        }
+    }
+
+    public function test_streaming_export_keeps_empty_and_deleted_orders_and_reconciles_the_grand_total(): void
+    {
+        $this->item('black-M', 4);
+        $this->replacement('black-M', 'TÖRÖLT');
+        $page = Livewire::test(SalesRepOrderSummary::class)
+            ->set('selectedSummaryOrderIds', [$this->order->id, $this->otherOrder->id])->call('openErpExport')
+            ->set('erpExportDeliveryDate', '2027-02-01')->call('exportErpOrders')
+            ->assertHasNoErrors()->assertFileDownloaded();
+        $book = $this->downloadedWorkbook($page);
+        $this->assertSame(1, $book->getSheet(0)->getHighestRow());
+        $audit = $book->getSheet(1);
+        $this->assertSame(4, $audit->getHighestRow());
+        $this->assertEquals($this->otherOrder->id, $audit->getCell('A2')->getValue());
+        $this->assertEquals(0, $audit->getCell('L2')->getOldCalculatedValue());
+        $this->assertEquals($this->order->id, $audit->getCell('A3')->getValue());
+        $this->assertEquals(4, $audit->getCell('K3')->getValue());
+        $this->assertEquals(4, $audit->getCell('L4')->getOldCalculatedValue());
+        $this->assertEquals(0, $audit->getCell('N4')->getOldCalculatedValue());
+        $book->disconnectWorksheets();
+    }
+
+    public function test_streaming_export_reads_items_in_bounded_chunks_and_deletes_file_after_sending(): void
+    {
+        $base = $this->skus['black-M'];
+        $skuRows = [];
+        for ($i = 0; $i < 1001; $i++) {
+            $skuRows[] = ['product_id' => $base->product_id, 'color_id' => $base->color_id,
+                'size_id' => $base->size_id, 'sku_code' => sprintf('CHUNK-%04d', $i),
+                'sku_name' => 'Chunk test '.$i, 'type' => 'piece'];
+        }
+        foreach (array_chunk($skuRows, 200) as $rows) {
+            DB::table('skus')->insert($rows);
+        }
+        $items = Sku::where('sku_code', 'like', 'CHUNK-%')->pluck('id')->map(fn ($id) => [
+            'order_id' => $this->order->id, 'sku_id' => $id, 'quantity' => 2, 'unit_price' => 1, 'line_total' => 2,
+        ])->all();
+        foreach (array_chunk($items, 200) as $rows) {
+            DB::table('order_items')->insert($rows);
+        }
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            if (str_starts_with(strtolower($query->sql), 'select') && str_contains($query->sql, 'from "order_items"')) {
+                $queries[] = $query->sql;
+            }
+        });
+        $response = app(ErpOrderExportService::class)->download([$this->order->id], $this->input);
+        $this->assertCount(3, $queries);
+        foreach ($queries as $sql) {
+            $this->assertStringContainsString('limit 500', $sql);
+        }
+        $path = $response->getFile()->getPathname();
+        try {
+            $book = IOFactory::load($path);
+            $this->assertSame(1002, $book->getSheet(0)->getHighestRow());
+            $this->assertSame('CHUNK-0000', $book->getSheet(0)->getCell('M2')->getValue());
+            $this->assertSame('CHUNK-1000', $book->getSheet(0)->getCell('M1002')->getValue());
+            $this->assertEquals(2002, $book->getSheet(1)->getCell('L2')->getOldCalculatedValue());
+            $book->disconnectWorksheets();
+            $bytes = filesize($path);
+            $response->prepare(request());
+            ob_start();
+            try {
+                $response->sendContent();
+                $binary = ob_get_contents();
+            } finally {
+                ob_end_clean();
+            }
+            $this->assertSame($bytes, strlen($binary));
+            $this->assertStringStartsWith('PK', $binary);
+            $this->assertFileDoesNotExist($path);
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    public function test_a_late_validation_error_does_not_return_or_leave_a_partial_export(): void
+    {
+        $this->item('black-M', 3, $this->otherOrder); // This authorized order is written first.
+        $this->item('navy-M', 2);
+        DB::table('sku_replacements')->insert(['season_id' => $this->season->id,
+            'old_sku_code' => $this->skus['navy-M']->sku_code, 'new_sku_code' => 'MISSING']);
+        $before = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.'erp-orders-*');
+        Livewire::test(SalesRepOrderSummary::class)
+            ->set('selectedSummaryOrderIds', [$this->otherOrder->id, $this->order->id])->call('openErpExport')
+            ->set('erpExportDeliveryDate', '2027-02-01')->call('exportErpOrders')
+            ->assertHasErrors(['erpExport'])->assertNoFileDownloaded()->assertSet('showErpExportModal', true);
+        $this->assertSame($before, glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.'erp-orders-*'));
+    }
+
+    public function test_excel_row_limit_reports_validation_error_instead_of_truncating_or_adding_sheets(): void
+    {
+        $this->app->bind(ErpOrderXlsxWriter::class, fn () => new class extends ErpOrderXlsxWriter
+        {
+            protected const MAX_ROWS = 2;
+        });
+        $this->item('black-M', 1);
+        $this->item('navy-M', 1);
+        Livewire::test(SalesRepOrderSummary::class)
+            ->set('selectedSummaryOrderIds', [$this->order->id])->call('openErpExport')
+            ->set('erpExportDeliveryDate', '2027-02-01')->call('exportErpOrders')
+            ->assertHasErrors(['erpExport'])->assertNoFileDownloaded();
     }
 }

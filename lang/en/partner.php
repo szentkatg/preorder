@@ -2,6 +2,7 @@
 
 // lang/en/partner.php
 return [
+    'erp_export_too_many_rows' => 'The selected orders exceed the Excel worksheet row limit. Export them in smaller groups.',
     'login_select_season_title' => 'Choose a season to continue',
     'login_select_season_help' => 'You are signed in. Select the season you want to work with, then press Open selected season.',
     'back_to_login' => 'Back to sign in',

@@ -85,11 +85,10 @@ class SalesRepOrderSummary extends Component
 
     public function exportErpOrders()
     {
-        $export = app(ErpOrderExportService::class)->build($this->erpExportOrderIds, [
+        $download = app(ErpOrderExportService::class)->download($this->erpExportOrderIds, [
             'erpExportNote' => $this->erpExportNote,
             'erpExportDeliveryDate' => $this->erpExportDeliveryDate,
         ]);
-        $download = Excel::download($export, 'ERP-rendelesek-'.now('Europe/Budapest')->format('Ymd-His').'.xlsx');
         $this->closeErpExport();
 
         return $download;
