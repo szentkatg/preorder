@@ -1,7 +1,10 @@
 <div class="mx-auto max-w-lg px-4 py-8">
     <form wire:submit="selectSeason" class="space-y-4 rounded-xl border bg-white p-6 shadow-lg">
         <h1 class="text-2xl font-bold">{{ __('partner.change_season') }}</h1>
-        <p id="selected-partner-season-help" class="text-sm text-slate-600">{{ __('partner.change_season_help') }}</p>
+        <p id="selected-partner-season-help" role="note" class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-700">
+            <strong class="mb-1 block">{{ __('partner.select_season_to_continue') }}</strong>
+            {{ __('partner.change_season_help') }}
+        </p>
         @if (session('partner_season_notice'))
             <p role="status" class="text-sm text-amber-800">{{ session('partner_season_notice') }}</p>
         @endif

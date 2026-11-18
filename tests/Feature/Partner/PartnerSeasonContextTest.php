@@ -109,27 +109,33 @@ class PartnerSeasonContextTest extends TestCase
         session([PartnerSeasonContext::SESSION_KEY => $this->season->id]);
     }
 
-    public function test_login_lists_only_published_seasons_including_historical_ones(): void
+    public function test_login_shows_credentials_first_and_lists_only_published_seasons_after_authentication(): void
     {
         auth('partner')->logout();
+        Livewire::test(Login::class)->assertDontSee('Selected winter')->assertDontSee('Other summer')
+            ->assertDontSeeHtml('data-login-season-modal')->assertSet('seasonId', null)
+            ->set('email', $this->user->email)->set('password', 'password')->call('login')
+            ->assertRedirect(route('partner.login'))->assertSet('password', '');
+        $this->assertNull(session(PartnerSeasonContext::SESSION_KEY));
         Livewire::test(Login::class)->assertSee('Selected winter')->assertSee('Other summer')
-            ->assertDontSee('Unpublished next season')->assertSet('seasonId', null);
+            ->assertDontSee('Unpublished next season')->assertSeeHtml('data-login-season-modal')->assertSet('seasonId', null);
     }
 
     public function test_login_season_tooltip_and_validation_follow_language_changes_without_resetting_selection(): void
     {
-        auth('partner')->logout();
         $huId = Language::where('code', 'HU')->value('id');
         $page = Livewire::test(Login::class)->set('seasonId', $this->season->id);
         foreach ([[$this->english->id, 'Select season', 'Select an available season to continue.'],
             [$huId, 'Válassz szezont', 'Válassz elérhető szezont a folytatáshoz.']] as [$languageId, $title, $message]) {
             $page->set('languageId', $languageId)->assertSet('seasonId', $this->season->id)
                 ->assertSeeHtml('title="'.$title.'"')->assertSeeHtml('data-required-message="'.$message.'"')
+                ->assertSeeHtml('id="partner-season-help" role="note"')
+                ->assertSeeHtml('data-login-season-modal')
                 ->assertSeeHtml('oninvalid="this.setCustomValidity(this.value ? \'\' : this.dataset.requiredMessage)"')
                 ->assertSeeHtml('oninput="this.setCustomValidity(\'\')"')->assertSeeHtml('onchange="this.setCustomValidity(\'\')"');
-            $page->set('seasonId', null)->set('email', $this->user->email)->set('password', 'password')->call('login')
+            $page->set('seasonId', null)->call('selectSeason')
                 ->assertHasErrors('seasonId')->assertSee($message)->set('seasonId', $this->season->id);
-            $this->assertGuest('partner');
+            $this->assertAuthenticatedAs($this->user, 'partner');
         }
     }
 
@@ -140,6 +146,8 @@ class PartnerSeasonContextTest extends TestCase
         session(['partner.locale' => $locale, 'partner.language_id' => $languageId]);
         Livewire::test(SeasonSelector::class)->assertSeeHtml('title="'.$title.'"')
             ->assertSeeHtml('data-required-message="'.$message.'"')
+            ->assertSeeHtml('id="selected-partner-season-help" role="note"')
+            ->assertSeeHtml('<strong class="mb-1 block">'.$message.'</strong>')
             ->assertSeeHtml('oninvalid="this.setCustomValidity(this.value ? \'\' : this.dataset.requiredMessage)"')
             ->assertSeeHtml('oninput="this.setCustomValidity(\'\')"')->assertSeeHtml('onchange="this.setCustomValidity(\'\')"')
             ->set('seasonId', null)->call('selectSeason')->assertHasErrors('seasonId')->assertSee($message);
@@ -160,7 +168,11 @@ class PartnerSeasonContextTest extends TestCase
         session(['partner_order_selector.order_id' => 987, 'order_selector.summary_filters.season_id' => $this->season->id]);
         Livewire::test(Login::class)->set('languageId', $this->english->id)->set('seasonId', $this->other->id)
             ->set('email', $this->user->email)->set('password', 'password')->call('login')
-            ->assertHasNoErrors()->assertRedirect(route('partner.orders.select'));
+            ->assertHasNoErrors()->assertRedirect(route('partner.login'))->assertSet('password', '');
+        $this->assertNull(session(PartnerSeasonContext::SESSION_KEY));
+        $this->get(route('partner.orders.select'))->assertRedirect(route('partner.seasons.select'));
+        Livewire::test(Login::class)->assertSet('showSeasonModal', true)->set('seasonId', $this->other->id)
+            ->call('selectSeason')->assertHasNoErrors()->assertRedirect(route('partner.orders.select'));
         $this->assertSame($this->other->id, session(PartnerSeasonContext::SESSION_KEY));
         $this->assertSame('en', session('partner.locale'));
         $this->assertNull(session('partner_order_selector.order_id'));
@@ -168,14 +180,16 @@ class PartnerSeasonContextTest extends TestCase
         $this->assertAuthenticatedAs($this->user, 'partner');
     }
 
-    public function test_missing_hidden_and_nonexistent_login_seasons_are_rejected_before_authentication(): void
+    public function test_missing_hidden_and_nonexistent_modal_seasons_are_rejected_after_authentication(): void
     {
         auth('partner')->logout();
         session()->forget(PartnerSeasonContext::SESSION_KEY);
+        Livewire::test(Login::class)->set('email', $this->user->email)->set('password', 'password')->call('login')
+            ->assertRedirect(route('partner.login'));
+        $modal = Livewire::test(Login::class)->assertSet('showSeasonModal', true);
         foreach ([null, $this->hidden->id, 99999] as $id) {
-            Livewire::test(Login::class)->set('seasonId', $id)->set('email', $this->user->email)
-                ->set('password', 'password')->call('login')->assertHasErrors('seasonId');
-            $this->assertGuest('partner');
+            $modal->set('seasonId', $id)->call('selectSeason')->assertHasErrors('seasonId');
+            $this->assertAuthenticatedAs($this->user, 'partner');
             $this->assertNull(session(PartnerSeasonContext::SESSION_KEY));
         }
     }

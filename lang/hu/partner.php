@@ -2,6 +2,9 @@
 
 // lang/hu/partner.php
 return [
+    'login_select_season_title' => 'Válassz szezont a folytatáshoz',
+    'login_select_season_help' => 'Sikeres bejelentkezés. Válaszd ki, melyik szezon rendeléseivel szeretnél dolgozni, majd nyomd meg a Kiválasztott szezon megnyitása gombot.',
+    'back_to_login' => 'Vissza a belépéshez',
     'portal_unavailable_title' => 'A partnerportál átmenetileg nem elérhető',
     'portal_unavailable_default_message' => 'Kérjük, próbálkozz később.',
     'portal_retry' => 'Újrapróbálás',

@@ -2,6 +2,9 @@
 
 // lang/en/partner.php
 return [
+    'login_select_season_title' => 'Choose a season to continue',
+    'login_select_season_help' => 'You are signed in. Select the season you want to work with, then press Open selected season.',
+    'back_to_login' => 'Back to sign in',
     'portal_unavailable_title' => 'The partner portal is temporarily unavailable',
     'portal_unavailable_default_message' => 'Please try again later.',
     'portal_retry' => 'Try again',

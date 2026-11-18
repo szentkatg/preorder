@@ -3,12 +3,14 @@
 namespace App\Livewire\Partner\Auth;
 
 use App\Models\Language;
+use App\Models\PartnerUser;
 use App\Models\Season;
 use App\Services\LanguageResolver;
 use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Login extends Component
@@ -21,6 +23,12 @@ class Login extends Component
 
     public string $password = '';
 
+    #[Locked]
+    public bool $showSeasonModal = false;
+
+    #[Locked]
+    public ?int $pendingPartnerUserId = null;
+
     public function mount(LanguageResolver $languageResolver): void
     {
         $language = $languageResolver->resolve(
@@ -28,13 +36,28 @@ class Login extends Component
         );
 
         $this->applyLanguage($language);
-        $seasons = Season::query()->visibleToPartners()->get();
-        $this->seasonId = $seasons->count() === 1 ? (int) $seasons->first()->id : null;
+        $user = PartnerUser::find(Auth::guard('partner')->id());
+        if ($user?->active) {
+            $this->pendingPartnerUserId = (int) $user->id;
+            $this->showSeasonModal = true;
+            $seasons = Season::query()->visibleToPartners()->get();
+            $this->seasonId = PartnerSeasonContext::current()?->id
+                ?? ($seasons->count() === 1 ? (int) $seasons->first()->id : null);
+        } elseif ($user) {
+            Auth::guard('partner')->logout();
+        }
     }
 
     public function boot(): void
     {
         app()->setLocale((string) session('partner.locale', 'hu'));
+    }
+
+    public function hydrate(): void
+    {
+        if ($this->showSeasonModal) {
+            $this->assertPendingPartner();
+        }
     }
 
     public function updatedLanguageId(
@@ -51,17 +74,18 @@ class Login extends Component
 
     public function login(): void
     {
+        abort_if($this->showSeasonModal, 403);
         $this->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
-            'seasonId' => ['required', 'integer', Rule::exists('seasons', 'id')->where('visible_to_partners', true)],
-        ], ['seasonId.required' => __('partner.select_season_to_continue'), 'seasonId.exists' => __('partner.select_season_to_continue')]);
+        ]);
 
         if (! Auth::guard('partner')->attempt([
             'email' => $this->email,
             'password' => $this->password,
             'active' => true,
         ])) {
+            $this->password = '';
             $this->addError(
                 'email',
                 __('partner.invalid_credentials')
@@ -70,13 +94,40 @@ class Login extends Component
             return;
         }
 
+        $this->password = '';
+        $this->seasonId = null;
+        session()->forget([PartnerSeasonContext::SESSION_KEY, 'partner_order_selector', 'order_selector']);
+        // SessionGuard rotates the session ID and CSRF token on authentication.
+        // A full GET gives the modal a fresh token, not the old Livewire document.
+        $this->redirectRoute('partner.login');
+    }
+
+    public function selectSeason(): void
+    {
+        $this->assertPendingPartner();
+        $this->validate([
+            'seasonId' => ['required', 'integer', Rule::exists('seasons', 'id')->where('visible_to_partners', true)],
+        ], ['seasonId.required' => __('partner.select_season_to_continue'), 'seasonId.exists' => __('partner.select_season_to_continue')]);
         PartnerSeasonContext::select($this->seasonId);
         session()->regenerate();
+        $this->redirectRoute('partner.orders.select');
+    }
 
-        $this->redirectRoute(
-            'partner.orders.select',
-            navigate: true
-        );
+    public function cancelLogin(): void
+    {
+        $this->assertPendingPartner();
+        Auth::guard('partner')->logout();
+        session()->forget([PartnerSeasonContext::SESSION_KEY, 'partner_order_selector', 'order_selector']);
+        session()->regenerate(true);
+        $this->password = '';
+        $this->redirectRoute('partner.login');
+    }
+
+    private function assertPendingPartner(): void
+    {
+        $user = PartnerUser::find(Auth::guard('partner')->id());
+        abort_unless($this->showSeasonModal && $user?->active
+            && (int) $user->id === $this->pendingPartnerUserId, 403);
     }
 
     public function render()
@@ -87,7 +138,7 @@ class Login extends Component
                 ->whereIn('code', $this->availableLocaleCodes())
                 ->orderBy('id')
                 ->get(),
-            'seasons' => Season::query()->visibleToPartners()->orderByDesc('id')->get(),
+            'seasons' => $this->showSeasonModal ? Season::query()->visibleToPartners()->orderByDesc('id')->get() : collect(),
         ]);
     }
 

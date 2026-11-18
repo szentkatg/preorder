@@ -25,9 +25,20 @@ A láthatóság kikapcsolása az adott szezon minden partneroldali hozzáférés
 
 ## Belépéshez kötött szezonválasztás
 
-- A bejelentkezéshez e-mail, jelszó, nyelv és szezon tartozik. Egyetlen elérhető
-  szezon esetén előre kiválasztjuk; többnél választani kell. Rejtett szezon
-  módosított kérésben sem fogadható el. Hibás belépés nem ment szezont.
+- A belépés kétlépcsős: először e-mail, jelszó és felületi nyelv adható meg.
+  Sikeres hitelesítés után külön, kötelező modálban kell szezont választani.
+  A rendelési felület szezon nélkül továbbra sem érhető el. Egyetlen elérhető
+  szezont előre kijelölünk, de azt is meg kell erősíteni. Rejtett szezon
+  módosított kérésben sem fogadható el. Hibás belépés nem nyit modált.
+- A modál nem csukható be Esc-pel vagy háttérkattintással; a **Vissza a belépéshez**
+  gomb kijelentkeztet a partnerportálról. Újratöltéskor a modál visszaáll,
+  nem szükséges ismét jelszót megadni. Jelszót a modál nem tárol. A modál
+  bejelentkezett felhasználóhoz kötött, böngészőből nem hamisítható az állapota,
+  és inaktivált felhasználó nem folytathatja vele a belépést.
+- A hitelesítés session- és CSRF-token-cseréje után teljes GET-betöltés nyitja
+  meg a modált. A szezon megerősítése után is teljes navigáció történik;
+  nem marad régi token az előző Livewire-dokumentumból. A tokenellenőrzést
+  nem kapcsoljuk ki, a sikertelen POST-okat nem játsszuk automatikusan újra.
 - A választást a munkamenet `partner.season_id` kulcsa tárolja. Belépéskor
   töröljük a korábbi rendelésválasztást és összesítőszűrőket; kijelentkezéskor
   a szezon is törlődik, a nyelv viszont megmarad.
@@ -143,3 +154,28 @@ git pull --ff-only
 /opt/alt/php83/usr/bin/php artisan optimize:clear
 /opt/alt/php83/usr/bin/php artisan optimize
 ```
+
+## Mobilos szezonválasztás és munkamenet
+
+A bejelentkezés utáni kötelező szezonválasztó modálban, illetve a későbbi
+szezonváltó képernyőn az útmutató állandóan látszik. Nem szükséges a natív
+`title` tooltipre hagyatkozni: érintőképernyőn az nem megbízható. A szöveg
+magyarul és angolul is megjelenik, a választó `aria-describedby` kapcsolattal
+hivatkozik rá. A szezon kötelező kitöltése és a szerveroldali ellenőrzés változatlan.
+
+A tárhely könyvtárvédelmének HTTP 401-es jelszókérése és a Laravel 419-es
+session/CSRF-hibája eltérő réteg. A jelszóablak hiánya önmagában nem jelenti a
+könyvtárvédelem hiányát, mert a böngésző megjegyezheti a hitelesítést. Ha friss
+privát munkamenetben működik a belépés, normál módban viszont nem, vizsgálandó
+a megmaradt webhelyadat és a régi/visszaállított oldal; ez önmagában nem bizonyít
+konkrét szerverhibát. Tiszta és privát munkamenetben is ismétlődő, közvetlenül
+a könyvtárjelszó után jelentkező 419-et nem tekintünk ezzel megoldottnak;
+az első kérés módját és a hitelesítés/session folyamatát külön kell vizsgálni.
+Nem kapcsoljuk ki a CSRF-ellenőrzést vagy a könyvtárvédelmet.
+
+A `PortalCsrfDiagnostics` a partner/admin/Livewire 419-es válaszainál a privát
+alkalmazásnaplóba csak technikai jelzőket ír: kérésmód, HTTPS, süti előfordulása
+és olvashatósága, token jelenléte, Authorization fejléc jelenléte és Android/Firefox
+jelző. Jelszót, felhasználónevet, tokent, sütiértéket, IP-címet, teljes URL-t vagy
+User-Agentet nem naplóz. A 419-es válasz és a védelem változatlan; a diagnosztika
+nem végez újrapróbálkozást. Naplózási hiba sem változtathatja 500-ra a választ.
