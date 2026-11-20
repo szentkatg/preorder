@@ -27,11 +27,15 @@ trait HandlesMultiAddressExcelImport
 
     public array $selectedImportPreviewKeys = [];
 
+    public array $importReferenceNumbers = [];
+
     public function updatedExcelFiles(): void
     {
         $this->importResults = [];
         $this->importPreviews = [];
         $this->selectedImportPreviewKeys = [];
+        $this->importReferenceNumbers = [];
+        $this->resetValidation('importReferenceNumbers');
     }
 
     public function previewExcelImports(): void
@@ -43,80 +47,17 @@ trait HandlesMultiAddressExcelImport
         $this->validateExcelImportFiles();
 
         $previews = [];
-        $selectedKeys = [];
-        $readyCount = 0;
-        $errorCount = 0;
-
         foreach (Arr::wrap($this->excelFiles) as $index => $file) {
-            $key = $this->importPreviewKey((int) $index);
-            $path = $file->getRealPath();
-            $originalName = $this->originalImportFilename($file);
-            $header = null;
-
-            try {
-                ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] = $this->prepareImportFile($path);
-
-                if ($this->isSubmittedOrder($targetOrder)) {
-                    throw new \RuntimeException(__('partner.import_target_order_already_submitted', ['address' => $addressCode]));
-                }
-
-                $import = new PartnerOrderMatrixImport($targetOrder, previewOnly: true);
-
-                Excel::import($import, $path);
-
-                $stats = $import->stats();
-
-                if (($stats['rows_with_meta'] ?? 0) < 1) {
-                    throw new \RuntimeException(__('partner.import_no_import_map_found'));
-                }
-
-                $previews[] = [
-                    'key' => $key,
-                    'index' => (int) $index,
-                    'filename' => $originalName,
-                    'address_code' => $addressCode,
-                    'reference_number' => $header['reference_number'],
-                    'success' => true,
-                    'message' => __('partner.import_preview_ready'),
-                    'stats' => $stats,
-                ];
-
-                $selectedKeys[] = $key;
-                $readyCount++;
-            } catch (Throwable $exception) {
-                $errorCount++;
-
-                $previews[] = [
-                    'key' => $key,
-                    'index' => (int) $index,
-                    'filename' => $originalName,
-                    'address_code' => $header['address_code'] ?? null,
-                    'reference_number' => $header['reference_number'] ?? null,
-                    'success' => false,
-                    'message' => $exception->getMessage(),
-                    'stats' => $this->emptyImportStats(),
-                ];
-            }
+            $previews[] = $this->previewExcelFile($file, (int) $index);
         }
-
-        $message = __('partner.import_preview_summary', [
-            'ready' => $readyCount,
-            'failed' => $errorCount,
-        ]);
-
-        $this->importPreviews = [
-            'success' => $errorCount === 0,
-            'message' => $message,
-            'files' => $previews,
-        ];
-        $this->selectedImportPreviewKeys = $selectedKeys;
-        $this->importResults = [];
+        $this->setImportPreviewState($previews);
+        $this->selectAllImportPreviews();
 
         $notification = Notification::make()
             ->title(__('partner.import_preview'))
-            ->body($message);
+            ->body($this->importPreviews['message']);
 
-        if ($errorCount === 0) {
+        if ($this->importPreviews['success']) {
             $notification->success();
         } else {
             $notification
@@ -125,6 +66,85 @@ trait HandlesMultiAddressExcelImport
         }
 
         $notification->send();
+        $this->dispatch('order-import-feedback', componentId: $this->getId());
+    }
+
+    public function updatedImportReferenceNumbers(mixed $value, string $key): void
+    {
+        if (! $this->canStartExcelImport() || ! preg_match('/^file-(\d+)$/', $key, $matches)) {
+            return;
+        }
+
+        $index = (int) $matches[1];
+        $previews = $this->importPreviews['files'] ?? [];
+        $position = array_search($key, array_column($previews, 'key'), true);
+        if ($position === false || ! isset($this->excelFiles[$index])) {
+            return;
+        }
+
+        $this->validateOnly('importReferenceNumbers.'.$key, [
+            'importReferenceNumbers.'.$key => ['nullable', 'string', 'max:100'],
+        ]);
+        $preview = $this->previewExcelFile($this->excelFiles[$index], $index);
+        $previews[$position] = $preview;
+        $this->selectedImportPreviewKeys = array_values(array_diff($this->selectedImportPreviewKeys, [$key]));
+        if ($preview['success']) {
+            $this->selectedImportPreviewKeys[] = $key;
+        }
+        $this->setImportPreviewState($previews);
+    }
+
+    protected function previewExcelFile(mixed $file, int $index): array
+    {
+        $key = $this->importPreviewKey($index);
+        $header = null;
+        $missingReference = false;
+        try {
+            $header = $this->readExcelHeader($file->getRealPath());
+            $missingReference = $header['reference_number'] === '';
+            ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] =
+                $this->prepareImportHeader($header, $this->importReferenceNumbers[$key] ?? null);
+
+            if ($this->isSubmittedOrder($targetOrder)) {
+                throw new \RuntimeException(__('partner.import_target_order_already_submitted', ['address' => $addressCode]));
+            }
+            $import = new PartnerOrderMatrixImport($targetOrder, previewOnly: true);
+            Excel::import($import, $file->getRealPath());
+            $stats = $import->stats();
+            if (($stats['rows_with_meta'] ?? 0) < 1) {
+                throw new \RuntimeException(__('partner.import_no_import_map_found'));
+            }
+            $success = true;
+            $message = __('partner.import_preview_ready');
+        } catch (Throwable $exception) {
+            $success = false;
+            $message = $exception->getMessage();
+            $stats = $this->emptyImportStats();
+        }
+
+        return [
+            'key' => $key,
+            'index' => $index,
+            'filename' => $this->originalImportFilename($file),
+            'address_code' => $header['address_code'] ?? null,
+            'reference_number' => $header['reference_number'] ?? null,
+            'missing_reference_number' => $missingReference,
+            'success' => $success,
+            'message' => $message,
+            'stats' => $stats,
+        ];
+    }
+
+    protected function setImportPreviewState(array $previews): void
+    {
+        $ready = count(array_filter($previews, fn (array $preview) => $preview['success']));
+        $failed = count($previews) - $ready;
+        $this->importPreviews = [
+            'success' => $failed === 0,
+            'message' => __('partner.import_preview_summary', ['ready' => $ready, 'failed' => $failed]),
+            'files' => $previews,
+        ];
+        $this->importResults = [];
     }
 
     public function selectAllImportPreviews(): void
@@ -172,7 +192,7 @@ trait HandlesMultiAddressExcelImport
                 continue;
             }
 
-            $result = $this->importExcelFile($file);
+            $result = $this->importExcelFile($file, $this->importPreviewKey((int) $index));
             $results[] = $result;
 
             if ($result['success'] ?? false) {
@@ -182,7 +202,7 @@ trait HandlesMultiAddressExcelImport
             }
         }
 
-        $this->reset('excelFiles');
+        $this->reset('excelFiles', 'importReferenceNumbers');
         $this->importPreviews = [];
         $this->selectedImportPreviewKeys = [];
 
@@ -203,8 +223,8 @@ trait HandlesMultiAddressExcelImport
         $successCount = 0;
         $errorCount = 0;
 
-        foreach (Arr::wrap($this->excelFiles) as $file) {
-            $result = $this->importExcelFile($file);
+        foreach (Arr::wrap($this->excelFiles) as $index => $file) {
+            $result = $this->importExcelFile($file, $this->importPreviewKey((int) $index));
             $results[] = $result;
 
             if ($result['success'] ?? false) {
@@ -214,7 +234,7 @@ trait HandlesMultiAddressExcelImport
             }
         }
 
-        $this->reset('excelFiles');
+        $this->reset('excelFiles', 'importReferenceNumbers');
         $this->importPreviews = [];
         $this->selectedImportPreviewKeys = [];
 
@@ -248,6 +268,8 @@ trait HandlesMultiAddressExcelImport
 
         $notification->send();
 
+        $this->dispatch('order-import-feedback', componentId: $this->getId());
+
         return false;
     }
 
@@ -256,17 +278,21 @@ trait HandlesMultiAddressExcelImport
         $this->validate([
             'excelFiles' => ['required', 'array', 'min:1'],
             'excelFiles.*' => ['file', 'mimes:xlsx,xls'],
+            'importReferenceNumbers' => ['array'],
+            'importReferenceNumbers.*' => ['nullable', 'string', 'max:100'],
         ]);
     }
 
-    protected function importExcelFile(mixed $file): array
+    protected function importExcelFile(mixed $file, string $key): array
     {
         $path = $file->getRealPath();
         $originalName = $this->originalImportFilename($file);
         $header = null;
 
         try {
-            ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] = $this->prepareImportFile($path);
+            $header = $this->readExcelHeader($path);
+            ['header' => $header, 'targetOrder' => $targetOrder, 'addressCode' => $addressCode] =
+                $this->prepareImportHeader($header, $this->importReferenceNumbers[$key] ?? null);
 
             if ($this->isSubmittedOrder($targetOrder)) {
                 throw new \RuntimeException(__('partner.import_target_order_already_submitted', ['address' => $addressCode]));
@@ -334,11 +360,15 @@ trait HandlesMultiAddressExcelImport
         }
 
         $notification->send();
+        $this->dispatch('order-import-feedback', componentId: $this->getId());
     }
 
-    protected function prepareImportFile(string $path): array
+    protected function prepareImportHeader(array $header, ?string $referenceNumber = null): array
     {
-        $header = $this->readExcelHeader($path);
+        // Only supplement an empty F1; never redirect a file that already identifies an order.
+        if ($header['reference_number'] === '') {
+            $header['reference_number'] = trim($referenceNumber ?? '');
+        }
 
         if ($header['address_code'] === '') {
             throw new \RuntimeException(__('partner.import_missing_address_code'));
@@ -395,23 +425,27 @@ trait HandlesMultiAddressExcelImport
     protected function readExcelHeader(string $path): array
     {
         $spreadsheet = IOFactory::load($path);
-        $sheet = $spreadsheet->getActiveSheet();
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
 
-        return [
-            'address_code' => trim((string) $sheet->getCell('C3')->getFormattedValue()),
-            'season' => trim((string) $sheet->getCell('C5')->getFormattedValue()),
-            'brand' => trim((string) $sheet->getCell('C6')->getFormattedValue()),
-            'order_sheet_type' => trim((string) $sheet->getCell('C7')->getFormattedValue()),
-            'reference_number' => trim((string) $sheet->getCell('F1')->getFormattedValue()),
-        ];
+            return [
+                'address_code' => trim((string) $sheet->getCell('C3')->getFormattedValue()),
+                'season' => trim((string) $sheet->getCell('C5')->getFormattedValue()),
+                'brand' => trim((string) $sheet->getCell('C6')->getFormattedValue()),
+                'order_sheet_type' => trim((string) $sheet->getCell('C7')->getFormattedValue()),
+                'reference_number' => trim((string) $sheet->getCell('F1')->getFormattedValue()),
+            ];
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
     }
 
     protected function resolveImportOrder(array $header): ?Order
     {
-        $this->order->loadMissing(['partner', 'partnerAddress']);
+        $partnerId = $this->excelImportPartnerId();
 
         $partnerAddress = PartnerAddress::query()
-            ->where('partner_id', $this->order->partner_id)
+            ->when($partnerId !== null, fn ($query) => $query->where('partner_id', $partnerId))
             ->where('addrid', $header['address_code'])
             ->first();
 
@@ -463,14 +497,20 @@ trait HandlesMultiAddressExcelImport
             return null;
         }
 
-        return Order::query()
-            ->where('partner_id', $this->order->partner_id)
+        return $partnerUser->accessibleOrdersQuery()
+            ->where('partner_id', $partnerAddress->partner_id)
             ->where('partner_address_id', $partnerAddress->id)
             ->where('season_id', $season->id)
             ->where('brand_id', $brand->id)
             ->where('order_sheet_type_id', $orderSheetType->id)
             ->where('reference_number', $header['reference_number'])
             ->first();
+    }
+
+    /** An open order limits imports to that partner; the selector import has no such context. */
+    protected function excelImportPartnerId(): ?int
+    {
+        return (int) $this->order->partner_id;
     }
 
     protected function refreshAfterExcelImport(): void
@@ -502,7 +542,7 @@ trait HandlesMultiAddressExcelImport
             'order_id' => $order?->id,
             'user_id' => auth('web')->id(),
             'partner_user_id' => auth('partner')->id(),
-            'partner_id' => $this->order->partner_id ?? null,
+            'partner_id' => $order?->partner_id ?? $this->excelImportPartnerId(),
             'partner_address_id' => $order?->partner_address_id,
             'address_code' => $addressCode,
             'filename' => $filename,

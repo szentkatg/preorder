@@ -241,6 +241,7 @@ class SalesRepOrderSummary extends Component
                     $haystack = mb_strtolower(implode(' ', [
                         $summary['partner_code'] ?? '',
                         $summary['partner_name'] ?? '',
+                        $summary['address_code'] ?? '',
                         $summary['address_name'] ?? '',
                         $summary['address'] ?? '',
                         $summary['reference_number'] ?? '',
@@ -483,6 +484,6 @@ class SalesRepOrderSummary extends Component
 
     protected function summaryCacheKey(): string
     {
-        return 'order-selector:sales-rep-summary:v3:'.(int) auth('partner')->id().':'.PartnerSeasonContext::id().':'.app()->getLocale();
+        return 'order-selector:sales-rep-summary:v4:'.(int) auth('partner')->id().':'.PartnerSeasonContext::id().':'.app()->getLocale();
     }
 }

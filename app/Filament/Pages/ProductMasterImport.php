@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\AdminImportTemplate;
+use App\Filament\Support\HasImportTemplateDownload;
 use App\Models\Brand;
 use App\Models\Color;
 use App\Models\ColorImage;
@@ -29,6 +31,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasImportTemplateDownload;
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
@@ -79,6 +82,7 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
     protected function getHeaderActions(): array
     {
         return [
+            $this->importTemplateAction(AdminImportTemplate::PRODUCTS),
             Action::make('validate')
                 ->label('Validálás')
                 ->action('validateImport'),

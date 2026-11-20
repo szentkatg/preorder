@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\AdminImportTemplate;
+use App\Filament\Support\HasImportTemplateDownload;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\PriceList;
@@ -22,6 +24,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class PriceListImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasImportTemplateDownload;
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
@@ -72,6 +75,7 @@ class PriceListImport extends Page implements Forms\Contracts\HasForms
     protected function getHeaderActions(): array
     {
         return [
+            $this->importTemplateAction(AdminImportTemplate::PRICE_LISTS),
             Action::make('validate')
                 ->label('Validálás')
                 ->action('validateImport'),

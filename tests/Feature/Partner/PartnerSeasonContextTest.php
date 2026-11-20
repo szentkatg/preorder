@@ -501,7 +501,8 @@ class PartnerSeasonContextTest extends TestCase
             $this->assertStringContainsString('wire:click="save"', $html);
             if ($component === CatalogGroupOrder::class) {
                 $this->assertStringContainsString('wire:click="exportExcel"', $html);
-                $this->assertStringContainsString('id="excelFiles"', $html);
+                $this->assertMatchesRegularExpression('/id="order-import-files-[^"]+"/', $html);
+                $this->assertStringContainsString('wire:model="excelFiles"', $html);
             }
         }
     }

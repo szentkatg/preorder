@@ -11,6 +11,11 @@ A rendeléslista **Területi képviselő** oszlopa a partner oszlopa mellett jel
 
 A képernyő összesítései, a „mindent kijelöl” és az Excel-export is a szűrt listát követi. Szűrőváltáskor a korábbi kijelölést töröljük. A szűrés a meglévő gyorsítótárazott összesítést használja, nem számolja újra a rendelési tételeket.
 
+A **Címkód** (`partner_addresses.addrid`) külön oszlopban, közvetlenül a cím előtt
+látható, a vezető nullák megtartásával. A partner/cím kereső címkódra és annak
+részletére is szűr, a partner neve/kódja és a cím neve, városa, utcája mellett.
+Ez a bővítés nem változtatja meg az Excel- és ERP-export oszlopszerkezetét.
+
 A gyorsítótár felhasználónként, a belépéskor kiválasztott szezononként és felületi nyelvenként különül el; a sorformátum verziózott. A gyorsítótárból visszaolvasott rendelések hozzáférését ismét ellenőrizzük, ezért egy később elrejtett szezon vagy visszavont partner-hozzárendelés adatai és képviselői sem szivárognak át a listába vagy az exportba.
 
 ## Ellenőrzés és kiadás

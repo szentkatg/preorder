@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\AdminImportTemplate;
+use App\Filament\Support\HasImportTemplateDownload;
 use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\Language;
@@ -24,6 +26,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasImportTemplateDownload;
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-up-tray';
@@ -74,6 +77,7 @@ class PartnerMasterImport extends Page implements Forms\Contracts\HasForms
     protected function getHeaderActions(): array
     {
         return [
+            $this->importTemplateAction(AdminImportTemplate::PARTNERS),
             Action::make('validate')
                 ->label('Validálás')
                 ->action('validateImport'),

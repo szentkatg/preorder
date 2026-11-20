@@ -360,6 +360,8 @@ class SalesRepOrderSummaryService
 
                     'sales_rep_erp_partner_code' => $order->partner?->sales_rep_erp_partner_code ?? '',
 
+                    'address_code' => (string) ($order->partnerAddress?->addrid ?? ''),
+
                     'address_name' => $order->partnerAddress?->name
                         ?? $order->partnerAddress?->addrid
                         ?? '',

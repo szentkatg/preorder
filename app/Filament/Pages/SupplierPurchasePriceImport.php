@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Exports\AdminImportTemplate;
+use App\Filament\Support\HasImportTemplateDownload;
 use App\Services\Imports\SupplierPurchasePriceImportService;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
@@ -9,10 +11,10 @@ use Filament\Forms;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 
-class SupplierPurchasePriceImport extends Page implements
-    Forms\Contracts\HasForms
+class SupplierPurchasePriceImport extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
+    use HasImportTemplateDownload;
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon =
@@ -53,7 +55,7 @@ class SupplierPurchasePriceImport extends Page implements
                     ->label('Excel fájl')
                     ->helperText(
                         'A fájl tartalmazhat suppliers és/vagy '
-                        . 'product_purchase_prices munkalapot.'
+                        .'product_purchase_prices munkalapot.'
                     )
                     ->storeFiles(false)
                     ->acceptedFileTypes([
@@ -68,6 +70,7 @@ class SupplierPurchasePriceImport extends Page implements
     protected function getHeaderActions(): array
     {
         return [
+            $this->importTemplateAction(AdminImportTemplate::SUPPLIERS),
             Action::make('validate')
                 ->label('Validálás')
                 ->icon('heroicon-o-check-circle')
@@ -81,7 +84,7 @@ class SupplierPurchasePriceImport extends Page implements
                 ->modalHeading('Importálás indítása')
                 ->modalDescription(
                     'A beszállítók és beszerzési árak létrehozása '
-                    . 'vagy frissítése megtörténik.'
+                    .'vagy frissítése megtörténik.'
                 )
                 ->action('import'),
         ];

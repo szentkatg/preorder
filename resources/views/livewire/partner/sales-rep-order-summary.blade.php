@@ -33,6 +33,11 @@
                             {{ __('partner.excel_export') }}
                         </button>
 
+                        <button type="button" wire:click="$dispatch('open-order-import')"
+                            class="rounded bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500">
+                            {{ __('partner.order_import') }}
+                        </button>
+
                         @if ($this->canExportErp)
                             <button type="button" wire:click="openErpExport" wire:loading.attr="disabled"
                                 class="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50">
@@ -123,7 +128,8 @@
                 <input
                     type="text"
                     wire:model.live.debounce.300ms="summarySearch"
-                    placeholder="{{ __('partner.search') }}"
+                    placeholder="{{ __('partner.order_summary_search_placeholder') }}"
+                    aria-label="{{ __('partner.order_summary_search_placeholder') }}"
                     class="rounded border"
                 >
             </div>
@@ -153,6 +159,7 @@
                             </th>
                             <th class="min-w-[150px] bg-white px-3 py-2">{{ __('partner.partner') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.sales_representative') }}</th>
+                            <th class="whitespace-nowrap bg-white px-3 py-2">{{ __('partner.address_code') }}</th>
                             <th class="min-w-[200px] bg-white px-3 py-2">{{ __('partner.address') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.season') }}</th>
                             <th class="bg-white px-3 py-2">{{ __('partner.brand') }}</th>
@@ -191,6 +198,7 @@
                                 <td class="px-3 py-2" data-order-sales-representative>
                                     {{ $summarySalesRepLabels->get($summary['sales_rep_erp_partner_code'] ?? '') ?? '—' }}
                                 </td>
+                                <td class="whitespace-nowrap px-3 py-2" data-order-address-code>{{ $summary['address_code'] ?? '' }}</td>
                                 <td class="px-3 py-2">
                                     {{ collect([$summary['address_name'], $summary['address']])->filter()->implode(' - ') }}
                                 </td>
@@ -221,7 +229,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="16" class="px-3 py-6 text-center text-gray-500">
+                                <td colspan="17" class="px-3 py-6 text-center text-gray-500">
                                     {{ __('partner.no_orders') }}
                                 </td>
                             </tr>
@@ -232,7 +240,7 @@
                         @foreach ($this->filteredSalesRepOrderSummaries->groupBy('currency') as $currency => $rows)
                             <tr class="border-t bg-gray-50 font-semibold">
                                 <td></td>
-                                <td colspan="10" class="px-3 py-2">
+                                <td colspan="11" class="px-3 py-2">
                                     {{ __('partner.total') }} – {{ $currency }}
                                 </td>
                                 <td class="px-3 py-2 text-right">

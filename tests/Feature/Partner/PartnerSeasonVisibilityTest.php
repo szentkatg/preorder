@@ -362,7 +362,7 @@ class PartnerSeasonVisibilityTest extends TestCase
     {
         $this->user->update(['role' => 'sales_rep']);
         $this->user->partners()->attach($this->address->partner_id);
-        Cache::put('order-selector:sales-rep-summary:v3:'.$this->user->id.':'.$this->visible->id.':hu', [
+        Cache::put('order-selector:sales-rep-summary:v4:'.$this->user->id.':'.$this->visible->id.':hu', [
             ['order_id' => $this->orders['visible']->id, 'season_id' => $this->visible->id, 'season_name' => 'Visible S27'],
             ['order_id' => $this->orders['hidden']->id, 'season_id' => $this->hidden->id, 'season_name' => 'Hidden W27'],
         ]);

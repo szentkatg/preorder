@@ -212,6 +212,7 @@ class OrderSummaryFiltersTest extends TestCase
 
     public function test_excel_export_only_contains_filtered_orders_and_totals(): void
     {
+        $this->freezeTime();
         Excel::fake();
         $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')
             ->set('summarySalesRepCode', 'P000555')->set('summaryStatus', 'submitted');
@@ -271,5 +272,22 @@ class OrderSummaryFiltersTest extends TestCase
             'summarySalesRepCode', 'summaryBrandId', 'summaryOrderSheetTypeId',
             'summaryCurrency', 'summaryFilledFilter', 'summaryStatus', 'summarySearch',
         ], $matches[1]);
+    }
+
+    public function test_address_codes_are_displayed_before_addresses_and_can_be_searched(): void
+    {
+        $this->addresses['a']->update(['addrid' => '00012345', 'city' => 'Kőszeg', 'street' => 'Rákóczi utca']);
+        $page = Livewire::test(SalesRepOrderSummary::class)->call('loadSummary')
+            ->assertSee('Címkód')->assertSee('00012345')->assertSee('Rendelés importálása');
+        $html = $page->html();
+        $this->assertMatchesRegularExpression('/data-order-address-code>\s*00012345\s*<\/td>\s*<td[^>]*>\s*Cím a/s', $html);
+        foreach (['012345', 'Kőszeg', 'Rákóczi'] as $search) {
+            $page->set('summarySearch', $search);
+            $this->assertSame($this->expectedIds(['a-draft', 'a-submitted', 'a-editing']), $this->ids($page));
+        }
+        $page->call('selectAllSummaryOrders');
+        $this->assertCount(3, $page->get('selectedSummaryOrderIds'));
+        $page->set('summarySearch', 'denied');
+        $this->assertSame([], $this->ids($page));
     }
 }

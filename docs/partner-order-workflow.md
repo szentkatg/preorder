@@ -25,6 +25,27 @@ képviselőnél jelenik meg. A visszanyitás a szerveren is képviselői művele
 A megosztott, belépés nélküli rendelőlap nem ad átjárást a belső rendeléslistához
 vagy összesítőoldalhoz; ott csak a csoportnavigáció marad.
 
+## Excel-import a rendelésválasztóról és hiányzó hivatkozás pótlása
+
+A rendeléslista műveleteinél a **Rendelés importálása** gomb külön ablakban nyitja
+meg a többfájlos importot. Nem a rendeléslista kijelölése alapján importál: a fájl
+fejléce (C3 címkód, C5 szezon, C6 márka, C7 rendelőlap, F1 hivatkozás) határozza
+meg a célrendelést. Csak a kiválasztott szezon már létező, még nem beküldött és
+a bejelentkezett felhasználó számára elérhető rendelése módosítható. A
+rendelőlapról indított import továbbra is az ott megnyitott partnerre korlátozott.
+
+Az **Importálás előnézete** megjelenésekor a felület az eredményhez görget,
+a külön importablakban annak belső görgetésével. Az előnézet nem ment adatot.
+Ha F1 üres, az adott fájl sorában hivatkozási szám írható be. Több hiányos
+fájlhoz külön mező tartozik. A mező elhagyásakor csak azt a fájlt ellenőrizzük
+újra, és frissülnek a várható változások. Érvényes találatnál a sor kijelölhető,
+alapból kijelölt; ismeretlen vagy nem engedélyezett rendelés nem importálható.
+
+A pótlás nem módosítja az Excel-fájlt és nem igényel új feltöltést. A már
+kitöltött F1 nem írható felül így. A tényleges mentés a **Kijelöltek importálása**
+gombbal történik, újabb jogosultság- és státuszellenőrzéssel. Új fájlfeltöltés,
+az importablak bezárása vagy az import befejezése törli az ideiglenes pótlásokat.
+
 ## Megosztott rendelőlap árlistája
 
 A megosztás árlistaválasztója kizárólag a rendelés partnerének valamelyik aktív címéhez rendelt, aktív `wholesale` vagy `distributor` árlistákat kínálja fel. Nem a bejelentkezett képviselő összes partnerének árlistáiból választunk. Egy partner több címe ugyanazt az árlistát csak egyszer jeleníti meg. Címfelhasználónál ezen belül csak a felhasználóhoz hozzárendelt aktív címek árlistái választhatók, nem a partner teljes címkörének árlistái. Több hozzárendelt cím esetén az ezekhez tartozó árlisták választhatók, de más partner árlistái nem. Partneradminnál és képviselőnél marad a rendelés partnerének teljes aktív címköre. Kisker, outlet, inaktív, más partnerhez rendelt vagy sehova nem rendelt árlista nem választható. Az alapérték a rendelés eredeti árlistája, ha jogosult; egyébként az első engedélyezett árlista, vagy üres választás.
