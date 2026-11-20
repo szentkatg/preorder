@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Partner\OrderSharePriceLists;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderShareLink extends Model
@@ -51,7 +52,16 @@ class OrderShareLink extends Model
             return false;
         }
 
-        return ($this->expires_at === null || $this->expires_at->isFuture())
-            && $this->order()->whereHas('season', fn ($query) => $query->visibleToPartners())->exists();
+        if ($this->expires_at !== null && ! $this->expires_at->isFuture()) {
+            return false;
+        }
+        $order = $this->order()->where('status', '!=', 'submitted')
+            ->whereHas('season', fn ($query) => $query->visibleToPartners())->first();
+
+        return $order !== null && app(OrderSharePriceLists::class)->allows(
+            $order,
+            $this->price_list_id ?: $order->price_list_id,
+            $this->createdByPartnerUser()->first()
+        );
     }
 }

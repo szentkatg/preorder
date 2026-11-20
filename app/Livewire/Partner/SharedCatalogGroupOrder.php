@@ -6,6 +6,14 @@ use App\Models\OrderShareLink;
 
 class SharedCatalogGroupOrder extends CatalogGroupOrder
 {
+    public function hydrate(): void
+    {
+        $link = $this->shareLink?->fresh();
+        abort_unless($link && (int) $link->order_id === (int) $this->order->id && $link->isAvailable(), 404);
+        $this->shareLink = $link;
+        $this->setDisplayPriceList($link->price_list_id ?: $this->order->price_list_id);
+    }
+
     public function mount(mixed $shareLink, string $catalogGroupName): void
     {
         if (! $shareLink instanceof OrderShareLink) {

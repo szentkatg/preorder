@@ -8,9 +8,14 @@ use App\Filament\Resources\PriceLists\Pages\EditPriceList;
 use App\Filament\Resources\PriceLists\Pages\ListPriceLists;
 use App\Filament\Resources\PriceLists\Pages\ViewPriceList;
 use App\Livewire\Partner\CatalogGroupOrder;
+use App\Models\Brand;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
 use App\Models\Order;
+use App\Models\OrderSheetType;
+use App\Models\Partner;
+use App\Models\PartnerAddress;
+use App\Models\PartnerUser;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -147,16 +152,25 @@ class PriceListSeasonTest extends TestCase
         $this->assertDatabaseHas('price_list_items', ['season_id' => $this->secondSeason->id, 'net_price' => 14990]);
     }
 
-    public function test_sharing_selects_active_lists_without_a_header_season(): void
+    public function test_sharing_selects_only_assigned_active_wholesale_lists_without_a_header_season(): void
     {
         $other = PriceList::create($this->formData('Wholesale_HU'));
         $other->update(['type' => 'wholesale']);
         $inactive = PriceList::create($this->formData('Inactive'));
         $inactive->update(['active' => false]);
+        $partner = Partner::create(['erp_partner_code' => 'SHARE-PARTNER', 'name' => 'Partner']);
+        $this->actingAs(PartnerUser::create(['partner_id' => $partner->id, 'role' => 'partner_admin',
+            'name' => 'Partner admin', 'email' => 'share-season@example.test', 'password' => 'password', 'active' => true]), 'partner');
+        $address = PartnerAddress::create(['partner_id' => $partner->id, 'addrid' => 'SHARE-ADDRESS', 'name' => 'Address', 'price_list_id' => $other->id]);
+        PartnerAddress::create(['partner_id' => $partner->id, 'addrid' => 'RETAIL-ADDRESS', 'name' => 'Retail address', 'price_list_id' => $this->list->id]);
+        $brand = Brand::create(['code' => 'SHARE-BRAND', 'name' => 'Brand']);
+        $sheet = OrderSheetType::create(['code' => 'SHARE-SHEET', 'name' => 'Sheet']);
         $page = $this->orderPage();
-        $page->order = new Order(['season_id' => $this->secondSeason->id]);
+        $page->order = Order::create(['season_id' => $this->secondSeason->id, 'partner_id' => $partner->id,
+            'partner_address_id' => $address->id, 'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id,
+            'reference_number' => 'SHARE-TEST', 'price_list_id' => $other->id]);
 
-        $this->assertEqualsCanonicalizing([$this->list->id, $other->id], $page->availableShareLists());
+        $this->assertSame([$other->id], $page->availableShareLists());
     }
 
     public function test_migration_removes_only_the_header_season_even_when_item_seasons_differ(): void

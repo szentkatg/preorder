@@ -494,6 +494,7 @@
                 </div>
 
                 @if ($showSharePanel)
+                    @php($shareOptions = $this->sharePriceListOptions())
                     <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-end">
                         <label class="block">
                             <span class="mb-1 block text-xs font-semibold text-gray-600">
@@ -503,10 +504,15 @@
                                 wire:model="sharePriceListId"
                                 class="w-full rounded border-gray-300 text-sm"
                             >
-                                @foreach ($this->sharePriceListOptions() as $priceListId => $priceListLabel)
+                                <option value="">{{ __('partner.share_select_price_list') }}</option>
+                                @foreach ($shareOptions as $priceListId => $priceListLabel)
                                     <option value="{{ $priceListId }}">{{ $priceListLabel }}</option>
                                 @endforeach
                             </select>
+                            <div class="mt-1 text-xs text-gray-600">{{ __('partner.share_price_list_scope_hint') }}</div>
+                            @if (empty($shareOptions))
+                                <div class="mt-1 text-xs text-red-700">{{ __('partner.share_price_list_no_options') }}</div>
+                            @endif
                             @error('sharePriceListId')
                                 <div class="mt-1 text-xs text-red-600">{{ $message }}</div>
                             @enderror
@@ -532,6 +538,7 @@
                             type="button"
                             wire:click="generateShareLink"
                             wire:loading.attr="disabled"
+                            @disabled(empty($shareOptions))
                             class="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                         >
                             {{ __('partner.generate_share_link') }}

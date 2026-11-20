@@ -10,11 +10,15 @@ use App\Models\Catalog;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderShareLink;
+use App\Models\PartnerUser;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Sku;
+use App\Services\Partner\OrderSharePriceLists;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -51,10 +55,13 @@ class CatalogGroupOrder extends Component
 
     public bool $showAllCatalogGroups = false;
 
+    #[Locked]
     public ?int $retailPriceListId = null;
 
+    #[Locked]
     public ?int $displayPriceListId = null;
 
+    #[Locked]
     public ?string $displayCurrencySymbol = null;
 
     public ?string $previousCatalogGroup = null;
@@ -69,8 +76,10 @@ class CatalogGroupOrder extends Component
 
     public array $excelFiles = [];
 
+    #[Locked]
     public bool $sharedMode = false;
 
+    #[Locked]
     public ?OrderShareLink $shareLink = null;
 
     public bool $showSharePanel = false;
@@ -287,7 +296,9 @@ class CatalogGroupOrder extends Component
         $this->catalogGroupName = urldecode($catalogGroupName);
 
         $this->setDisplayPriceList($this->order->price_list_id);
-        $this->sharePriceListId = $this->order->price_list_id ?: $this->sharePriceListQuery()->value('id');
+        $this->sharePriceListId = $this->sharePriceListQuery()->whereKey($this->order->price_list_id)->exists()
+            ? $this->order->price_list_id
+            : $this->sharePriceListQuery()->orderBy('code')->value('id');
 
         $this->allowAssortmentOrdering = (bool) $this->order->partnerAddress?->allow_assortment_ordering;
 
@@ -855,6 +866,11 @@ class CatalogGroupOrder extends Component
 
     public function sharePriceListOptions(): array
     {
+        if ($this->sharedMode) {
+            return [];
+        }
+        $this->authorizeShareManagement();
+
         return $this->sharePriceListQuery()
             ->with('currency')
             ->orderBy('code')
@@ -874,6 +890,8 @@ class CatalogGroupOrder extends Component
         if ($this->sharedMode) {
             return [];
         }
+        $this->authorizeShareManagement();
+        $allowedPriceIds = $this->sharePriceListQuery()->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         return OrderShareLink::query()
             ->with('priceList.currency')
@@ -893,11 +911,11 @@ class CatalogGroupOrder extends Component
                     'shareLink' => $shareLink->token,
                     'catalogGroupName' => $this->catalogGroupName,
                 ]),
-                'price_list' => trim(collect([
+                'price_list' => in_array((int) ($shareLink->price_list_id ?: $this->order->price_list_id), $allowedPriceIds, true) ? trim(collect([
                     $shareLink->priceList?->code,
                     $shareLink->priceList?->translate('name'),
                     $shareLink->priceList?->currency?->code,
-                ])->filter()->implode(' - ')),
+                ])->filter()->implode(' - ')) : __('partner.share_price_list_unavailable'),
                 'expires_at' => $shareLink->expires_at?->format('Y.m.d. H:i'),
                 'last_accessed_at' => $shareLink->last_accessed_at?->format('Y.m.d. H:i'),
             ])
@@ -906,7 +924,15 @@ class CatalogGroupOrder extends Component
 
     protected function sharePriceListQuery()
     {
-        return PriceList::query()->where('active', true);
+        return app(OrderSharePriceLists::class)->forOrder($this->order, $this->authorizeShareManagement());
+    }
+
+    protected function authorizeShareManagement(): PartnerUser
+    {
+        $partnerUser = PartnerUser::find(auth('partner')->id());
+        abort_unless($partnerUser?->active && $partnerUser->canAccessOrder($this->order), 403);
+
+        return $partnerUser;
     }
 
     public function generateShareLink(): void
@@ -915,18 +941,20 @@ class CatalogGroupOrder extends Component
             return;
         }
 
-        $partnerUser = auth('partner')->user();
-
-        abort_unless($partnerUser && $partnerUser->canAccessOrder($this->order), 403);
+        $partnerUser = $this->authorizeShareManagement();
 
         if ($this->order->isSubmitted()) {
             return;
         }
 
         $this->validate([
-            'sharePriceListId' => ['required', 'integer', 'exists:price_lists,id'],
+            'sharePriceListId' => ['required', 'integer'],
             'shareExpiresInDays' => ['required', 'integer', 'min:1', 'max:365'],
         ]);
+
+        if (! $this->sharePriceListQuery()->whereKey($this->sharePriceListId)->exists()) {
+            throw ValidationException::withMessages(['sharePriceListId' => __('partner.share_price_list_not_allowed')]);
+        }
 
         $shareLink = OrderShareLink::query()->create([
             'order_id' => $this->order->id,
@@ -951,9 +979,7 @@ class CatalogGroupOrder extends Component
             return;
         }
 
-        $partnerUser = auth('partner')->user();
-
-        abort_unless($partnerUser && $partnerUser->canAccessOrder($this->order), 403);
+        $this->authorizeShareManagement();
 
         OrderShareLink::query()
             ->whereKey($shareLinkId)

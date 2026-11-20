@@ -6,8 +6,11 @@ use App\Filament\Support\AdminTableState;
 use App\Http\Middleware\EnsurePartnerPortalIsAvailable;
 use App\Http\Middleware\RequirePartnerSeason;
 use App\Models\User;
+use App\Services\Auth\LoginAuditRecorder;
 use BezhanSalleh\FilamentShield\Facades\FilamentShield;
 use Filament\Tables\Table;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(Login::class, fn (Login $event) => app(LoginAuditRecorder::class)->record($event));
         Livewire::addPersistentMiddleware([EnsurePartnerPortalIsAvailable::class, RequirePartnerSeason::class]);
         Table::configureUsing(AdminTableState::configure(...));
         FilamentShield::prohibitDestructiveCommands($this->app->isProduction());

@@ -25,6 +25,20 @@ képviselőnél jelenik meg. A visszanyitás a szerveren is képviselői művele
 A megosztott, belépés nélküli rendelőlap nem ad átjárást a belső rendeléslistához
 vagy összesítőoldalhoz; ott csak a csoportnavigáció marad.
 
+## Megosztott rendelőlap árlistája
+
+A megosztás árlistaválasztója kizárólag a rendelés partnerének valamelyik aktív címéhez rendelt, aktív `wholesale` vagy `distributor` árlistákat kínálja fel. Nem a bejelentkezett képviselő összes partnerének árlistáiból választunk. Egy partner több címe ugyanazt az árlistát csak egyszer jeleníti meg. Címfelhasználónál ezen belül csak a felhasználóhoz hozzárendelt aktív címek árlistái választhatók, nem a partner teljes címkörének árlistái. Több hozzárendelt cím esetén az ezekhez tartozó árlisták választhatók, de más partner árlistái nem. Partneradminnál és képviselőnél marad a rendelés partnerének teljes aktív címköre. Kisker, outlet, inaktív, más partnerhez rendelt vagy sehova nem rendelt árlista nem választható. Az alapérték a rendelés eredeti árlistája, ha jogosult; egyébként az első engedélyezett árlista, vagy üres választás.
+
+A címfelhasználó kiválasztását a szerver friss felhasználói és cím-hozzárendelési adatokból ellenőrzi. Ha egy meglévő megosztás létrehozója címfelhasználó, a link megnyitása és minden további kérése is figyelembe veszi az aktuális címjogosultságát. A cím-hozzárendelés vagy az árlista-hozzárendelés megszűnésekor a link nem használható. A régi, létrehozó nélkül tárolt linkeknél csak a rendelés partnerének árlistakorlátja ellenőrizhető.
+
+A szerver a létrehozáskor frissen újraellenőrzi a kiválasztást. A régi link megnyitása és a már megnyitott megosztás minden további Livewire-kérése is ellenőrzi a lejáratot, visszavonást, rendelési állapotot, szezonláthatóságot és az árlista aktuális engedélyét. Tiltott link 404-et ad, nem rögzít hozzáférési időpontot és nem módosít rendelési sort. Ha az engedély később ismét érvényessé válik, egy még nem lejárt és nem visszavont link újra használható. Végleges letiltáshoz a megosztást vissza kell vonni; az engedélytelen régi link a tulajdonos listájában általános, árlistanevet nem felfedő felirattal továbbra is visszavonható.
+
+A megjelenített árlista, pénznem, kapcsolt kiskerárlista és megosztott mód szerver által kezelt, zárolt Livewire-tulajdonság. A linket megnyitó nem állíthatja át ezeket más árlistára. A megosztott oldal nem listázza a partner más megosztható árlistáit.
+
+A kisker ár feloldása változatlan: a megosztáskor kiválasztott nagyker-/disztribútor-árlista `retail_price_list_id` kapcsolata mutat a kiskerárlistára. Mindkét ár a `price_list_items` táblából, a rendelés szezonjára és az adott modellre olvasódik. Nincs külön kiskerárlista-választás, automatikus pénznemkeresés vagy átváltás; hiányzó kapcsolat vagy tétel esetén a jelenlegi megjelenítő 0-t ad vissza. A megosztásban rögzített mennyiségek mentett rendelési egységára továbbra is az eredeti rendelés árlistájából származik, nem a megosztott nézeti árlistából.
+
+Ehhez a szűkítéshez nincs migráció, függőségtelepítés vagy frontendbuild. Ellenőrzés: `OrderSharePriceListAccessTest`, `PriceListSeasonTest`, valamint a partneroldali szezon-, elérhetőségi és disztribútor-regressziós tesztek.
+
 ## Engedélyezett rendeléstípusok
 
 Az adminban a **Partner Addresses / Partnercímek** szerkesztésénél, illetve a
