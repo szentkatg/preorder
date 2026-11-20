@@ -494,7 +494,9 @@
                 </div>
 
                 @if ($showSharePanel)
-                    @php($shareOptions = $this->sharePriceListOptions())
+                    @php
+                        $shareOptions = $this->sharePriceListOptions();
+                    @endphp
                     <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-end">
                         <label class="block">
                             <span class="mb-1 block text-xs font-semibold text-gray-600">

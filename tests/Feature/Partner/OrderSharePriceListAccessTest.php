@@ -117,6 +117,63 @@ class OrderSharePriceListAccessTest extends TestCase
             array_keys($page->instance()->sharePriceListOptions()));
     }
 
+    public static function sharingPanelContexts(): array
+    {
+        return [['partner_admin', 'hu'], ['partner_admin', 'en'], ['address_user', 'hu'], ['address_user', 'en']];
+    }
+
+    #[DataProvider('sharingPanelContexts')]
+    public function test_opening_and_reopening_the_share_panel_renders_translated_controls_and_only_allowed_options(string $role, string $locale): void
+    {
+        session(['partner.locale' => $locale]);
+        $this->user->update(['role' => $role]);
+        $this->user->addresses()->attach($this->address);
+        $page = $this->page()->set('showSharePanel', true)->assertSuccessful();
+        $this->assertRenderedSharePanel($page);
+        $page->assertSeeHtml('<option value="'.$this->lists['whole']->id.'">');
+        if ($role === 'partner_admin') {
+            $page->assertSeeHtml('<option value="'.$this->lists['dist']->id.'">');
+        } else {
+            $page->assertDontSeeHtml('<option value="'.$this->lists['dist']->id.'">');
+        }
+        foreach (['retail', 'outlet', 'foreign', 'unassigned', 'inactive', 'inactive_address'] as $key) {
+            $page->assertDontSeeHtml('<option value="'.$this->lists[$key]->id.'">');
+        }
+        $page->set('showSharePanel', false)->assertDontSeeHtml('wire:model="sharePriceListId"');
+        $this->assertRenderedSharePanel($page->set('showSharePanel', true));
+    }
+
+    private function assertRenderedSharePanel($page): void
+    {
+        $page->assertSee(__('partner.share_price_list'))->assertSee(__('partner.share_select_price_list'))
+            ->assertSee(__('partner.share_expires_in_days'))->assertSee(__('partner.generate_share_link'))
+            ->assertDontSeeHtml('{{')->assertDontSeeHtml('@if')->assertDontSeeHtml('@error')
+            ->assertDontSeeHtml('@php')->assertDontSeeHtml('sharePriceListOptions()');
+    }
+
+    public function test_open_share_panel_displays_generated_link_and_allows_revoking_it(): void
+    {
+        $page = $this->page()->set('showSharePanel', true)->call('generateShareLink')->assertHasNoErrors();
+        $link = OrderShareLink::firstOrFail();
+        $this->assertRenderedSharePanel($page);
+        $page->assertSee(__('partner.generated_share_link'))->assertSee(__('partner.revoke_share_link'))
+            ->assertSeeHtml($page->get('generatedShareUrl'));
+        $this->assertTrue($link->isAvailable());
+        $page->call('revokeShareLink', $link->id)->assertHasNoErrors();
+        $this->assertNotNull($link->fresh()->revoked_at);
+    }
+
+    public function test_open_share_panel_without_eligible_lists_renders_the_notice_and_disables_creation(): void
+    {
+        PartnerAddress::where('partner_id', $this->partner->id)->update(['active' => false]);
+        $page = $this->page()->set('showSharePanel', true)->assertSee(__('partner.share_price_list_no_options'));
+        $this->assertRenderedSharePanel($page);
+        $this->assertSame(1, preg_match('/<button\b[^>]*wire:click="generateShareLink"[^>]*>/s', $page->html(), $matches));
+        $this->assertMatchesRegularExpression('/\bdisabled(?:[ =>])/', $matches[0]);
+        $page->call('generateShareLink')->assertHasErrors(['sharePriceListId']);
+        $this->assertDatabaseCount('order_share_links', 0);
+    }
+
     public function test_address_user_cannot_select_or_share_a_list_of_an_unassigned_address_of_the_same_partner(): void
     {
         $this->user->update(['role' => 'address_user']);
