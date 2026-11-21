@@ -120,6 +120,47 @@ class OrderImportTest extends TestCase
         }
     }
 
+    private function assertPreviewCheckbox($page, string $key, bool $enabled): void
+    {
+        $document = new \DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document->loadHTML('<?xml encoding="UTF-8">'.$page->html());
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $nodes = (new \DOMXPath($document))->query('//input[@type="checkbox" and @value="'.$key.'"]');
+        $this->assertSame(1, $nodes->length, 'Every preview row must keep its checkbox, including failed rows.');
+        $this->assertSame(! $enabled, $nodes->item(0)->hasAttribute('disabled'));
+    }
+
+    public function test_reference_completion_enables_and_selects_the_existing_checkbox_and_invalid_input_disables_it_again(): void
+    {
+        $page = Livewire::test(OrderImport::class)->call('open')->set('excelFiles', [$this->upload('a'), $this->upload('b')])
+            ->call('previewExcelImports')->assertSet('selectedImportPreviewKeys', [])
+            ->assertSee('wire:model.live.debounce.500ms="importReferenceNumbers.file-0"', false)
+            ->assertDontSee('wire:model.blur="importReferenceNumbers.file-0"', false);
+        $this->assertPreviewCheckbox($page, 'file-0', false);
+        $this->assertPreviewCheckbox($page, 'file-1', false);
+
+        $page->set('importReferenceNumbers.file-0', 'REF-a')->assertSet('selectedImportPreviewKeys', ['file-0']);
+        $this->assertPreviewCheckbox($page, 'file-0', true);
+        $this->assertPreviewCheckbox($page, 'file-1', false);
+
+        $page->set('selectedImportPreviewKeys', [])->set('importReferenceNumbers.file-1', 'REF-b')
+            ->assertSet('selectedImportPreviewKeys', ['file-1']);
+        $this->assertPreviewCheckbox($page, 'file-0', true);
+        $this->assertPreviewCheckbox($page, 'file-1', true);
+
+        $page->set('importReferenceNumbers.file-1', 'UNKNOWN')->assertSet('selectedImportPreviewKeys', []);
+        $this->assertPreviewCheckbox($page, 'file-1', false);
+        $page->set('importReferenceNumbers.file-1', 'REF-b')->call('importSelectedExcelFiles')
+            ->assertSet('importResults.success', true);
+        $this->assertDatabaseHas('order_items', ['sku_id' => $this->sku->id, 'order_id' => $this->orders['a']->id, 'quantity' => 2]);
+        $this->assertDatabaseHas('order_items', ['sku_id' => $this->sku->id, 'order_id' => $this->orders['b']->id, 'quantity' => 7]);
+    }
+
     public function test_missing_references_can_be_completed_independently_without_changing_or_reuploading_files(): void
     {
         $a = $this->upload('a');
@@ -173,6 +214,38 @@ class OrderImportTest extends TestCase
             ->assertSet('importPreviews.files.0.success', false)->assertSee('F1');
         $this->assertDatabaseCount('order_import_logs', 0);
         $this->assertDatabaseCount('orders', 6);
+    }
+
+    public function test_reference_feedback_is_directly_next_to_its_field_with_prominent_error_and_success_states(): void
+    {
+        $page = Livewire::test(OrderImport::class)->call('open')->set('excelFiles', [$this->upload('a'), $this->upload('b')])
+            ->call('previewExcelImports')->set('importReferenceNumbers.file-0', 'UNKNOWN');
+        $document = new \DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document->loadHTML('<?xml encoding="UTF-8">'.$page->html());
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $xpath = new \DOMXPath($document);
+        $feedback = $xpath->query('//*[@data-import-reference-feedback="file-0"]')->item(0);
+        $this->assertNotNull($feedback);
+        $this->assertSame('alert', $feedback->getAttribute('role'));
+        $this->assertStringContainsString('bg-red-100', $feedback->getAttribute('class'));
+        $this->assertStringContainsString('Nem importálható', $feedback->textContent);
+        $this->assertStringContainsString('UNKNOWN', $feedback->textContent);
+        $input = $xpath->query('../input', $feedback)->item(0);
+        $this->assertSame($feedback->getAttribute('id'), $input->getAttribute('aria-describedby'));
+        $this->assertSame('true', $input->getAttribute('aria-invalid'));
+        $this->assertStringContainsString('border-red-600', $input->getAttribute('class'));
+        $this->assertPreviewCheckbox($page, 'file-0', false);
+
+        $page->set('importReferenceNumbers.file-0', 'REF-a')
+            ->assertSee('role="status"', false)->assertSee('bg-green-50', false)
+            ->assertSee('aria-invalid="false"', false)->assertSee('Importálható');
+        $this->assertPreviewCheckbox($page, 'file-0', true);
+        $this->assertPreviewCheckbox($page, 'file-1', false);
     }
 
     public function test_a_reference_already_in_f1_cannot_be_overridden(): void

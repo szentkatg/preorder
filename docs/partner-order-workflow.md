@@ -37,9 +37,14 @@ rendelőlapról indított import továbbra is az ott megnyitott partnerre korlá
 Az **Importálás előnézete** megjelenésekor a felület az eredményhez görget,
 a külön importablakban annak belső görgetésével. Az előnézet nem ment adatot.
 Ha F1 üres, az adott fájl sorában hivatkozási szám írható be. Több hiányos
-fájlhoz külön mező tartozik. A mező elhagyásakor csak azt a fájlt ellenőrizzük
+fájlhoz külön mező tartozik. A gépelésben tartott rövid szünet után csak azt a fájlt ellenőrizzük
 újra, és frissülnek a várható változások. Érvényes találatnál a sor kijelölhető,
-alapból kijelölt; ismeretlen vagy nem engedélyezett rendelés nem importálható.
+alapból kijelölt. A checkbox minden sorban látszik, de csak importálható sornál
+használható; ismeretlen vagy nem engedélyezett rendelés nem importálható.
+A szerkeszthető hivatkozás alatt közvetlenül is megjelenik az ellenőrzés eredménye:
+hiba esetén piros, keretezett **Nem importálható** jelzés a pontos okkal és piros
+mezőkerettel, siker esetén zöld **Importálható** jelzés. A visszajelzés így nem
+csak a táblázat távoli Státusz oszlopában látható; képernyőolvasó is felolvashatja.
 
 A pótlás nem módosítja az Excel-fájlt és nem igényel új feltöltést. A már
 kitöltött F1 nem írható felül így. A tényleges mentés a **Kijelöltek importálása**

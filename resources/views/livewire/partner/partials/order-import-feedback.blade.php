@@ -63,23 +63,39 @@
                         @foreach (($importPreviews['files'] ?? []) as $filePreview)
                             <tr wire:key="import-preview-{{ $filePreview['key'] }}" class="{{ ($filePreview['success'] ?? false) ? '' : 'bg-red-50 text-red-800' }}">
                                 <td class="px-3 py-2">
-                                    @if ($filePreview['success'] ?? false)
-                                        <input
-                                            type="checkbox"
-                                            wire:model.live="selectedImportPreviewKeys"
-                                            value="{{ $filePreview['key'] }}"
-                                            class="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                                        />
-                                    @endif
+                                    <input
+                                        type="checkbox"
+                                        wire:key="import-preview-select-{{ $filePreview['key'] }}"
+                                        wire:model.live="selectedImportPreviewKeys"
+                                        value="{{ $filePreview['key'] }}"
+                                        aria-label="{{ __('partner.select_for_import', ['file' => $filePreview['filename']]) }}"
+                                        @disabled(! ($filePreview['success'] ?? false))
+                                        class="rounded border-orange-300 text-orange-600 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
                                 </td>
                                 <td class="px-3 py-2 font-medium">{{ $filePreview['filename'] ?? '' }}</td>
                                 <td class="px-3 py-2">
                                     @if ($filePreview['missing_reference_number'] ?? false)
                                         <input type="text" maxlength="100"
-                                            wire:model.blur="importReferenceNumbers.{{ $filePreview['key'] }}"
+                                            wire:model.live.debounce.500ms="importReferenceNumbers.{{ $filePreview['key'] }}"
                                             aria-label="{{ __('partner.import_reference_number_label') }} — {{ $filePreview['filename'] }}"
+                                            aria-describedby="import-reference-feedback-{{ $this->getId() }}-{{ $filePreview['key'] }}"
+                                            aria-invalid="{{ ($filePreview['success'] ?? false) ? 'false' : 'true' }}"
                                             placeholder="{{ __('partner.reference_number') }}"
-                                            class="w-48 rounded border border-orange-400 bg-white px-2 py-1 text-gray-900 focus:ring-orange-500" />
+                                            class="w-48 rounded border-2 bg-white px-2 py-1 text-gray-900 {{ ($filePreview['success'] ?? false) ? 'border-green-600 focus:ring-green-500' : 'border-red-600 focus:ring-red-500' }}" />
+                                        <div id="import-reference-feedback-{{ $this->getId() }}-{{ $filePreview['key'] }}"
+                                            data-import-reference-feedback="{{ $filePreview['key'] }}"
+                                            role="{{ ($filePreview['success'] ?? false) ? 'status' : 'alert' }}"
+                                            aria-atomic="true"
+                                            class="mt-2 w-64 rounded-md border px-3 py-2 text-sm {{ ($filePreview['success'] ?? false) ? 'border-green-600 bg-green-50 text-green-900' : 'border-red-600 bg-red-100 text-red-900' }}">
+                                            <strong>
+                                                <span aria-hidden="true">{{ ($filePreview['success'] ?? false) ? '✓' : '⚠' }}</span>
+                                                {{ ($filePreview['success'] ?? false) ? __('partner.import_preview_ready') : __('partner.import_preview_blocked') }}
+                                            </strong>
+                                            @if (! ($filePreview['success'] ?? false))
+                                                <span class="mt-1 block">{{ $filePreview['message'] ?? '' }}</span>
+                                            @endif
+                                        </div>
                                         <div class="mt-1 text-xs">{{ __('partner.import_reference_number_hint') }}</div>
                                         @error('importReferenceNumbers.'.$filePreview['key'])
                                             <div class="text-xs text-red-700">{{ $message }}</div>
@@ -94,7 +110,13 @@
                                 <td class="px-3 py-2 text-right">{{ number_format((int) ($filePreview['stats']['changed'] ?? 0), 0, ',', ' ') }}</td>
                                 <td class="px-3 py-2 text-right">{{ number_format((int) ($filePreview['stats']['new_quantity'] ?? 0), 0, ',', ' ') }}</td>
                                 <td class="px-3 py-2 text-right">{{ number_format((float) ($filePreview['stats']['new_value'] ?? 0), 0, ',', ' ') }}</td>
-                                <td class="px-3 py-2">{{ $filePreview['message'] ?? '' }}</td>
+                                <td class="px-3 py-2">
+                                    @if ($filePreview['missing_reference_number'] ?? false)
+                                        {{ ($filePreview['success'] ?? false) ? __('partner.import_preview_ready') : __('partner.import_preview_blocked') }}
+                                    @else
+                                        {{ $filePreview['message'] ?? '' }}
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
