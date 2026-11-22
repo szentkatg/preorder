@@ -5,6 +5,7 @@ namespace App\Filament\Support;
 use App\Exports\AdminTableExport;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PricingCalculationRow;
@@ -222,6 +223,17 @@ class AdminResourceTable
                     ),
                     isIndividual: true,
                 );
+        }
+
+        if ($modelClass === Partner::class && $column->getName() === 'salesRepresentative.name') {
+            // Alias the self-referencing relation so the subquery correlates to the outer partner.
+            $column->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                DB::table('partners as partner_sales_representatives')
+                    ->select('partner_sales_representatives.name')
+                    ->whereColumn('partner_sales_representatives.erp_partner_code', 'partners.sales_rep_erp_partner_code')
+                    ->limit(1),
+                $direction,
+            ));
         }
 
         if ($modelClass === PartnerAddress::class && $column->getName() === 'orderTypes.code') {
