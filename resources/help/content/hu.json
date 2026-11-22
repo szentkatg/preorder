@@ -1,0 +1,450 @@
+[
+  {
+    "title": "Bejelentkezés és jelszó",
+    "intro": "A partnerportált a Heavy Toolstól kapott címen nyisd meg. Az éles rendszer belépési címe https://rendeles.szeganet.hu/partner/login. Ha teszteléshez külön címet kaptál, azt ne keverd össze az éles rendszerrel.",
+    "images": [
+      [
+        "01-belepes.png",
+        "A bejelentkező űrlap. A nyelv a belépés előtt is kiválasztható.",
+        3.5,
+        2.6
+      ]
+    ],
+    "steps": [
+      "Válaszd ki a felület nyelvét, majd add meg a rendszerben nyilvántartott e-mail-címedet és a jelszavadat.",
+      "Kattints a Bejelentkezés gombra. Sikeres azonosítás után külön ablakban kell szezont választanod.",
+      "Ha megjelenik a frissítési tájékoztató, olvasd el, majd folytasd a szezonválasztással. A Ne jelenjen meg újra jelölés a saját felhasználódnál, másik böngészőben is megjegyzi az elrejtést.",
+      "Ha először lépsz be vagy nem emlékszel a jelszavadra, válaszd az Elfelejtett jelszó hivatkozást.",
+      "Add meg a nyilvántartott e-mail-címedet, és kérd a visszaállítási linket. A kapott levélből nyisd meg a jelszó-visszaállító oldalt.",
+      "Az új jelszót kétszer kell megadni; legalább 8 karakter legyen. Mentés után térj vissza a belépéshez."
+    ],
+    "notes": [
+      "Ha nem érkezik levél, nézd meg a levélszemét mappát is. Ha az e-mail-címed nincs regisztrálva, kérj segítséget a területi képviselődtől.",
+      "Biztonság: a jelszó-visszaállító linket és a jelszavadat ne továbbítsd másnak. Közös számítógépen a munka végén jelentkezz ki."
+    ]
+  },
+  {
+    "title": "Szezonválasztás és nyelvváltás",
+    "intro": "Egy munkamenetben mindig egy kiválasztott szezon adataival dolgozol. Ez a rendeléslistára, az új rendelésekre, az összesítésekre és az importálásra is érvényes.",
+    "images": [
+      [
+        "03-szezon-dialog.png",
+        "A sikeres belépés után megjelenő szezonválasztó ablak.",
+        4.6,
+        3.4
+      ]
+    ],
+    "steps": [
+      "Válassz a felkínált szezonok közül. Csak a partnerportálon láthatóvá tett szezonok jelennek meg.",
+      "Kattints a Kiválasztott szezon megnyitása gombra. Új jelszómegadás nélkül jutsz a rendelésválasztó oldalra.",
+      "Másik szezonhoz használd a Szezonváltás gombot. Válassz új szezont, majd nyisd meg; nem kell kijelentkezned és újra bejelentkezned."
+    ],
+    "paragraphs": [
+      "Az aktuális szezon a rendelésválasztó és a rendelőlap tetején is jól látható. A rendelőlapon a márka és a rendelőlap típusa is megjelenik.",
+      "A fejléc Nyelv választójával a rendelésválasztón és a rendelőlapon is módosíthatod a felület nyelvét. A nyelvváltás nem változtatja meg a rendelés árlistáját, pénznemét vagy mennyiségeit.",
+      "A nyelvválasztó mellett található Súgó külön böngészőlapon nyitja meg a választott nyelvű kézikönyvet. Itt a PDF-változatot is letöltheted."
+    ],
+    "notes": [
+      "Ha a keresett szezon nincs a listában, azt nem a szűrők törlésével lehet előhozni: jelezd a területi képviselőnek."
+    ]
+  },
+  {
+    "title": "Új rendelés és meglévő rendelés megnyitása",
+    "intro": "Ugyanahhoz a szezonhoz, címhez, márkához és rendelőlaphoz több külön rendelés is létrehozható. A rendeléseket a hivatkozási szám különbözteti meg egymástól.",
+    "images": [
+      [
+        "04-selector-panel.png",
+        "Az elkülönített rendelésválasztó panel meglévő rendelésekkel és új hivatkozási számmal.",
+        7.05,
+        2.7
+      ]
+    ],
+    "steps": [
+      "A Keresés a címben mezővel szűkítheted a címlistát partnernév, partnerkód, címkód, címnév, város vagy utca alapján.",
+      "Válaszd ki a címet, majd a márkát és a rendelőlapot. Csak a jogosultságod és a cím beállításai alapján elérhető elemek közül választhatsz.",
+      "Meglévő rendeléshez kattints a megfelelő hivatkozási szám sorában a Rendelőlap megnyitása gombra.",
+      "Új rendeléshez írj be új hivatkozási számot, válassz rendeléstípust, majd kattints az Új rendelés létrehozása gombra."
+    ],
+    "paragraphs": [
+      "A rendeléstípus nem ugyanaz, mint a rendelőlap típusa. Például a Textil egy rendelőlap, a VRELO pedig normál előrendelést jelent. Csak a kiválasztott címhez engedélyezett aktív rendeléstípusok jelennek meg.",
+      "Példa hivatkozásra: ELŐ-S27-005. Az azonos szezon, partner, cím, márka és rendelőlap kombináción belül a hivatkozási számnak egyedinek kell lennie. Az új szám legfeljebb 100 karakter hosszú lehet.",
+      "A régebbi rendelések hivatkozási számát már kitöltöttük. Az aktuális hivatkozást mindig a rendeléslistában ellenőrizd."
+    ],
+    "notes": [
+      "A rendeléstípus megváltoztatása önmagában nem teszi újra felhasználhatóvá ugyanazt a hivatkozást. Ha egy választóban egyetlen lehetőség van, a rendszer azt automatikusan kijelölheti."
+    ]
+  },
+  {
+    "title": "A rendeléslista szűrése és kijelölése",
+    "intro": "A rendelésválasztó alatt a kiválasztott szezonhoz tartozó, számodra elérhető rendelések listáját találod. A lista több címet és több hivatkozási számot is tartalmazhat.",
+    "images": [
+      [
+        "05-rendeleslista.png",
+        "A rendeléslista a szűrőkkel, állapotjelzésekkel és összesítő gombokkal.",
+        7.05,
+        3
+      ]
+    ],
+    "steps": [
+      "A szűrők között választhatsz területi képviselőt, márkát, rendelőlapot, pénznemet, kitöltöttséget és rendelésstátuszt. A partner kereső külön mezőben található.",
+      "A sor elején lévő jelölőnégyzettel válaszd ki a kívánt rendeléseket. A fejléc jelölőnégyzete a szűrésnek megfelelő rendelések kijelölését kapcsolja.",
+      "Egy rendelés megnyitásához kattints a listában a sorára. Ellenőrizd a címet és a hivatkozási számot, ne csak a partner nevét.",
+      "Az Exportálás Excel-be gomb a szűrt rendeléslistát exportálja, nem az egyedi rendelőlap méretenkénti mátrixát."
+    ],
+    "table": [
+      [
+        "Jelzés",
+        "Jelentés"
+      ],
+      [
+        [
+          "Piszkozat",
+          "A rendelés még szerkeszthető."
+        ],
+        [
+          "Beküldve",
+          "A rendelés már csak megtekinthető."
+        ],
+        [
+          "0 mennyiség",
+          "A rendelés létezik, de még nincs benne rendelt mennyiség."
+        ]
+      ]
+    ],
+    "notes": [
+      "A sorok kijelölése és a felső, új rendelést létrehozó panel választásai két külön funkciót vezérelnek. Az ERP-exporthoz és a több rendelés összesítéséhez mindig a lista jelölőnégyzetei számítanak."
+    ]
+  },
+  {
+    "title": "A rendelőlap áttekintése",
+    "intro": "A rendelőlap termék, szín és méret szerint rendezi a rendelhető tételeket. Alapból az aktuális katalóguscsoport látszik.",
+    "images": [
+      [
+        "06-rendelolap.png",
+        "A rendelőlap mintamennyiségekkel. Széles táblázatnál oldalirányú görgetés is szükséges lehet.",
+        7.05,
+        4.15
+      ]
+    ],
+    "steps": [
+      "A lap tetején ellenőrizd a szezont, a márkát és a rendelőlap típusát, valamint az alatta látható partner- és címadatokat.",
+      "A Vissza a rendelésekhez gomb a rendelésválasztóra visz. Az Összesített adatok gomb az adott rendelés katalóguscsoportonkénti áttekintését nyitja meg.",
+      "Az előző és következő katalóguscsoport nevét mutató hivatkozásokkal léphetsz tovább a csoportok között.",
+      "Az Aktuális katalóguscsoport és a Teljes rendelés blokkok az összesített mennyiséget, nettó nagyker értéket és bruttó kisker értéket mutatják."
+    ],
+    "notes": [
+      "A Minden katalóguscsoport megjelenítése gomb minden csoportot egymás alá tesz. Nagy textil rendelőlapnál ez több időt és nagyobb böngészőmemóriát igényelhet. A Csak aktuális katalóguscsoport gombbal visszatérhetsz az alapnézethez."
+    ]
+  },
+  {
+    "title": "Mennyiségek mentése és gyűjtős rendelés",
+    "intro": "A rendelhető méretek mezőibe egész mennyiséget írj. A nem elérhető méretekhez nem adhatsz rendelést.",
+    "images": [
+      [
+        "06-mennyisegek.png",
+        "Darabos mennyiségek, gyűjtőrendelés és az ezekből számolt méretenkénti összes mennyiségek.",
+        7.05,
+        2.75
+      ],
+      [
+        "06-mentes-export.png",
+        "A lap alján található mentési, exportálási és importálási gombok.",
+        4.4,
+        0.55
+      ]
+    ],
+    "steps": [
+      "Kattints a megfelelő termék, szín és méret metszetében lévő beviteli mezőre, és add meg a mennyiséget.",
+      "A mező elhagyásakor a rendszer menti a változást. Kilépés vagy navigálás előtt kattints ki az utolsó szerkesztett mezőből; használhatod a Mentés gombot is.",
+      "Korábbi mennyiség törléséhez írj 0-t a mezőbe, majd hagyd el a mezőt.",
+      "Excelből egy összefüggő mennyiségtartományt Ctrl+C-vel másolhatsz, majd a kezdő méret mezőjébe Ctrl+V-vel illeszthetsz. Ellenőrizd a kezdő cellát, a méretsorrendet és a beillesztés eredményét."
+    ],
+    "paragraphs": [
+      "Ha a címnél engedélyezett a gyűjtős rendelés és az adott színhez létezik gyűjtő, külön Gyűjtő rendelés oszlop jelenik meg. Ide a gyűjtők számát írd, nem a bennük lévő összes darabot.",
+      "A példában egy gyűjtő 6 darabot tartalmaz. Két gyűjtő 12 darabbal növeli a méretenkénti összesített mennyiségeket. A darabos és a gyűjtős mennyiségek összeadódnak."
+    ],
+    "notes": [
+      "Beküldött rendelésen nincs szerkeszthető mennyiségmező. A Mentés és a Beküldés nem ugyanaz: a mentett piszkozat később még módosítható."
+    ]
+  },
+  {
+    "title": "Modellkeresés és termékképek",
+    "intro": "Nem szükséges végiggörgetned az összes terméket ahhoz, hogy egy ismert modellt megtalálj.",
+    "images": [
+      [
+        "06-modellkereses.png",
+        "A navigációs sor jobb oldalán található a Modell keresése mező és a nagyító gomb.",
+        7.05,
+        0.85
+      ]
+    ],
+    "steps": [
+      "A jobb felső Modell keresése mezőbe írj modellnevet, modellkódot vagy ezek egy részletét.",
+      "Nyomj Entert, vagy használd a nagyító gombot. A rendszer a találathoz tartozó katalóguscsoporthoz navigál.",
+      "Több találatnál a nagyítóval léphetsz a következőre. Ellenőrizd a kiemelt modellt, mielőtt mennyiséget adsz meg.",
+      "A modellnévre kattintva megnyílik a hozzá tartozó képek ablaka. Ha van hozzájuk kép, itt jelennek meg a színváltozatok és a katalógusképek is.",
+      "A képet külön böngészőlapon is megnyithatod. A képek ablakát a Bezárás gombbal zárhatod be."
+    ],
+    "paragraphs": [
+      "A képek megtekintése nem változtatja meg a rendelést. A modell neve és a szín neve között különbség van: mennyiséget mindig a kívánt szín sorába írj.",
+      "A Minden katalóguscsoport megjelenítése nézetben a csoportok gyorshivatkozásai is megjelennek. Ezekkel a hosszú oldalon belül az adott csoporthoz ugorhatsz."
+    ],
+    "notes": [
+      "Ha egy színhez nem látszik kép, az önmagában nem jelenti azt, hogy nem rendelhető. A rendelhetőséget a sorban elérhető méretek mutatják."
+    ]
+  },
+  {
+    "title": "Excel export és az offline rendelőlap kitöltése",
+    "intro": "Az egyedi rendelőlap alján található Exportálás Excel-be gomb a teljes rendelőlapot tölti le, nem csak az aktuális katalóguscsoportot. A már mentett mennyiségeket is tartalmazza.",
+    "images": [
+      [
+        "06-mentes-export.png",
+        "Az egyedi rendelőlap Excel-exportjának és importjának indítása.",
+        5.5,
+        0.75
+      ]
+    ],
+    "steps": [
+      "Mentsd el a böngészőben végzett módosításokat, majd töltsd le a rendelőlapot.",
+      "A fájl fejlécében ellenőrizd a partnert, a címet, a szezont, a márkát, a rendelőlapot és a hivatkozási számot.",
+      "Csak a rendelhető méretek mennyiségeit módosítsd. Az exportált munkalap védelme a kitölthető mezők elkülönítését szolgálja.",
+      "A kész fájlt Excel-formátumban mentsd el, majd az importálással töltsd vissza."
+    ],
+    "table": [
+      [
+        "Cellák",
+        "Tartalom"
+      ],
+      [
+        [
+          "C3",
+          "A cím ERP-kódja."
+        ],
+        [
+          "C5, C6 és C7",
+          "Szezon, márka és rendelőlap."
+        ],
+        [
+          "E1 és F1",
+          "A hivatkozási szám felirata és értéke."
+        ],
+        [
+          "Rejtett technikai adatok",
+          "A termékek, SKU-k és méretek importálásához szükséges azonosítók."
+        ]
+      ]
+    ],
+    "notes": [
+      "Ne töröld és ne nevezd át a technikai adatokat, ne szúrj be vagy mozgass sorokat és oszlopokat. A lapvédelem feloldása nem teszi rendelhetővé a hiányzó méreteket.",
+      "Másik rendelésre csak ellenőrzött azonosítókkal és előre létrehozott célrendeléssel tölts vissza fájlt. A régi módszer, amikor csak a partner- és címkódot írták át, a hivatkozási szám bevezetése miatt már nem elég."
+    ]
+  },
+  {
+    "title": "Excel import ellenőrzése és végrehajtása",
+    "intro": "A fájlválasztás még nem importálás. Először ellenőrző lista készül; ennek alapján döntheted el, mely fájlokat töltöd be.",
+    "images": [
+      [
+        "09-import-panel.png",
+        "Az import előnézet részlete: a hiányzó hivatkozás pótlásáig a sor nem jelölhető ki.",
+        7.05,
+        2.5
+      ]
+    ],
+    "steps": [
+      "A rendelésválasztó Rendelés import gombjával vagy egy szerkeszthető rendelőlapon az Importálandó fájlok kiválasztása gombbal válassz egy vagy több .xlsx vagy .xls fájlt.",
+      "Kattints az Import előnézet gombra. Az oldal az eredményhez gördül; a program ellenőrzi a fájlban szereplő címet, szezont, márkát, rendelőlapot és hivatkozási számot.",
+      "Ha az F1 cella üres, a hiányzó hivatkozást az adott fájl előnézeti sorában pótolhatod. Gépelés után várd meg az ellenőrzést, és figyeld a piros hibaüzenetet vagy a zöld Importálható jelzést.",
+      "Csak az importálható sor jelölhető ki; érvényes hivatkozás esetén ez automatikusan megtörténik. A hibás sor jelölőnégyzete letiltva marad, amíg a hibát nem javítod.",
+      "Hasonlítsd össze a meglévő és az új mennyiségeket, értékeket és a módosuló sorok számát. Egyesével kijelölhetsz, illetve használhatod a Mindent kijelöl és a Kijelölés visszavonása gombot.",
+      "A Kijelöltek importálása gombbal hajtsd végre a betöltést, majd ellenőrizd az eredményt és a figyelmeztetéseket."
+    ],
+    "paragraphs": [
+      "Csak már létező, számodra elérhető és szerkeszthető rendelésre lehet importálni, a kiválasztott szezonban. A fájl címének, márkájának és rendelőlapjának is egyeznie kell. A hiányzó hivatkozás mező csak az üres F1-et pótolja; nem üres, hibás F1 esetén a fájlt kell javítani."
+    ],
+    "notes": [
+      "Üres Excel-cella: nem módosítja a meglévő mennyiséget. 0 érték: törli az adott mennyiséget. Hibás, beküldött vagy nem jogosult célrendeléshez a betöltés nem hajtható végre."
+    ]
+  },
+  {
+    "title": "Összesített adatok és a rendelés beküldése",
+    "intro": "Az egyedi rendelőlap tetején az Összesített adatok gomb nyitja meg az adott rendelés katalóguscsoportonkénti áttekintését. Ez már nem a rendelésválasztó aljára van beépítve.",
+    "images": [
+      [
+        "08-osszesitett-adatok.png",
+        "Katalóguscsoportonkénti mennyiségek és értékek, valamint a Rendelőlap beküldése gomb.",
+        7.05,
+        2.85
+      ]
+    ],
+    "steps": [
+      "Nézd át a csoportonkénti mennyiségeket, a nagyker értéket és a kisker értéket. Ellenőrizd a partner címét és a hivatkozási számot is.",
+      "Ha javítani szeretnél, a csoport sorára vagy a Rendelőlap megnyitása gombra kattintva visszajutsz a kitöltéshez.",
+      "Ha elkészültél, kattints a Rendelőlap beküldése gombra, majd olvasd el és hagyd jóvá a megerősítést.",
+      "Beküldés után a státusz Beküldve lesz. A rendelést továbbra is megtekintheted, de már nem módosíthatod és nem importálhatsz rá."
+    ],
+    "paragraphs": [
+      "A rendszer a beküldő felhasználó e-mail-címére is küld egy üzenetet, a rendelőlap Excel-példányával. Ha a levél nem érkezik meg, először a rendelés felületen látható státuszát ellenőrizd; ne hozz létre emiatt automatikusan újabb rendelést."
+    ],
+    "notes": [
+      "Téves beküldéskor a területi képviselő tudja piszkozatra visszaállítani a hozzáférhető rendelést. Piszkozat rendelés teljes törlése a rendelőlapon, a megerősítés jóváhagyása után lehetséges; ez nem ugyanaz, mint a mennyiségek nullázása."
+    ]
+  },
+  {
+    "title": "Több rendelés közös összesítése",
+    "intro": "A rendeléslistában kijelölt rendeléseket közös, csak olvasható termék-, szín- és méretmátrixban tekintheted át.",
+    "images": [
+      [
+        "11-tobb-rendeles-osszesitese.png",
+        "Két kijelölt rendelés közös összesítő rendelőlapja. Az összesítőben nem adhatók meg mennyiségek.",
+        7.05,
+        3.55
+      ]
+    ],
+    "steps": [
+      "A rendeléslistában jelöld ki az összesíteni kívánt rendeléseket.",
+      "Csak azonos szezonú, márkájú és rendelőlap-típusú rendeléseket jelölj ki együtt. A hivatkozások és a címek eltérhetnek.",
+      "Kattints a Kiválasztottak összesítése gombra. A rendszer megnyitja az összevont rendelőlapot.",
+      "Az összesítő Exportálás Excel-be gombja az összevont méretenkénti adatokat exportálja. A módosítást az eredeti rendeléseken kell elvégezni."
+    ],
+    "notes": [
+      "Eltérő árlistájú rendeléseket pénzügyi ellenőrzéshez külön összesíts. A közös mátrix egy közös árlistával áraz: nem az egyes rendelések eltérő árakon mentett értékeinek egyszerű összeadása.",
+      "A rendeléslista Excel-exportja, az egyedi rendelőlap exportja, a közös mátrix exportja és az ERP-export különböző fájlok. Mindig a feladatnak megfelelő gombot használd."
+    ]
+  },
+  {
+    "title": "Rendelőlap megosztása",
+    "intro": "Piszkozat rendeléshez időkorlátos hivatkozást adhatsz olyan kitöltőnek is, akinek nincs külön partnerfelhasználója. A link az eredeti rendeléshez vezet, nem új másolatot hoz létre.",
+    "images": [
+      [
+        "07-megosztasi-panel.png",
+        "A megosztás panelje a jogosult árlistával, a lejárattal, a generált linkkel és a visszavonás lehetőségével.",
+        7.05,
+        2
+      ]
+    ],
+    "steps": [
+      "Nyisd meg a kívánt rendelőlapot, majd kattints a Megosztási panel megnyitása gombra.",
+      "Válaszd ki a megjelenítéshez használható nagyker- vagy disztribútor-árlistát. Kisker és outlet árlista itt nem választható.",
+      "Add meg a lejáratot napokban. Az alapérték 14 nap; 1 és 365 nap közötti érték adható meg.",
+      "Kattints a Megosztási link generálása gombra. Másold ki a Generált link mező teljes tartalmát, és juttasd el a kitöltőnek.",
+      "Ha a hozzáférésre már nincs szükség, a link sorában kattints a Visszavonás gombra, és erősítsd meg."
+    ],
+    "paragraphs": [
+      "Partneradmin és képviselő a rendelés partnerének aktív címeihez rendelt aktív nagyker- és disztribútor-árlistákból választhat. Címfelhasználó csak a saját hozzáférhető aktív címeihez tartozó árlistákat látja.",
+      "A bruttó kisker ár a kiválasztott nagyker- vagy disztribútor-árlistához kapcsolt kiskerárlistából jön, a rendelés szezonjára. A megosztott nézet árlistája nem írja át az eredeti rendelés árlistáját."
+    ],
+    "notes": [
+      "A link birtokosa belépés nélkül írhat a rendelésbe. Csak annak küldd el, akinek ezt engedélyezni akarod. Lejárat, visszavonás, beküldés vagy az árlista-jogosultság megszűnése után a link nem használható."
+    ]
+  },
+  {
+    "title": "A megosztott rendelőlap kitöltése",
+    "intro": "A megosztott hivatkozás megnyitásához nem kell partnerfiók. A kitöltő csak a megosztott rendelés felületét kapja meg.",
+    "images": [
+      [
+        "12-megosztott-rendelolap.png",
+        "A belépés nélkül elérhető megosztott rendelőlap. A kitöltő nem jut el a partner többi rendeléséhez.",
+        7.05,
+        3.55
+      ]
+    ],
+    "steps": [
+      "Nyisd meg a kapott teljes linket. Ellenőrizd a fejlécben a szezont, a márkát, a rendelőlapot és a cím adatait.",
+      "A kívánt termék, szín és méret sorában add meg a mennyiséget, majd kattints ki a cellából a mentéshez.",
+      "Ha elérhető, a katalóguscsoportok közötti navigációval lépj tovább. Kilépés előtt használd a Mentés gombot.",
+      "A kitöltés elkészültét jelezd annak, akitől a hivatkozást kaptad. A végleges beküldést ő végzi a saját belépett felületén."
+    ],
+    "paragraphs": [
+      "Ezen az oldalon nincs beküldés, rendeléstörlés, új megosztás, Excel-import vagy Excel-export. A megosztott kitöltő nem választhat másik árlistát sem.",
+      "A kitöltött mennyiségek közvetlenül az eredeti rendelésbe kerülnek. Ha ugyanazt a rendelést egyszerre több személy szerkeszti, ugyanannak a mezőnek az utolsó mentése felülírhatja az előző értéket. Célszerű előre egyeztetni, ki mely tételeket tölti."
+    ],
+    "notes": [
+      "Ha a link már nem nyílik meg, ne módosítsd kézzel az URL-t. Kérj új hivatkozást a megosztótól. A megosztó a hozzáférést bármikor visszavonhatja."
+    ]
+  },
+  {
+    "title": "Területi képviselői funkciók",
+    "intro": "A területi képviselő a hozzáférési körébe tartozó partnerek rendeléseit kezeli. A képviselői funkciók normál partner- és címfelhasználónál nem jelennek meg.",
+    "images": [
+      [
+        "15-lefedettseg.png",
+        "A partner rendelés-lefedettségi nézet a kiválasztott szezonra.",
+        7.05,
+        2.9
+      ]
+    ],
+    "steps": [
+      "A rendeléslista területi képviselő szűrőjével és partnerkeresőjével szűkítsd a listát. A Területi képviselő oszlopban a képviselő kódja és neve is látható.",
+      "A Partner rendelés lefedettség gombbal nyisd meg a címek, márkák és rendelőlapok szerinti áttekintést. A nézetből Excel-export is készíthető.",
+      "Beküldött rendelés javításához nyisd meg annak Összesített adatok oldalát, és válaszd a Visszaállítás piszkozatba műveletet. A visszaállítást meg kell erősíteni.",
+      "Javítás után a rendelést ismét be kell küldeni. Ellenőrizd, hogy a lista státusza valóban Beküldve lett."
+    ],
+    "paragraphs": [
+      "A hozzáférési kör közvetlen partner-hozzárendelésből és képviselői partnerkörből is származhat. A képviselői partnerkör a partnertörzsben megadott képviselő alapján követi az új partnereket; a beállítást adminisztrátor végzi."
+    ],
+    "notes": [
+      "Ha hiányzik egy partner vagy cím, ezt jogosultsági kérdésként jelezd az adminisztrátornak. A portálon egy meglévő rendelés címének vagy partnerének közvetlen átírására a bemutatott verzióban nincs külön művelet."
+    ]
+  },
+  {
+    "title": "Kijelölt rendelések ERP exportja",
+    "intro": "Ez a funkció kizárólag területi képviselőként érhető el. Az ERP-be tölthető fájl eltér a partnernek szánt rendelőlap-mátrixtól.",
+    "images": [
+      [
+        "14-erp-dialog.png",
+        "ERP-export előtt megadható megjegyzés és kötelező kért szállítási határidő.",
+        4.65,
+        3.35
+      ]
+    ],
+    "steps": [
+      "A rendeléslistában jelöld ki a kívánt rendeléseket, majd kattints a Kijelölt rendelések ERP-exportja gombra.",
+      "Ellenőrizd a kijelölt rendelések számát. A megadott szállítási határidő és megjegyzés az export minden sorára érvényes lesz.",
+      "A megjegyzés nem kötelező, legfeljebb 250 karakter lehet. A kért szállítási határidőt kötelező megadni.",
+      "Kattints az ERP Excel letöltése gombra. A fájl Munka1 munkalapját olvassa be az ERP; ezt ne nevezd át.",
+      "Az Ellenőrzés munkalapon nézd át rendelésenként a változatlanul átvett, kicserélt és törölt mennyiségeket. Ezek összege a TOTAL, amelynek egyeznie kell az eredeti rendelés mennyiségével."
+    ],
+    "notes": [
+      "A vállalat HUPS, a Document a rendeléstípus kódja, a vevői referencia a hivatkozási szám, a BOLT a cím neve. A rendelés napja az exportálás napja.",
+      "A cikkcsere az adminban rögzített szezonos SKU-szabályokat használja. A TÖRÖLT célú tételek kimaradnak a Munka1 lapról. A gyűjtőket saját cikkszámukkal és gyűjtőmennyiségükkel exportálja, nem bontja darabos SKU-kra. Az eredeti rendelés ettől nem módosul."
+    ]
+  },
+  {
+    "title": "Gyakori kérdések és ellenőrzőlista",
+    "faqs": [
+      [
+        "Nem látom a szezont vagy a címemet",
+        "A szezont láthatóvá kell tenni, a címhez pedig jogosultság szükséges. Először ellenőrizd a fejlécben az aktuális szezont, majd jelezd a hiányt a területi képviselődnek."
+      ],
+      [
+        "Nem lehet új rendelést létrehozni",
+        "Válassz címet, márkát és rendelőlapot, adj meg egyedi hivatkozási számot, és válassz a címhez engedélyezett rendeléstípusokból. Ha nincs választható típus, adminisztrátori beállítás szükséges."
+      ],
+      [
+        "Az import nem találja a rendelést",
+        "Ellenőrizd a fájl címkódját, szezonját, márkáját, rendelőlapját és az F1 cellában a hivatkozási számot. A célrendelésnek előre léteznie kell, és nem lehet beküldött állapotú."
+      ],
+      [
+        "Miért nem törölt az üres Excel-cella",
+        "Az üres cellát az import kihagyja. Törléshez 0-t kell megadnod, majd a fájlt ismét ellenőrizned és importálnod."
+      ],
+      [
+        "Nem választható a kívánt megosztási árlista",
+        "Csak jogosult aktív címhez rendelt aktív nagyker- és disztribútor-árlista osztható meg. Címfelhasználónál csak a hozzárendelt címek árlistái számítanak."
+      ],
+      [
+        "419 vagy lejárt munkamenet üzenet jelenik meg",
+        "Nyisd meg újra a megfelelő belépési címet, és jelentkezz be. Ha a tesztkörnyezet könyvtárvédelmi jelszót kér, azt külön kell megadni. Ismétlődő hibánál jelezd a használt címet, böngészőt és eszközt a támogatásnak."
+      ],
+      [
+        "Karbantartási üzenet fogad",
+        "A partnerportál átmenetileg le lehet zárva. Olvasd el a megjelenő üzenetet, és próbáld újra később. Ettől még nem szükséges új jelszót kérni."
+      ]
+    ],
+    "checklist": [
+      "Beküldés előtt: megfelelő szezon, partner, cím és hivatkozás; ellenőrzött mennyiségek és értékek; elmentett utolsó cella.",
+      "A munka végén: ellenőrizd a státuszt, és a Kijelentkezés gombbal lépj ki. Közös gépen ne csak a böngészőfület zárd be.",
+      "Segítségkéréskor: küldd el a szezon, partnerkód, címkód és hivatkozás adatait, valamint a hiba szövegét. Jelszót vagy megosztási linket ne tegyél nyilvános üzenetbe."
+    ]
+  }
+]

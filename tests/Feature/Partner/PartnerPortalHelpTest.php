@@ -8,6 +8,7 @@ use App\Models\Partner;
 use App\Models\PartnerUser;
 use App\Models\Season;
 use App\Services\Partner\PartnerPortalNotice;
+use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
@@ -96,17 +97,53 @@ class PartnerPortalHelpTest extends TestCase
         Livewire::test(Login::class)->set('showUpdateNotice', true);
     }
 
-    public function test_both_public_manuals_are_real_inline_pdfs_and_no_other_file_is_served(): void
+    public function test_help_is_a_complete_localised_html_guide_with_a_separate_pdf_download(): void
     {
         foreach (['hu', 'en'] as $locale) {
-            $this->get(route('partner.help', ['locale' => $locale]))->assertOk()
+            $otherLocale = $locale === 'hu' ? 'en' : 'hu';
+            session(['partner.locale' => $otherLocale]);
+            $html = $this->get(route('partner.help', ['locale' => $locale]))->assertOk()
+                ->assertHeader('Content-Type', 'text/html; charset=utf-8')
+                ->assertSeeHtml('<html lang="'.$locale.'">')->assertSeeHtml('data-partner-help-guide')
+                ->assertSeeHtml(route('partner.help.pdf', ['locale' => $locale]))
+                ->assertSee($locale === 'hu' ? 'PDF letöltése' : 'Download PDF')->assertSee('F1')
+                ->assertSeeHtml('id="chapter-16"')->assertSeeHtml('href="#chapter-1"')
+                ->assertDontSeeHtml('<iframe')->assertDontSeeHtml('wire:snapshot')->getContent();
+            $this->assertSame($otherLocale, session('partner.locale'), 'Reading another guide language must not change the portal language.');
+            $this->assertDoesNotMatchRegularExpression('/@endforeach|@if\s*\(|\{\{\s*/', $html);
+            preg_match_all('/<img src="([^"]+)"/', $html, $images);
+            $this->assertGreaterThan(10, count($images[1]));
+            foreach ($images[1] as $url) {
+                $path = public_path(ltrim(parse_url($url, PHP_URL_PATH), '/'));
+                $this->assertFileExists($path);
+                $this->assertSame(IMAGETYPE_JPEG, getimagesize($path)[2]);
+            }
+            $this->get(route('partner.help.pdf', ['locale' => $locale]))->assertOk()
                 ->assertHeader('Content-Type', 'application/pdf')
-                ->assertHeader('Content-Disposition', 'inline; filename="partner-guide-'.$locale.'.pdf"');
+                ->assertHeader('Content-Disposition', 'attachment; filename=partner-guide-'.$locale.'.pdf');
             $this->assertStringStartsWith('%PDF-', file_get_contents(resource_path('help/partner-guide-'.$locale.'.pdf')));
         }
         $this->get('/partner/help/de')->assertNotFound();
         $this->get('/partner/help/.env')->assertNotFound();
         $this->get('/partner/help/en/../../.env')->assertNotFound();
+        $this->get('/partner/help/de/pdf')->assertNotFound();
+        $this->get('/partner/help/.env/pdf')->assertNotFound();
         $this->get(route('partner.password.request'))->assertOk()->assertSeeHtml('data-partner-help');
+    }
+
+    public function test_help_sits_beside_the_language_selector_without_a_duplicate_top_bar(): void
+    {
+        $response = $this->get(route('partner.login'))->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'data-partner-help'));
+        $this->assertMatchesRegularExpression('/data-partner-language-tools[^>]*>.*?<select.*?<\/select>.*?data-partner-help/s', $response->getContent());
+        $this->actingAs($this->user, 'partner');
+        $notice = Livewire::test(Login::class)->assertSeeHtml('data-portal-update-notice');
+        $this->assertSame(1, substr_count($notice->html(), 'data-partner-help'));
+        $notice->call('acknowledgeUpdateNotice')->assertSeeHtml('data-login-season-modal');
+        $this->assertSame(1, substr_count($notice->html(), 'data-partner-help'));
+        session([PartnerSeasonContext::SESSION_KEY => Season::first()->id]);
+        $orders = $this->get(route('partner.orders.select'))->assertOk()->getContent();
+        $this->assertSame(1, substr_count($orders, 'data-partner-help'));
+        $this->assertMatchesRegularExpression('/data-partner-language-tools[^>]*>.*?<select.*?<\/select>.*?data-partner-help/s', $orders);
     }
 }

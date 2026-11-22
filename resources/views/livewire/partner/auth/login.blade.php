@@ -42,7 +42,7 @@
                     <li>{{ __('partner.update_notice_season') }}</li>
                 </ul>
                 <p class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6">{{ __('partner.update_notice_import') }}</p>
-                <p class="text-sm">{{ __('partner.update_notice_help') }} <x-partner-help-link /></p>
+                <p class="text-sm">{{ __('partner.update_notice_help') }}</p>
                 <form wire:submit="acknowledgeUpdateNotice" class="space-y-4">
                     <label class="flex cursor-pointer items-start gap-2 text-sm">
                         <input type="checkbox" wire:model="doNotShowUpdateNoticeAgain" class="mt-1 h-4 w-4">
@@ -66,7 +66,6 @@
                 <p id="partner-season-help" role="note" class="mt-2 text-sm text-slate-700">{{ __('partner.login_select_season_help') }}</p>
             </div>
             <div class="p-5">
-                <div class="mb-3 flex justify-end"><x-partner-help-link /></div>
                 @include('livewire.partner.auth.partials.language-selector')
                 <form wire:submit="selectSeason" class="space-y-4">
                     <div>

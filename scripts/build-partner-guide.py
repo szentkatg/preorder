@@ -72,7 +72,7 @@ def main():
                           title='Heavy Tools Partner Portal - User Guide', author='Heavy Tools',
                           pageCompression=1).build(story, onFirstPage=footer, onLaterPages=footer)
 
-    chapters = json.loads((ROOT / 'docs/partner-guide/en.json').read_text(encoding='utf-8'))
+    chapters = json.loads((ROOT / 'resources/help/content/en.json').read_text(encoding='utf-8'))
     story = [Spacer(1, 20), p('HEAVY TOOLS', 'LabelGuide'), Spacer(1, 25),
              p('Partner portal\nUser guide', 'TitleGuide'), p('English edition | Updated 22 November 2026', 'LabelGuide'),
              Spacer(1, 14), p('A practical guide to creating orders, entering quantities, working with Excel files and submitting your order. Representative-only tools have their own chapters.'),

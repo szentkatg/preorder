@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PartnerHelpController;
 use App\Livewire\Partner\AddressShow;
 use App\Livewire\Partner\Auth\ForgotPassword;
 use App\Livewire\Partner\Auth\Login;
@@ -23,17 +24,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Public, anonymised manuals are also available before login or during maintenance.
-Route::get('/partner/help/{locale}', function (string $locale) {
-    abort_unless(in_array($locale, ['hu', 'en'], true), 404);
-
-    return response()->file(resource_path('help/partner-guide-'.$locale.'.pdf'), [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="partner-guide-'.$locale.'.pdf"',
-        'X-Content-Type-Options' => 'nosniff',
-        'Cache-Control' => 'public, max-age=3600',
-    ]);
-})->name('partner.help')->where('locale', 'hu|en');
+// Public, anonymised help remains accessible before login and during maintenance.
+Route::get('/partner/help/{locale}', [PartnerHelpController::class, 'show'])
+    ->name('partner.help')->where('locale', 'hu|en');
+Route::get('/partner/help/{locale}/pdf', [PartnerHelpController::class, 'download'])
+    ->name('partner.help.pdf')->where('locale', 'hu|en');
 
 Route::post('/partner/logout', function (Request $request) {
     $locale = $request->session()->get('partner.locale');
