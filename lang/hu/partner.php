@@ -2,6 +2,15 @@
 
 // lang/hu/partner.php
 return [
+    'help' => 'Súgó',
+    'update_notice_title' => 'Frissült a partnerportál',
+    'update_notice_reference' => 'Minden rendeléshez kötelező a hivatkozási szám. A meglévő rendeléseknél ezt már kitöltöttük; az aktuális számot a rendeléslistában találod.',
+    'update_notice_order_type' => 'Új rendelésnél válassz rendeléstípust, ha a kiválasztott címhez többféle is engedélyezett.',
+    'update_notice_season' => 'A szezont mostantól sikeres bejelentkezés után, külön ablakban választhatod ki. Később a Szezonváltás gombbal módosíthatod, újabb bejelentkezés nélkül.',
+    'update_notice_import' => 'Korábban exportált rendelőlap visszatöltése előtt ellenőrizd a célrendelés hivatkozási számát! Írd az importálandó fájl F1 cellájába. Ha a cella üres, a hiányzó hivatkozást az import előnézet erre szolgáló mezőjében is pótolhatod. Csak már létező, szerkeszthető rendelés tölthető be.',
+    'update_notice_help' => 'A részletes felhasználói leírást minden oldal tetején a Súgó hivatkozással nyithatod meg.',
+    'update_notice_do_not_show' => 'Ne jelenjen meg újra',
+    'update_notice_continue' => 'Tovább a szezonválasztáshoz',
     'erp_export_too_many_rows' => 'A kijelölt rendelések túllépik egy Excel-munkalap sorkorlátját. Exportáld őket kisebb csoportokban.',
     'login_select_season_title' => 'Válassz szezont a folytatáshoz',
     'login_select_season_help' => 'Sikeres bejelentkezés. Válaszd ki, melyik szezon rendeléseivel szeretnél dolgozni, majd nyomd meg a Kiválasztott szezon megnyitása gombot.',

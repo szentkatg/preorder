@@ -15,6 +15,9 @@
 </head>
 <body>
     <main role="main">
+        <div style="text-align:right; margin-bottom:1rem">
+            <a href="{{ route('partner.help', ['locale' => app()->getLocale() === 'en' ? 'en' : 'hu']) }}" target="_blank" rel="noopener" data-partner-help>{{ __('partner.help') }}</a>
+        </div>
         <h1>{{ __('partner.portal_unavailable_title') }}</h1>
         <p>{{ filled($message) ? $message : __('partner.portal_unavailable_default_message') }}</p>
         <button type="button" onclick="window.location.reload()">{{ __('partner.portal_retry') }}</button>

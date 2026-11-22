@@ -16,6 +16,9 @@
     ></div>
 
     <div class="relative z-10">
+        <nav aria-label="{{ __('partner.help') }}" class="flex justify-end px-4 py-1">
+            <x-partner-help-link />
+        </nav>
         {{ $slot }}
     </div>
 

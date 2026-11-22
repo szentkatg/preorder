@@ -6,6 +6,7 @@ use App\Models\Language;
 use App\Models\PartnerUser;
 use App\Models\Season;
 use App\Services\LanguageResolver;
+use App\Services\Partner\PartnerPortalNotice;
 use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -29,6 +30,11 @@ class Login extends Component
     #[Locked]
     public ?int $pendingPartnerUserId = null;
 
+    #[Locked]
+    public bool $showUpdateNotice = false;
+
+    public bool $doNotShowUpdateNoticeAgain = false;
+
     public function mount(LanguageResolver $languageResolver): void
     {
         $language = $languageResolver->resolve(
@@ -40,6 +46,7 @@ class Login extends Component
         if ($user?->active) {
             $this->pendingPartnerUserId = (int) $user->id;
             $this->showSeasonModal = true;
+            $this->showUpdateNotice = app(PartnerPortalNotice::class)->shouldShow($user);
             $seasons = Season::query()->visibleToPartners()->get();
             $this->seasonId = PartnerSeasonContext::current()?->id
                 ?? ($seasons->count() === 1 ? (int) $seasons->first()->id : null);
@@ -113,6 +120,16 @@ class Login extends Component
         $this->redirectRoute('partner.orders.select');
     }
 
+    public function acknowledgeUpdateNotice(): void
+    {
+        $this->assertPendingPartner();
+        abort_unless($this->showUpdateNotice, 403);
+        if ($this->doNotShowUpdateNoticeAgain) {
+            app(PartnerPortalNotice::class)->dismiss(PartnerUser::findOrFail(Auth::guard('partner')->id()));
+        }
+        $this->showUpdateNotice = false;
+    }
+
     public function cancelLogin(): void
     {
         $this->assertPendingPartner();
@@ -173,5 +190,6 @@ class Login extends Component
         ]);
 
         Cookie::queue('partner_locale', $locale, 60 * 24 * 365);
+        $this->dispatch('partner-interface-language-changed', locale: $locale);
     }
 }

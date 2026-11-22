@@ -32,6 +32,7 @@ use App\Models\Size;
 use App\Models\Sku;
 use App\Models\Translation;
 use App\Services\Partner\ErpOrderExportService;
+use App\Services\Partner\PartnerPortalNotice;
 use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cookie;
@@ -90,6 +91,7 @@ class PartnerSeasonContextTest extends TestCase
             'password' => 'password', 'role' => 'sales_rep', 'active' => true]);
         $this->user->partners()->attach($partner);
         $this->user->addresses()->attach($address);
+        app(PartnerPortalNotice::class)->dismiss($this->user);
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Bags', 'active' => true]);
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);
         foreach ([$this->season, $this->other, $this->hidden] as $season) {

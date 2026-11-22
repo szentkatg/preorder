@@ -2,6 +2,15 @@
 
 // lang/en/partner.php
 return [
+    'help' => 'Help',
+    'update_notice_title' => 'The partner portal has been updated',
+    'update_notice_reference' => 'Every order now requires a reference number. We have already added references to existing orders; you can find them in the order list.',
+    'update_notice_order_type' => 'When creating an order, choose an order type if more than one type is available for the selected address.',
+    'update_notice_season' => 'You now choose your season in a separate window after signing in. Use Change season later to switch without signing in again.',
+    'update_notice_import' => 'Before importing an older exported order sheet, check the target order\'s reference number! Enter it in cell F1 of the import file. If F1 is empty, you can also enter the missing reference in the import preview field. Only an existing, editable order can be imported.',
+    'update_notice_help' => 'Open the detailed user guide using the Help link at the top of any page.',
+    'update_notice_do_not_show' => 'Do not show again',
+    'update_notice_continue' => 'Continue to season selection',
     'erp_export_too_many_rows' => 'The selected orders exceed the Excel worksheet row limit. Export them in smaller groups.',
     'login_select_season_title' => 'Choose a season to continue',
     'login_select_season_help' => 'You are signed in. Select the season you want to work with, then press Open selected season.',

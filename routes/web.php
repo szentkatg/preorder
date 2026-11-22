@@ -23,6 +23,18 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Public, anonymised manuals are also available before login or during maintenance.
+Route::get('/partner/help/{locale}', function (string $locale) {
+    abort_unless(in_array($locale, ['hu', 'en'], true), 404);
+
+    return response()->file(resource_path('help/partner-guide-'.$locale.'.pdf'), [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="partner-guide-'.$locale.'.pdf"',
+        'X-Content-Type-Options' => 'nosniff',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+})->name('partner.help')->where('locale', 'hu|en');
+
 Route::post('/partner/logout', function (Request $request) {
     $locale = $request->session()->get('partner.locale');
     $languageId = $request->session()->get('partner.language_id');

@@ -7,16 +7,19 @@ use App\Models\Language;
 use App\Models\Partner;
 use App\Models\PartnerUser;
 use App\Models\Season;
+use App\Services\Partner\PartnerPortalNotice;
 use App\Services\Partner\PartnerSeasonContext;
 use App\Support\PortalCsrfDiagnostics;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class PartnerLoginSeasonModalTest extends TestCase
@@ -39,6 +42,8 @@ class PartnerLoginSeasonModalTest extends TestCase
         $this->user = PartnerUser::create(['partner_id' => $partner->id, 'name' => 'User', 'email' => 'modal@example.test',
             'password' => 'password', 'role' => 'partner_admin', 'active' => true]);
         $this->user->partners()->attach($partner);
+        // These regressions exercise the season flow after the update has been read.
+        app(PartnerPortalNotice::class)->dismiss($this->user);
     }
 
     private function signIn(): void
@@ -147,8 +152,17 @@ class PartnerLoginSeasonModalTest extends TestCase
         ]]], ['X-Livewire' => 'true']);
     }
 
-    public function test_full_cookie_and_csrf_enforced_flow_uses_a_fresh_get_before_the_modal(): void
+    public static function noticeModes(): array
     {
+        return ['notice already hidden' => [false], 'new notice' => [true]];
+    }
+
+    #[DataProvider('noticeModes')]
+    public function test_full_cookie_and_csrf_enforced_flow_uses_a_fresh_get_before_the_modal(bool $showNotice): void
+    {
+        if ($showNotice) {
+            DB::table('partner_user_notice_dismissals')->delete();
+        }
         config(['session.driver' => 'database', 'session.lottery' => [0, 100]]);
         app('session')->forgetDrivers();
         app()->forgetInstance('session.store');
@@ -166,13 +180,22 @@ class PartnerLoginSeasonModalTest extends TestCase
         $login->assertOk()->assertJsonPath('components.0.effects.redirect', route('partner.login'));
         $this->assertFalse($login->json('components.0.effects.redirectUsingNavigate') ?? false);
         $this->nextRequest($login);
-        $modal = $this->get(route('partner.login'))->assertSeeHtml('data-login-season-modal');
+        $modal = $this->get(route('partner.login'))->assertSeeHtml($showNotice ? 'data-portal-update-notice' : 'data-login-season-modal');
         [$snapshot, $newToken] = $this->parts($modal);
         $this->assertNotSame($oldToken, $newToken);
         $this->nextRequest($modal);
-        $stale = $this->update($snapshot, $oldToken, 'selectSeason', ['seasonId' => $this->season->id])->assertStatus(419);
+        $stale = $this->update($snapshot, $oldToken, $showNotice ? 'acknowledgeUpdateNotice' : 'selectSeason', ['seasonId' => $this->season->id])->assertStatus(419);
         $this->assertNull(session(PartnerSeasonContext::SESSION_KEY));
         $this->nextRequest($stale);
+        if ($showNotice) {
+            $read = $this->update($snapshot, $newToken, 'acknowledgeUpdateNotice', ['doNotShowUpdateNoticeAgain' => true]);
+            $read->assertOk();
+            $this->assertStringContainsString('data-login-season-modal', $read->json('components.0.effects.html'));
+            $this->nextRequest($read);
+            $seasonModal = $this->get(route('partner.login'))->assertSeeHtml('data-login-season-modal')->assertDontSeeHtml('data-portal-update-notice');
+            [$snapshot, $newToken] = $this->parts($seasonModal);
+            $this->nextRequest($seasonModal);
+        }
         $chosen = $this->update($snapshot, $newToken, 'selectSeason', ['seasonId' => $this->season->id]);
         $chosen->assertOk()->assertJsonPath('components.0.effects.redirect', route('partner.orders.select'));
         $this->nextRequest($chosen);
