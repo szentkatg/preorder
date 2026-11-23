@@ -1,5 +1,38 @@
 # Kisker, nagyker és disztribútori árkalkuláció
 
+## Manuális HUF kisker árak vágólapról (2026-11-23)
+
+A HUF kisker árak fejlécében a **Manuális árak vágólapról** művelet
+a kiválasztott, nem lezárt árprojekthez használható, ársor-módosítási joggal.
+Válaszd ki a már kiszámított HUF kisker árlistát (egyetlen lehetőségnél
+előre kitöltjük), majd Excelből a modellkód és ár oszlopot Ctrl+V-vel
+illeszd a szövegmezőbe. A fejléc opcionális, legfeljebb 2000 adatsor adható meg.
+Például a `B10024-W27` + `12 990,50` sor a `B10024W27` modellhez kerül.
+Pont vagy vessző tizedesjel, szóközös ezres tagolás és Ft/HUF utótag elfogadott.
+
+A modellkódok összehasonlításakor a szóközöket és kötőjeleket eltávolítjuk,
+a kis-/nagybetű nem számít. A kiválasztott projekt/árlista összes meglévő
+HUF kisker kalkulációjára dolgozunk, nem csak az aktuális lapra vagy szűrésre.
+Más projekthez, árlistához vagy ártípushoz nem írunk árat. Új kalkulációs sor
+nem keletkezik; több színszintű ársornál egyenként vizsgáljuk az áregyezést.
+
+- Kalkulált árral egyező értéket nem töltünk manuális árként; a meglévő
+  manuális/megtartott ár és jóváhagyás is változatlan marad.
+- A már azonos manuális ár újbóli beillesztése nem vonja vissza a jóváhagyást.
+- Az eltérő manuális ár a szokásos kézi módosítási folyamaton keresztül mentődik:
+  új jóváhagyás szükséges, a függő árak felülvizsgálandók. Az elavult kalkulációt
+  előbb újra kell számítani. Egy modell színsorai együtt kerülnek mentésre,
+  részleges modellfrissítés nem történik.
+- Dupla vágólapkód, tisztítás utáni többértelmű találat, hibás ár, nem talált
+  modell vagy hiányzó kalkuláció esetén az érintett sor kimarad, indoklással.
+
+A végén automatikus, görgethető eredményablak mutatja az eredeti vágólapsor
+számát, a beillesztett/tisztított kódot, az árat, a kalkulált árat és az eredményt.
+A teljes jelentés felhasználóhoz és laphoz kötött, egyórás cache-ben van;
+nem növeli minden további Livewire-kérés méretét. A táblázatból csak a módosult
+cellák és fejlécátlagok frissülnek, a sorrend, szűrés és oszlopbeállítás megmarad.
+A publikált árak nem módosulnak. Nincs migráció, új jogosultság vagy frontendbuild.
+
 ## Értékkel súlyozott szorzóátlagok (2026-10-16)
 
 Az összes árképzési fejlécátlag a korábbi számtani átlag helyett az

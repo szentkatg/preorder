@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\PricingCalculationRows\Tables\HufRetailCalculationsTable;
 use App\Filament\Support\Actions\CalculateHufRetailAction;
 use App\Filament\Support\AdminResourceTable;
+use App\Filament\Support\Concerns\HasHufRetailClipboardImport;
 use App\Filament\Support\Concerns\HasOutletPricing;
 use App\Filament\Support\Concerns\HasPricingGridInteractions;
 use App\Filament\Support\Concerns\HasPricingProjectContext;
@@ -25,6 +26,7 @@ use Livewire\Attributes\Computed;
 
 class PricingHufRetailCalculations extends Page implements HasTable
 {
+    use HasHufRetailClipboardImport;
     use HasOutletPricing;
     use HasPageShield {
         canAccess as protected canAccessUsingPagePermission;
@@ -93,7 +95,7 @@ class PricingHufRetailCalculations extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
-        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction(),
+        return [CalculateHufRetailAction::make(fn () => $this->pricingSelectedProject), $this->importHufRetailClipboardAction(), $this->calculateOutletAction(), $this->pricingDecimalPlacesAction(),
             Action::make('priceDistribution')->label('Áreloszlás főcsoportonként')->icon('heroicon-o-chart-bar')
                 ->url(fn () => PricingHufRetailPriceDistribution::getUrl())];
     }
