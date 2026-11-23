@@ -86,6 +86,10 @@ class ProductForm
                 Toggle::make('active')
                     ->label('Aktív')
                     ->default(true),
+                Toggle::make('visible_to_partners')
+                    ->label('Partnerportálon látható')
+                    ->helperText('Kikapcsolva a termék nem jelenik meg a partner- és megosztott rendelőlapokon, és nem rendelhető. Aktív termékként az árképzésben továbbra is használható.')
+                    ->default(false),
             ]);
     }
 }

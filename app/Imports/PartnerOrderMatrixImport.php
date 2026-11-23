@@ -214,6 +214,17 @@ class PartnerOrderMatrixImport implements ToCollection
             return;
         }
 
+        $sku = Sku::query()->forPartnerOrder($this->order)->with('assortmentComponents')->find($skuId);
+        if (! $sku) {
+            $this->invalidCount++;
+            $this->warnings[] = [
+                'row' => $excelRowNumber, 'column' => $columnIndex, 'sku_id' => $skuId,
+                'value' => $value, 'message' => __('partner.import_sku_not_available'),
+            ];
+
+            return;
+        }
+
         if ((int) $quantity === 0) {
             if ($this->previewOnly) {
                 if (array_key_exists($skuId, $this->previewQuantitiesBySkuId)) {
@@ -242,23 +253,6 @@ class PartnerOrderMatrixImport implements ToCollection
 
         if ($this->previewOnly) {
             $this->applyPreviewQuantityBySkuId($skuId, $quantity, $excelRowNumber, $columnIndex, $value);
-
-            return;
-        }
-
-        $sku = Sku::query()
-            ->with('assortmentComponents')
-            ->find($skuId);
-
-        if (! $sku) {
-            $this->invalidCount++;
-            $this->warnings[] = [
-                'row' => $excelRowNumber,
-                'column' => $columnIndex,
-                'sku_id' => $skuId,
-                'value' => $value,
-                'message' => 'Nem található SKU.',
-            ];
 
             return;
         }
@@ -318,6 +312,7 @@ class PartnerOrderMatrixImport implements ToCollection
         mixed $value
     ): void {
         $skuExists = Sku::query()
+            ->forPartnerOrder($this->order)
             ->whereKey($skuId)
             ->exists();
 

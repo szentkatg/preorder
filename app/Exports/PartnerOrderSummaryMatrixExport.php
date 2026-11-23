@@ -194,7 +194,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
         $rows[] = ['', __('partner.wholesale_value'), ''];
         $rows[] = ['', __('partner.retail_value'), ''];
 
-        $products = Product::query()
+        $products = Product::query()->visibleToPartners()
             ->with([
                 'sizeRange.items.size',
                 'colors.skus.size',
@@ -246,7 +246,7 @@ class PartnerOrderSummaryMatrixExport extends DefaultValueBinder implements From
                     ->sortBy([
                         fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0),
                         fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']),
-                ])
+                    ])
                     ->values();
 
                 $fixedHeaderColumns = [

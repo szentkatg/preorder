@@ -2,6 +2,7 @@
 
 // lang/hu/partner.php
 return [
+    'import_sku_not_available' => 'A cikk nem rendelhető ezen a rendelőlapon (rejtett, inaktív, nem található vagy másik szezonhoz/márkához/rendelőlaphoz tartozik). A meglévő mennyiséget nem módosítottuk.',
     'help' => 'Súgó',
     'update_notice_title' => 'Frissült a partnerportál',
     'update_notice_reference' => 'Minden rendeléshez kötelező a hivatkozási szám. A meglévő rendeléseknél ezt már kitöltöttük; az aktuális számot a rendeléslistában találod.',

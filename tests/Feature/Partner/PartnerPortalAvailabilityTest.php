@@ -97,7 +97,7 @@ class PartnerPortalAvailabilityTest extends TestCase
         $user->partners()->attach($partner);
         $user->addresses()->attach($address);
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Bags', 'active' => true]);
-        $product = Product::create(['model_code' => 'MODEL', 'name_hu' => 'Product', 'season_id' => $season->id,
+        $product = Product::create(['visible_to_partners' => true, 'model_code' => 'MODEL', 'name_hu' => 'Product', 'season_id' => $season->id,
             'item_main_group_id' => $group->id, 'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id, 'catalog_group_name_hu' => 'Bags', 'active' => true]);
         $color = Color::create(['product_id' => $product->id, 'code' => '01', 'name_hu' => 'BLACK', 'active' => true]);
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);

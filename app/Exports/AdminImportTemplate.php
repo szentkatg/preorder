@@ -59,6 +59,7 @@ class AdminImportTemplate implements WithMultipleSheets
             self::PRODUCTS => [
                 'products' => ['hint' => 'Kötelező munkalap. Egy sor egy modell. A termékek törzsadatait hozza létre vagy frissíti.', 'columns' => [
                     'model_code' => 'Egyedi modellkód, pl. B03028W27. A kapcsolódó lapokon ugyanezt használd.',
+                    'visible_to_partners' => '1 = partnerportálon látható, 0 = rejtett. Az aktív állapottól független. Hiányzó oszlop vagy üres cella: meglévő terméknél a beállítás megmarad, új terméknél rejtett. Árazáshoz active=1 és visible_to_partners=0 használható.',
                     'season_code' => 'Létező szezonkód, pl. W27.',
                     'brand_code' => 'Létező márkakód.',
                     'order_sheet_type_code' => 'Létező rendelőlap-típuskód, pl. T.',

@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -73,10 +74,14 @@ class ProductsTable
                 IconColumn::make('active')
                     ->label('Aktív')
                     ->boolean(),
+                IconColumn::make('visible_to_partners')
+                    ->label('Partnerportálon látható')
+                    ->boolean(),
             ])
             ->defaultPaginationPageOption(100)
             ->paginationPageOptions([50, 100, 250, 500, 'all'])
             ->filters([
+                TernaryFilter::make('visible_to_partners')->label('Partnerportálon látható'),
                 SelectFilter::make('brand')
                     ->label('Márka')
                     ->relationship('brand', 'name'),

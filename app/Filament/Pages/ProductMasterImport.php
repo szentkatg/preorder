@@ -343,6 +343,14 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             $seenModelCodes[$modelCode] = true;
 
+            if (array_key_exists('visible_to_partners', $row)) {
+                try {
+                    $this->partnerVisibilityValue($row['visible_to_partners']);
+                } catch (InvalidArgumentException) {
+                    $this->addRowError($modelCode, "products {$rowNumber}. sor: hibás visible_to_partners (1 = látható, 0 = rejtett)");
+                }
+            }
+
             $this->validateRequiredValue($modelCode, $row, 'name_hu', "products {$rowNumber}. sor: hiányzó name_hu");
             $this->validateSharedName($modelCode, $row, 'name', "products {$rowNumber}. sor");
             $this->validateSharedName($modelCode, $row, 'catalog_group_name', "products {$rowNumber}. sor");
@@ -516,6 +524,11 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
                 $productData['material_composition'] = $this->nullIfEmpty(
                     $row['material_composition']
                 );
+            }
+
+            $visibility = $this->partnerVisibilityValue($row['visible_to_partners'] ?? null);
+            if ($visibility !== null) {
+                $productData['visible_to_partners'] = $visibility;
             }
 
             $product->forceFill($productData);
@@ -752,6 +765,10 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
 
             foreach ($headers as $column => $header) {
                 $item[$header] = $row[$column] ?? null;
+                if ($header === 'visible_to_partners') {
+                    // Preserve native Excel FALSE/0 rather than treating formatted false as a blank cell.
+                    $item[$header] = $sheet->getCell($column.($rowIndex + 2))->getCalculatedValue();
+                }
                 if ($header === 'promised_delivery_date') {
                     // Keep Excel date serials independent of locale/display formatting.
                     // Other columns retain their formatting (for example zero-padded codes).
@@ -844,6 +861,23 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
         $value = strtolower(trim((string) $value));
 
         return in_array($value, ['1', 'true', 'yes', 'igen', 'y'], true);
+    }
+
+    protected function partnerVisibilityValue(mixed $value): ?bool
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+        if (is_bool($value)) {
+            return $value;
+        }
+        $value = mb_strtolower(trim((string) $value));
+
+        return match ($value) {
+            '1', 'true', 'yes', 'igen', 'y' => true,
+            '0', 'false', 'no', 'nem', 'n' => false,
+            default => throw new InvalidArgumentException('Hibás partneroldali láthatóság.'),
+        };
     }
 
     protected function dateValue(mixed $value): ?string

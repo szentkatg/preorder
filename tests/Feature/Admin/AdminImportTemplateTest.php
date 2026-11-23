@@ -77,6 +77,9 @@ class AdminImportTemplateTest extends TestCase
                 $headers = $sheet->rangeToArray('A1:'.$sheet->getHighestDataColumn().'1')[0];
                 $this->assertNotContains('name_en', $headers);
                 $this->assertNotContains('catalog_group_name_en', $headers);
+                if ($name === 'products') {
+                    $this->assertContains('visible_to_partners', $headers);
+                }
                 if ($name === 'price_lists') {
                     $this->assertNotContains('season_code', $headers);
                     $this->assertNotContains('name_hu', $headers);

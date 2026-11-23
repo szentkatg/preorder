@@ -80,7 +80,7 @@ class OrderSharePriceListAccessTest extends TestCase
         $brand = Brand::create(['code' => 'HT', 'name' => 'HT']);
         $sheet = OrderSheetType::create(['code' => 'B', 'name' => 'Bags']);
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Bags']);
-        $this->product = Product::create(['model_code' => 'MODEL-S27', 'name_hu' => 'Model', 'season_id' => $season->id,
+        $this->product = Product::create(['visible_to_partners' => true, 'model_code' => 'MODEL-S27', 'name_hu' => 'Model', 'season_id' => $season->id,
             'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id, 'item_main_group_id' => $group->id,
             'catalog_group_name_hu' => 'Bags', 'active' => true]);
         $color = Color::create(['product_id' => $this->product->id, 'code' => '01', 'name_hu' => 'BLACK', 'active' => true]);

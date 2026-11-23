@@ -6,6 +6,7 @@ use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\PartnerOrderSummaryMatrixExport;
 use App\Filament\Resources\Seasons\Pages\CreateSeason;
 use App\Filament\Resources\Seasons\Pages\EditSeason;
+use App\Imports\PartnerOrderMatrixImport;
 use App\Livewire\Partner\CatalogGroupOrder;
 use App\Livewire\Partner\Dashboard;
 use App\Livewire\Partner\OrderSelector;
@@ -28,7 +29,10 @@ use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Models\PricingCalculationRow;
+use App\Models\PricingParameter;
 use App\Models\PricingProject;
+use App\Models\PricingRoundingRule;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\Size;
@@ -38,6 +42,7 @@ use App\Models\Translation;
 use App\Models\User;
 use App\Services\PartnerOrderCoverageService;
 use App\Services\Pricing\CostCalculationAuthorization;
+use App\Services\Pricing\HufRetailCalculationService;
 use App\Services\Pricing\PricingProjectProductService;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -103,7 +108,7 @@ class PartnerSeasonVisibilityTest extends TestCase
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);
         foreach (['visible', 'hidden', 'historical'] as $kind) {
             $season = $this->{$kind};
-            $product = Product::create(['season_id' => $season->id, 'model_code' => 'B01'.$season->code, 'name_hu' => 'Model '.$kind,
+            $product = Product::create(['visible_to_partners' => true, 'season_id' => $season->id, 'model_code' => 'B01'.$season->code, 'name_hu' => 'Model '.$kind,
                 'item_main_group_id' => $group->id, 'size_range_id' => $range->id, 'brand_id' => $this->brand->id,
                 'order_sheet_type_id' => $this->type->id, 'catalog_group_name_hu' => 'Táskák', 'active' => true]);
             $color = Color::create(['product_id' => $product->id, 'code' => 'BLACK', 'name_hu' => 'Fekete', 'active' => true]);
@@ -394,5 +399,109 @@ class PartnerSeasonVisibilityTest extends TestCase
         $this->assertTrue(CostCalculationAuthorization::canRecalculate($project));
         $this->assertSame(1, app(PricingProjectProductService::class)->add($project, [$this->products['hidden']->id]));
         $this->assertFalse($this->hidden->fresh()->visible_to_partners);
+    }
+
+    public function test_new_products_are_hidden_by_default_without_disabling_them(): void
+    {
+        $data = $this->products['visible']->only(['season_id', 'item_main_group_id', 'brand_id', 'order_sheet_type_id', 'name_hu', 'active']);
+        $new = Product::create($data + ['model_code' => 'NEW-HIDDEN']);
+        $this->assertFalse($new->visible_to_partners);
+        $this->assertFalse($new->fresh()->visible_to_partners);
+        $this->assertTrue((bool) $new->fresh()->active);
+        $rawId = DB::table('products')->insertGetId($data + ['model_code' => 'RAW-HIDDEN']);
+        $this->assertFalse(Product::findOrFail($rawId)->visible_to_partners);
+    }
+
+    public function test_product_visibility_migration_preserves_existing_products_and_order_items(): void
+    {
+        $this->products['historical']->update(['active' => false]);
+        $before = DB::table('order_items')->orderBy('id')->get()->toJson();
+        $migration = require database_path('migrations/2026_11_23_130000_add_partner_visibility_to_products_table.php');
+        $migration->down();
+        $migration->up();
+        foreach ($this->products as $product) {
+            $this->assertTrue($product->fresh()->visible_to_partners);
+        }
+        $this->assertFalse((bool) $this->products['historical']->fresh()->active);
+        $this->assertSame($before, DB::table('order_items')->orderBy('id')->get()->toJson());
+    }
+
+    public function test_hidden_products_are_excluded_from_normal_shared_and_summary_matrices_search_and_exports(): void
+    {
+        $product = $this->products['visible'];
+        $product->update(['visible_to_partners' => false]);
+        Livewire::test(CatalogGroupOrder::class, ['order' => $this->orders['visible'], 'catalogGroupName' => 'Táskák'])
+            ->assertSuccessful()->assertDontSee('Model visible')
+            ->set('modelSearch', $product->model_code)->call('jumpToFirstModelSearchResult')->assertSet('modelSearchResults', [])
+            ->call('openProductImages', $product->id)->assertSet('showImageModal', false);
+        Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $this->share('visible'), 'catalogGroupName' => 'Táskák'])
+            ->assertSuccessful()->assertDontSee('Model visible');
+        Livewire::test(OrderSummary::class, ['season' => $this->visible, 'brand' => $this->brand, 'orderSheetType' => $this->type])
+            ->assertSuccessful()->assertDontSee('Model visible')->call('openProductImages', $product->id)->assertSet('showImageModal', false);
+        foreach ([new PartnerOrderMatrixExport($this->orders['visible']), new PartnerOrderSummaryMatrixExport(new Collection([$this->orders['visible']]))] as $export) {
+            $cells = collect($export->array())->flatten()->all();
+            $this->assertNotContains($product->model_code, $cells);
+            $this->assertNotContains('Model visible', $cells);
+        }
+        $selector = Livewire::test(OrderSelector::class);
+        $selector->set('partnerAddressId', $this->address->id);
+        $this->assertSame([], $selector->instance()->brands->modelKeys());
+        $selector->set('brandId', $this->brand->id);
+        $this->assertSame([], $selector->instance()->orderSheetTypes->modelKeys());
+    }
+
+    public function test_hidden_products_cannot_be_modified_or_deleted_through_stale_or_shared_order_pages(): void
+    {
+        $order = $this->orders['visible'];
+        $sku = $this->skus['visible'];
+        $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Táskák']);
+        $before = DB::table('order_items')->where('order_id', $order->id)->get()->toJson();
+        $this->products['visible']->update(['visible_to_partners' => false]);
+        $page->call('savePieceQuantity', $sku->id, 9)->call('saveAssortmentQuantity', $sku->id, 9)
+            ->set('pieceQuantities', [$sku->id => 0])->call('save');
+        Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $this->share('visible'), 'catalogGroupName' => 'Táskák'])
+            ->call('savePieceQuantity', $sku->id, 7)->call('savePieceQuantity', $sku->id, 0);
+        $this->assertSame($before, DB::table('order_items')->where('order_id', $order->id)->get()->toJson());
+        $this->products['visible']->update(['visible_to_partners' => true]);
+        $page->call('savePieceQuantity', $sku->id, 3);
+        $this->assertSame(3, (int) OrderItem::where('order_id', $order->id)->where('sku_id', $sku->id)->value('quantity'));
+    }
+
+    public function test_hidden_products_are_rejected_by_import_including_zero_quantities_and_rechecked_after_preview(): void
+    {
+        $order = $this->orders['visible'];
+        $sku = $this->skus['visible'];
+        $rows = fn ($quantity) => collect([collect([json_encode(['version' => 1, 'skus' => [2 => $sku->id]]), $quantity])]);
+        $preview = new PartnerOrderMatrixImport($order, previewOnly: true);
+        $preview->collection($rows(7));
+        $this->assertSame(1, $preview->stats()['updated']);
+        $this->products['visible']->update(['visible_to_partners' => false]);
+        foreach ([true, false] as $previewOnly) {
+            foreach ([0, 7] as $quantity) {
+                $import = new PartnerOrderMatrixImport($order, previewOnly: $previewOnly);
+                $import->collection($rows($quantity));
+                $this->assertSame(1, $import->stats()['invalid']);
+                $this->assertSame(0, $import->stats()['changed']);
+                $this->assertSame(__('partner.import_sku_not_available'), $import->stats()['warnings'][0]['message']);
+            }
+        }
+        $this->assertSame(2, (int) OrderItem::where('order_id', $order->id)->where('sku_id', $sku->id)->value('quantity'));
+    }
+
+    public function test_hidden_active_products_can_still_be_priced(): void
+    {
+        $product = $this->products['visible'];
+        $product->update(['visible_to_partners' => false]);
+        $project = PricingProject::create(['season_id' => $this->visible->id, 'name' => 'Preparation', 'status' => 'active']);
+        $project->products()->attach($product);
+        $huf = $this->list->currency_id;
+        $list = PriceList::create(['code' => 'RETAIL_PREP', 'name' => 'Preparation', 'type' => 'retail', 'currency_id' => $huf, 'active' => true]);
+        PricingCalculationRow::create(['pricing_project_id' => $project->id, 'product_id' => $product->id,
+            'price_type' => 'cost', 'currency_id' => $huf, 'calculated_price' => 100]);
+        PricingParameter::create(['pricing_project_id' => $project->id, 'parameter_type' => 'retail_multiplier', 'scope_type' => 'global', 'value' => 4.7, 'active' => true]);
+        PricingRoundingRule::create(['pricing_project_id' => $project->id, 'name' => 'HUF', 'price_type' => 'retail', 'round_to' => 10, 'mode' => 'nearest', 'adjustment' => 0, 'active' => true]);
+        $result = app(HufRetailCalculationService::class)->recalculate($project, $list);
+        $this->assertSame(1, $result['created']);
+        $this->assertFalse($product->fresh()->visible_to_partners);
     }
 }

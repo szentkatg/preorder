@@ -69,6 +69,22 @@ class ProductBulkUpdateTest extends TestCase
             ['field' => 'catalog_page', 'value' => 12], ['field' => 'active', 'value' => '0']];
     }
 
+    public function test_partner_visibility_can_be_bulk_changed_and_filtered_independently_of_active(): void
+    {
+        $page = Livewire::test(ListProducts::class)->assertTableColumnExists('visible_to_partners')
+            ->mountTableBulkAction('bulkUpdateProducts', [$this->first, $this->second]);
+        $page->set('mountedActions.0.data.changes', [['field' => 'visible_to_partners', 'value' => '1']])
+            ->set('mountedActions.0.data.confirmed', true)->callMountedTableBulkAction()->assertHasNoTableBulkActionErrors();
+        $this->assertTrue($this->first->fresh()->visible_to_partners);
+        $this->assertTrue($this->second->fresh()->visible_to_partners);
+        $this->assertFalse($this->untouched->fresh()->visible_to_partners);
+        $this->assertTrue((bool) $this->first->fresh()->active);
+        $page->filterTable('visible_to_partners', false)->assertCountTableRecords(1)->assertCanSeeTableRecords([$this->untouched]);
+        $this->update([['field' => 'visible_to_partners', 'value' => '0']], [$this->first->id]);
+        $this->assertFalse($this->first->fresh()->visible_to_partners);
+        $this->assertTrue($this->second->fresh()->visible_to_partners);
+    }
+
     private function update(array $changes, ?array $ids = null): array
     {
         return app(ProductBulkUpdateService::class)->update($ids ?? [$this->first->id, $this->second->id], $changes);

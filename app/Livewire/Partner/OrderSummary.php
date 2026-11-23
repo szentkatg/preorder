@@ -220,7 +220,7 @@ class OrderSummary extends Component
     {
         $catalogGroupColumn = $this->catalogGroupNameColumn();
 
-        $products = Product::query()
+        $products = Product::query()->visibleToPartners()
             ->with([
                 'sizeRange.items.size',
                 'colors.skus.size',
@@ -499,7 +499,7 @@ class OrderSummary extends Component
 
     public function openProductImages(int $productId): void
     {
-        $product = Product::query()
+        $product = Product::query()->visibleToPartners()
             ->with([
                 'colorImages.color',
             ])

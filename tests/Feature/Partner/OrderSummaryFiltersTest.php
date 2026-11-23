@@ -71,7 +71,7 @@ class OrderSummaryFiltersTest extends TestCase
         session(['partner.season_id' => $this->season->id]);
 
         $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska']);
-        $product = Product::create(['season_id' => $this->season->id, 'item_main_group_id' => $group->id,
+        $product = Product::create(['visible_to_partners' => true, 'season_id' => $this->season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'B01W27', 'name_hu' => 'EMIRO', 'brand_id' => $this->brand->id, 'order_sheet_type_id' => $this->type->id]);
         $color = Color::create(['product_id' => $product->id, 'code' => '01', 'name_hu' => 'BLACK']);
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE']);

@@ -232,6 +232,45 @@ class ProductMasterImportTest extends TestCase
         ];
     }
 
+    public function test_product_visibility_import_preserves_existing_values_and_defaults_new_products_to_hidden(): void
+    {
+        $this->createProductReferences();
+        $row = ['model_code' => 'TEST001', 'season_code' => 'S01', 'brand_code' => 'BR', 'order_sheet_type_code' => 'STD',
+            'item_main_group_code' => 'TST', 'name_hu' => 'Model', 'active' => 1];
+        $page = $this->importPage();
+        $page->importProductRows([$row]);
+        $product = Product::where('model_code', 'TEST001')->firstOrFail();
+        $this->assertFalse($product->visible_to_partners);
+        $this->assertTrue((bool) $product->active);
+        foreach ([1, 0, 'igen', 'nem', true, false] as $value) {
+            $data = $row + ['visible_to_partners' => $value];
+            $this->assertSame([], $page->validateProductRows([$data]));
+            $page->importProductRows([$data]);
+            $this->assertSame(in_array($value, [1, 'igen', true], true), $product->fresh()->visible_to_partners);
+        }
+        $product->update(['visible_to_partners' => true]);
+        foreach ([$row, $row + ['visible_to_partners' => ''], $row + ['visible_to_partners' => null]] as $data) {
+            $page->importProductRows([$data]);
+            $this->assertTrue($product->fresh()->visible_to_partners);
+        }
+        $invalid = $row + ['visible_to_partners' => 'maybe'];
+        $errors = $page->validateProductRows([$invalid]);
+        $this->assertStringContainsString('visible_to_partners', implode(' ', $errors));
+        $page->importProductRows([$invalid]);
+        $this->assertTrue($product->fresh()->visible_to_partners);
+    }
+
+    public function test_visibility_boolean_excel_cells_and_reordered_headers_are_preserved(): void
+    {
+        $sheet = (new Spreadsheet)->getActiveSheet();
+        $sheet->fromArray([['visible_to_partners', 'model_code'], [true, 'SHOW'], [false, 'HIDE'], [0, 'ZERO'], [null, 'KEEP']], null, 'A1', true);
+        $rows = $this->importPage()->rowsFromSheet($sheet);
+        $this->assertTrue($rows[0]['visible_to_partners']);
+        $this->assertFalse($rows[1]['visible_to_partners']);
+        $this->assertSame(0, $rows[2]['visible_to_partners']);
+        $this->assertNull($rows[3]['visible_to_partners']);
+    }
+
     private function createProductReferences(): void
     {
         $timestamps = [

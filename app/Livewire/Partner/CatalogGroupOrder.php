@@ -207,7 +207,7 @@ class CatalogGroupOrder extends Component
         }
 
         if (empty($this->modelSearchResults)) {
-            $products = Product::query()
+            $products = Product::query()->visibleToPartners()
                 ->where('season_id', $this->order->season_id)
                 ->where('brand_id', $this->order->brand_id)
                 ->where('order_sheet_type_id', $this->order->order_sheet_type_id)
@@ -361,7 +361,7 @@ class CatalogGroupOrder extends Component
     {
         $catalogGroupColumn = $this->catalogGroupNameColumn();
 
-        $query = Product::query()
+        $query = Product::query()->visibleToPartners()
             ->with([
                 'sizeRange.items.size',
                 'colors.skus.size',
@@ -496,7 +496,7 @@ class CatalogGroupOrder extends Component
     {
         $catalogGroupColumn = $this->catalogGroupNameColumn();
 
-        $groups = Product::query()
+        $groups = Product::query()->visibleToPartners()
             ->where('season_id', $this->order->season_id)
             ->where('brand_id', $this->order->brand_id)
             ->where('order_sheet_type_id', $this->order->order_sheet_type_id)
@@ -693,7 +693,7 @@ class CatalogGroupOrder extends Component
 
     public function openProductImages(int $productId): void
     {
-        $product = Product::query()
+        $product = Product::query()->visibleToPartners()
             ->with([
                 'colorImages.color',
             ])
@@ -794,20 +794,19 @@ class CatalogGroupOrder extends Component
         foreach ($quantities as $skuId => $quantity) {
             $quantity = (int) $quantity;
 
+            // Recheck visibility for every write, including stale pages and zero-quantity deletes.
+            $sku = Sku::query()->forPartnerOrder($this->order)
+                ->with('assortmentComponents')->find($skuId);
+            if (! $sku) {
+                continue;
+            }
+
             if ($quantity <= 0) {
                 OrderItem::query()
                     ->where('order_id', $this->order->id)
                     ->where('sku_id', $skuId)
                     ->delete();
 
-                continue;
-            }
-
-            $sku = Sku::query()
-                ->with('assortmentComponents')
-                ->find($skuId);
-
-            if (! $sku) {
                 continue;
             }
 

@@ -69,7 +69,7 @@ class ErpOrderExportTest extends TestCase
         $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint']);
         $list = PriceList::create(['code' => 'WHOLE', 'name' => 'Nagyker', 'type' => 'wholesale', 'currency_id' => $currency->id]);
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Táska']);
-        $product = Product::create(['season_id' => $this->season->id, 'item_main_group_id' => $group->id,
+        $product = Product::create(['visible_to_partners' => true, 'season_id' => $this->season->id, 'item_main_group_id' => $group->id,
             'model_code' => 'B01W27', 'name_hu' => 'MODELL', 'brand_id' => $brand->id, 'order_sheet_type_id' => $sheet->id]);
         $sizes = [];
         foreach (['XL' => 1, 'M' => 2] as $code => $sort) {

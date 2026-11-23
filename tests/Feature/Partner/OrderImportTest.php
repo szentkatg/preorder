@@ -57,7 +57,7 @@ class OrderImportTest extends TestCase
         $currency = Currency::create(['code' => 'HUF', 'name' => 'Forint']);
         $list = PriceList::create(['code' => 'WHOLE', 'name' => 'Wholesale', 'type' => 'wholesale', 'currency_id' => $currency->id]);
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Bags']);
-        $product = Product::create(['model_code' => 'MODEL', 'name_hu' => 'Model', 'season_id' => $this->season->id,
+        $product = Product::create(['visible_to_partners' => true, 'model_code' => 'MODEL', 'name_hu' => 'Model', 'season_id' => $this->season->id,
             'item_main_group_id' => $group->id, 'brand_id' => $brand->id, 'order_sheet_type_id' => $type->id]);
         $color = Color::create(['product_id' => $product->id, 'code' => '01', 'name_hu' => 'BLACK']);
         $this->sku = Sku::create(['product_id' => $product->id, 'color_id' => $color->id,

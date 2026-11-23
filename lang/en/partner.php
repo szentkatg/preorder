@@ -2,6 +2,7 @@
 
 // lang/en/partner.php
 return [
+    'import_sku_not_available' => 'This item cannot be ordered on this order sheet (hidden, inactive, missing, or belonging to another season/brand/order sheet). Any existing quantity was left unchanged.',
     'help' => 'Help',
     'update_notice_title' => 'The partner portal has been updated',
     'update_notice_reference' => 'Every order now requires a reference number. We have already added references to existing orders; you can find them in the order list.',

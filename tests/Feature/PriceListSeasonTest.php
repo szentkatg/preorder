@@ -56,7 +56,7 @@ class PriceListSeasonTest extends TestCase
         $this->secondSeason = Season::create(['code' => 'S28', 'name' => '2028', 'active' => true, 'visible_to_partners' => true]);
         $this->currency = Currency::create(['code' => 'HUF', 'name' => 'Forint', 'active' => true]);
         $group = ItemMainGroup::create(['code' => 'BAG', 'name' => 'Táska', 'active' => true]);
-        $this->product = Product::create(['season_id' => $this->firstSeason->id,
+        $this->product = Product::create(['visible_to_partners' => true, 'season_id' => $this->firstSeason->id,
             'item_main_group_id' => $group->id, 'model_code' => 'B10024W27', 'name_hu' => 'Teszt termék', 'active' => true]);
         $this->list = PriceList::create($this->formData('Retail_HU'));
 

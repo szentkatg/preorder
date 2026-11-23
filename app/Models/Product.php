@@ -28,11 +28,20 @@ class Product extends Model
         'rounding_rule_id',
         'promised_delivery_date',
         'active',
+        'visible_to_partners',
     ];
+
+    protected $attributes = ['visible_to_partners' => false];
 
     protected function casts(): array
     {
-        return ['previous_season_match_override' => 'boolean'];
+        return ['previous_season_match_override' => 'boolean', 'visible_to_partners' => 'boolean'];
+    }
+
+    public function scopeVisibleToPartners(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('active'), true)
+            ->where($query->qualifyColumn('visible_to_partners'), true);
     }
 
     public function previousSeasonProduct(): BelongsTo

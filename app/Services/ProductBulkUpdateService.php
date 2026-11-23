@@ -38,6 +38,7 @@ class ProductBulkUpdateService
             'catalog_sort' => ['label' => 'Katalógus sorrend', 'type' => 'integer', 'unsigned' => true],
             'catalog_page' => ['label' => 'Katalógus oldal', 'type' => 'integer'],
             'active' => ['label' => 'Aktív', 'type' => 'boolean', 'required' => true],
+            'visible_to_partners' => ['label' => 'Partnerportálon látható', 'type' => 'boolean', 'required' => true],
         ];
     }
 

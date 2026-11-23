@@ -2,10 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Sku extends Model
 {
+    public function scopeForPartnerOrder(Builder $query, Order $order): Builder
+    {
+        return $query->whereHas('product', fn (Builder $product) => $product->visibleToPartners()
+            ->where('season_id', $order->season_id)->where('brand_id', $order->brand_id)
+            ->where('order_sheet_type_id', $order->order_sheet_type_id));
+    }
+
     protected $fillable = [
         'product_id',
         'color_id',

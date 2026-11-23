@@ -1,5 +1,41 @@
 # Szezon előkészítése a partnerportál megnyitása nélkül
 
+## További termékek előkészítése egy már nyitott szezonban (2026-11-23)
+
+A terméktörzsben külön `visible_to_partners` (**Partnerportálon látható**) mező
+választja el a rendelhetőséget az aktív/árazható állapottól. Új termék alapból
+rejtett, a migráció a meglévő termékek korábbi elérhetőségét megtartja.
+Az inaktív termék a láthatóság bekapcsolásától sem válik rendelhetővé.
+
+W27 új modelljeinek előkészítéséhez:
+
+1. Az importban `active=1`, `visible_to_partners=0` értékeket használj.
+2. Vedd fel őket az árprojektbe, és végezd el az árképzést a szokásos módon.
+3. Amikor megnyithatók a partnereknek, a **Products** listában jelöld ki őket.
+4. **Csoportos műveletek → Termékek tömeges módosítása → Partnerportálon látható → Igen**,
+   majd a darabszámot tartalmazó megerősítéssel mentsd. Ugyanígy el is rejthetők.
+
+A mező egyedi szerkesztésnél, a lista oszlopai között és külön igen/nem szűrőként
+is elérhető. A meglévő termékmódosítási jog kell hozzá, nincs új jogosultság.
+Az importminta `products` lapján szerepel az új, opcionális oszlop.
+Hiányzó oszlop vagy üres cella meglévő terméknél nem változtat a láthatóságon,
+új terméknél rejtett állapotot jelent. `1`/`0`, igaz/hamis Excel-cella,
+`true`/`false`, `yes`/`no`, `igen`/`nem` is elfogadott; hibás érték esetén a
+modell importja validálási hibát kap. Az oszlop sorrendje tetszőleges.
+
+A rejtett termék kimarad a partner- és megosztott rendelőlapokból, modellkeresésből,
+katalóguscsoportokból, a választható márka/rendelőlap kínálatából és a partner
+Excel-rendelőlapsablonokból. A közvetlen SKU-mentés és az import (az előnézet után
+újra ellenőrizve is) kihagyja a rejtett terméket, nulla mennyiséggel sem törli
+a korábbi rendeléstételt. A tárolt rendeléstételek és az ERP-export alapjául szolgáló
+rendelési adatok nem íródnak át vagy törlődnek a láthatóság módosításától.
+A szezon láthatósága ettől külön feltétel marad, az árprojekt publikálása pedig
+nem kapcsolja be automatikusan sem a szezon, sem a termék partneroldali láthatóságát.
+
+Üzemeltetés: a `2026_11_23_130000_add_partner_visibility_to_products_table` migráció
+szükséges. Nincs új függőség vagy frontendbuild. Telepítéskor a kódváltás és a
+migráció rövid maintenance ablakban történjen; a fejlesztés önmagában nem telepít.
+
 ## Használat
 
 A **Szezonok** adminoldalon külön **Partnerportálon látható** kapcsoló található,

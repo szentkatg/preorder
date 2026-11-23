@@ -169,7 +169,7 @@ class PartnerOrderMatrixExport extends DefaultValueBinder implements FromArray, 
         $rows[] = ['', __('partner.wholesale_value'), ''];
         $rows[] = ['', __('partner.retail_value'), ''];
 
-        $products = Product::query()
+        $products = Product::query()->visibleToPartners()
             ->with([
                 'sizeRange.items.size',
                 'colors.skus.size',

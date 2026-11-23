@@ -95,7 +95,7 @@ class PartnerSeasonContextTest extends TestCase
         $group = ItemMainGroup::create(['code' => 'B01', 'name' => 'Bags', 'active' => true]);
         $size = Size::create(['code' => 'ONE', 'name_hu' => 'ONE', 'active' => true]);
         foreach ([$this->season, $this->other, $this->hidden] as $season) {
-            $product = Product::create(['model_code' => 'MODEL'.$season->code, 'name_hu' => 'Product '.$season->code,
+            $product = Product::create(['visible_to_partners' => true, 'model_code' => 'MODEL'.$season->code, 'name_hu' => 'Product '.$season->code,
                 'season_id' => $season->id, 'item_main_group_id' => $group->id, 'brand_id' => $this->brand->id,
                 'order_sheet_type_id' => $this->type->id, 'catalog_group_name_hu' => 'Bags', 'active' => true]);
             $color = Color::create(['product_id' => $product->id, 'code' => '01', 'name_hu' => 'BLACK', 'active' => true]);

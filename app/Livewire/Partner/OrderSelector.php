@@ -289,7 +289,8 @@ class OrderSelector extends Component
                     ->from('products')
                     ->whereColumn('products.brand_id', 'brands.id')
                     ->where('products.season_id', $this->seasonId)
-                    ->where('products.active', true);
+                    ->where('products.active', true)
+                    ->where('products.visible_to_partners', true);
             })
             ->select('brands.*')
             ->orderBy('name')
@@ -384,7 +385,8 @@ class OrderSelector extends Component
                     ->whereColumn('products.order_sheet_type_id', 'order_sheet_types.id')
                     ->where('products.season_id', $this->seasonId)
                     ->where('products.brand_id', $this->brandId)
-                    ->where('products.active', true);
+                    ->where('products.active', true)
+                    ->where('products.visible_to_partners', true);
             })
             ->select('order_sheet_types.*')
             ->orderBy('name')
@@ -654,7 +656,7 @@ class OrderSelector extends Component
 
         $order->loadMissing(['partnerAddress.language', 'priceList.currency']);
 
-        $products = Product::query()
+        $products = Product::query()->visibleToPartners()
             ->with(['skus.assortmentComponents'])
             ->where('season_id', $order->season_id)
             ->where('brand_id', $order->brand_id)

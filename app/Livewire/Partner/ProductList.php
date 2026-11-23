@@ -59,7 +59,7 @@ class ProductList extends Component
 
     public function render()
     {
-        $catalogGroups = Product::query()
+        $catalogGroups = Product::query()->visibleToPartners()
             ->where('season_id', $this->season->id)
             ->where('brand_id', $this->brand->id)
             ->where('order_sheet_type_id', $this->type->id)
