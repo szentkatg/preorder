@@ -1,5 +1,34 @@
 # Letölthető admin importminták
 
+## Modellszintű exkluzivitás (2026-11-23)
+
+A terméktörzs `exclusivity` mezője opcionális, legfeljebb 100 karakteres szöveg
+(`VARCHAR(100) NULL`). Az adminban **Exkluzivitás** néven szerkeszthető, kereshető,
+rendezhető és exportálható listaoszlop. A kijelölt modellekhez a **Termékek
+tömeges módosítása** művelettel is megadható vagy üresre állítható; nem jelöl
+árakat felülvizsgálatra, nem korlátozza a rendelhetőséget, és nem jelenik meg
+automatikusan a partneroldalon.
+
+A termékimport mintájának `products` lapján az `exclusivity` oszlop használható.
+Opcionális: hiányzó oszlop megtartja a meglévő adatot, jelen lévő üres cella
+törli. Új terméknél alapból üres. A 100 karakteres korlát ékezetes betűkkel is
+karakterszám, nem bájtszám; hosszabb érték validálási hibát okoz, nem csonkolódik.
+Az adminűrlap és a tömeges módosítás ugyanezt a korlátot ellenőrzi.
+
+Az **Exkluzivitás** oszlop a bekerülési érték, HUF/devizás kisker, nagyker,
+disztribútori, általános kalkulációs sorok és teljes áráttekintés listáiban is
+elérhető (a termékenkénti árkezelést is beleértve). Kereshető, rendezhető és
+az oszlopkezelőben ki/be kapcsolható; a meglévő Excel-exportok a teljes
+szöveget viszik ki. Az árprojekt terméklistája, termékfelvételi listája és
+a kalkulációs hibalista szintén mutatja. Mindig a terméktörzs aktuális értékét
+használjuk, nem kalkulációs pillanatképet; változása nem igényel újraszámítást.
+A főcsoportonként összesített áreloszlásnak nincs egyedi modellrekordja,
+ezért abba nem kerül ilyen oszlop.
+
+Ehhez a mezőhöz a `2026_11_23_150000_add_exclusivity_to_products_table` migráció
+szükséges; a meglévő termékek más mezőit nem módosítja. A korábbi, a mintafájlok
+bevezetéséről szóló üzemeltetési megjegyzések ezt az új migrációt nem helyettesítik.
+
 Az importoldalak fejlécében az **Excel-minta letöltése** művelet fájlfeltöltés és validálás nélkül is letölthető XLSX-et ad:
 
 - Partner import: partners, partner_addresses, partner_users, address_brands, address_order_sheet_types.

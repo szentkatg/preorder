@@ -122,7 +122,7 @@ class PricingParameterValidationTest extends TestCase
     {
         $country = $this->parameter(['scope_type' => 'supplier_country', 'supplier_country_code' => 'cn',
             'product_id' => $this->product->id, 'item_main_group_id' => $this->product->item_main_group_id, 'material_composition' => 'PU']);
-        $this->assertSame(['supplier_country_code' => 'CN', 'item_main_group_id' => null, 'material_composition' => null, 'product_id' => null], $country->fresh()->scopeAttributes());
+        $this->assertSame(['supplier_country_code' => 'CN', 'item_main_group_id' => null, 'item_main_group_pattern' => null, 'material_composition' => null, 'product_id' => null], $country->fresh()->scopeAttributes());
         $this->assertNull($country->fresh()->product_id);
         $this->assertNull($country->fresh()->item_main_group_id);
         $this->assertNull($country->fresh()->material_composition);

@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\PricingParameters\Schemas;
 
+use App\Models\ItemMainGroup;
 use App\Models\PricingParameter;
 use App\Models\Product;
+use App\Services\Pricing\ItemMainGroupCodePattern;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -44,10 +46,20 @@ class PricingParameterForm
                 Select::make('item_main_group_id')
                     ->label('Főcsoport')
                     ->relationship('itemMainGroup', 'name')
-                    ->searchable()
+                    ->getOptionLabelFromRecordUsing(fn (ItemMainGroup $record): string => $record->codeAndName())
+                    ->searchable(['code', 'name'])
                     ->preload()
+                    ->required()
                     ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP)
                     ->dehydrated(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP),
+
+                TextInput::make('item_main_group_pattern')
+                    ->label('Főcsoportkód-minta')
+                    ->placeholder('S*')
+                    ->helperText('* = tetszőleges karaktersor, ? = egy karakter. A konkrét főcsoport megelőzi a jokeres szabályt; a jokeresek közül a pontosabb minta érvényesül.')
+                    ->maxLength(100)->regex(ItemMainGroupCodePattern::VALIDATION_REGEX)->required()
+                    ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN)
+                    ->dehydrated(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN),
 
                 Select::make('material_composition')
                     ->label('Anyagösszetétel')
@@ -55,7 +67,7 @@ class PricingParameterForm
                         ->where('material_composition', '!=', '')->distinct()->orderBy('material_composition')
                         ->pluck('material_composition', 'material_composition'))
                     ->searchable()->required()
-                    ->helperText('Pontos egyezés a terméktörzs anyagösszetételével. Elsőbbség: globális → ország → főcsoport → anyagösszetétel → modell.')
+                    ->helperText('Pontos egyezés a terméktörzs anyagösszetételével. Elsőbbség: globális → ország → főcsoportkód-minta → konkrét főcsoport → anyagösszetétel → modell.')
                     ->visible(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_MATERIAL_COMPOSITION)
                     ->dehydrated(fn ($get): bool => $get('scope_type') === PricingParameter::SCOPE_MATERIAL_COMPOSITION),
 
@@ -112,6 +124,7 @@ class PricingParameterForm
         return [
             PricingParameter::SCOPE_GLOBAL => 'Globális',
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => 'Beszállító ország',
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN => 'Főcsoportkód-minta (joker)',
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => 'Főcsoport',
             PricingParameter::SCOPE_MATERIAL_COMPOSITION => 'Anyagösszetétel',
             PricingParameter::SCOPE_PRODUCT => 'Modell',

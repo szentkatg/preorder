@@ -83,6 +83,7 @@ class HufRetailCalculator
                 'retail_parameter' => [
                     'id' => $parameter->id, 'scope_type' => $parameter->scope_type,
                     'product_id' => $parameter->product_id, 'item_main_group_id' => $parameter->item_main_group_id,
+                    'item_main_group_pattern' => $parameter->item_main_group_pattern,
                     'supplier_country_code' => $parameter->supplier_country_code,
                     'material_composition' => $parameter->material_composition,
                     'price_list_id' => $parameter->price_list_id, 'currency_id' => $parameter->currency_id,

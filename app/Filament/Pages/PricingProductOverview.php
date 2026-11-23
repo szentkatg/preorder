@@ -97,7 +97,7 @@ class PricingProductOverview extends Page implements HasTable
             'shipping_cost_percent' => 'Szállítás %', 'customs_percent' => 'Vám %', 'final_price' => 'Bekerülési HUF'];
         foreach ($this->overviewLists as $list) {
             foreach (app(PricingOverviewQuery::class)->columns($list) as $name => $column) {
-                if (! in_array($column['kind'], ['status', 'review'], true)) {
+                if (! in_array($column['kind'], ['status', 'review', 'currency'], true)) {
                     $columns[$name] = $column['label'];
                 }
             }
@@ -112,6 +112,7 @@ class PricingProductOverview extends Page implements HasTable
             ->whereHas('product', fn ($q) => $q->where('active', true))->with(['product.itemMainGroup', 'product.brand', 'color', 'supplier', 'purchaseCurrency', 'pricingProject']))
             ->select('pricing_calculation_rows.*');
         $columns = [TextColumn::make('product.model_code')->label('Modell kód'), TextColumn::make('product.name_hu')->label('Modell név'),
+            TextColumn::make('product.exclusivity')->label('Exkluzivitás'),
             TextColumn::make('product.itemMainGroup.name')->label('Főcsoport'), TextColumn::make('product.catalog_group_name_hu')->label('Katalóguscsoport'),
             TextColumn::make('product.brand.name')->label('Márka'), TextColumn::make('color.name_hu')->label('Szín'),
             TextColumn::make('supplier.erp_partner_code')->label('Beszállító kód'), TextColumn::make('supplier.name')->label('Beszállító'),
@@ -127,7 +128,7 @@ class PricingProductOverview extends Page implements HasTable
                 $query->selectSub(clone $definition['query'], $name);
                 $expressions[$name] = $definition;
                 $column = TextColumn::make($name)->label($definition['label'])->placeholder('—')
-                    ->toggleable(isToggledHiddenByDefault: in_array($definition['kind'], ['status', 'review'], true));
+                    ->toggleable(isToggledHiddenByDefault: in_array($definition['kind'], ['status', 'review', 'currency'], true));
                 if ($definition['kind'] === 'review') {
                     $column->getStateUsing(fn ($record) => $record->{$name} === null ? null : (bool) $record->{$name})
                         ->formatStateUsing(fn ($state) => $state === null ? '—' : ($state ? 'Igen' : 'Nem'))
@@ -138,7 +139,15 @@ class PricingProductOverview extends Page implements HasTable
                         'modified_approved' => 'Módosított jóváhagyott', 'approved_round_2' => '2. körös jóváhagyott',
                         'approved_round_3' => '3. körös jóváhagyott', default => $state,
                     });
-                } else {
+                } elseif ($definition['kind'] === 'target_purchase_price') {
+                    $query->selectSub(clone $definition['purchase_query'], $name.'_original');
+                    $column->numeric()->alignEnd()
+                        ->formatStateUsing(fn ($state, PricingCalculationRow $record) => $this->formatPricingDecimal($state, $name, 4)
+                            .(filled($record->{$name.'_currency'}) ? ' '.$record->{$name.'_currency'} : ''))
+                        ->color(fn (PricingCalculationRow $record) => $record->{$name} !== null && $record->{$name.'_original'} !== null
+                            && (float) $record->{$name} < (float) $record->{$name.'_original'} ? 'danger' : null)
+                        ->tooltip('A HUF kiskerárhoz tartozó cél beszerzési ár, a mentett beszerzési ár pénznemében. A lealkudandó árat piros jelöli.');
+                } elseif ($definition['kind'] !== 'currency') {
                     $column->numeric()->alignEnd()->formatStateUsing(fn ($state) => $this->formatPricingDecimal($state, $name, 2));
                 }
                 $columns[] = $column;

@@ -175,7 +175,7 @@ class PricingConfigurationCopyService
         $attributes = $row->only(array_diff($row->getFillable(), ['pricing_project_id']));
         if ($row instanceof PricingParameter) {
             if (! in_array($row->scope_type, [PricingParameter::SCOPE_GLOBAL, PricingParameter::SCOPE_SUPPLIER_COUNTRY,
-                PricingParameter::SCOPE_ITEM_MAIN_GROUP, PricingParameter::SCOPE_MATERIAL_COMPOSITION, PricingParameter::SCOPE_PRODUCT], true)) {
+                PricingParameter::SCOPE_ITEM_MAIN_GROUP, PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN, PricingParameter::SCOPE_MATERIAL_COMPOSITION, PricingParameter::SCOPE_PRODUCT], true)) {
                 throw new DomainException('Ismeretlen paraméterszűkítés a forrás- vagy célsorban.');
             }
             $attributes = array_replace($attributes, $row->scopeAttributes());
@@ -188,7 +188,7 @@ class PricingConfigurationCopyService
     {
         $attributes = $this->attributes($row);
         $fields = $row instanceof PricingParameter
-            ? ['parameter_type', 'scope_type', 'supplier_country_code', 'item_main_group_id', 'material_composition', 'product_id', 'price_list_id', 'currency_id']
+            ? ['parameter_type', 'scope_type', 'supplier_country_code', 'item_main_group_id', 'item_main_group_pattern', 'material_composition', 'product_id', 'price_list_id', 'currency_id']
             : ['price_type', 'price_list_id', 'currency_id'];
 
         return json_encode(array_map(fn ($field) => $attributes[$field] ?? null, $fields), JSON_THROW_ON_ERROR);

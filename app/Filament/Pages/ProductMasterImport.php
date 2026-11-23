@@ -355,6 +355,10 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
             $this->validateSharedName($modelCode, $row, 'name', "products {$rowNumber}. sor");
             $this->validateSharedName($modelCode, $row, 'catalog_group_name', "products {$rowNumber}. sor");
 
+            if (array_key_exists('exclusivity', $row) && mb_strlen($this->nullIfEmpty($row['exclusivity']) ?? '') > 100) {
+                $this->addRowError($modelCode, "products {$rowNumber}. sor: az exclusivity legfeljebb 100 karakter lehet");
+            }
+
             $this->validateCodeExists($modelCode, $seasonCodes, $row['season_code'] ?? null, "products {$rowNumber}. sor: nem létező season_code");
             $this->validateCodeExists($modelCode, $brandCodes, $row['brand_code'] ?? null, "products {$rowNumber}. sor: nem létező brand_code");
             $this->validateCodeExists($modelCode, $orderSheetTypeCodes, $row['order_sheet_type_code'] ?? null, "products {$rowNumber}. sor: nem létező order_sheet_type_code");
@@ -529,6 +533,10 @@ class ProductMasterImport extends Page implements Forms\Contracts\HasForms
             $visibility = $this->partnerVisibilityValue($row['visible_to_partners'] ?? null);
             if ($visibility !== null) {
                 $productData['visible_to_partners'] = $visibility;
+            }
+
+            if (array_key_exists('exclusivity', $row)) {
+                $productData['exclusivity'] = $this->nullIfEmpty($row['exclusivity']);
             }
 
             $product->forceFill($productData);

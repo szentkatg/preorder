@@ -10,15 +10,21 @@ use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Filament\Pages\PricingProductOverview;
 use App\Filament\Pages\PricingProductWorkspace;
 use App\Filament\Pages\PricingWholesaleCalculations;
+use App\Filament\Resources\PricingCalculationErrors\Pages\ListPricingCalculationErrors;
 use App\Filament\Resources\PricingCalculationRows\Pages\ListPricingCalculationRows;
+use App\Filament\Resources\PricingProjects\Pages\EditPricingProject;
 use App\Filament\Resources\PricingProjects\Pages\ListPricingProjects;
+use App\Filament\Resources\PricingProjects\Pages\SelectPricingProjectProducts;
 use App\Filament\Resources\PricingProjects\Pages\ViewPricingProject;
+use App\Filament\Resources\PricingProjects\RelationManagers\ProductsRelationManager;
 use App\Filament\Support\ProductPricingNavigation;
 use App\Models\Brand;
+use App\Models\Color;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
 use App\Models\PriceList;
+use App\Models\PricingCalculationError;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingParameter;
 use App\Models\PricingProject;
@@ -38,6 +44,7 @@ use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Livewire\Mechanisms\ExtendBlade\ExtendBlade;
@@ -114,6 +121,60 @@ class ProductPricingWorkspaceTest extends TestCase
     private function settings(): array
     {
         return app(ProductPricingService::class)->open($this->project, $this->product);
+    }
+
+    public function test_all_pricing_grids_display_search_sort_and_export_current_product_exclusivity(): void
+    {
+        $value = 'B'.str_repeat('Ő', 99);
+        $this->product->update(['exclusivity' => $value]);
+        $this->other->update(['exclusivity' => 'A partner']);
+        $this->assertSame(0, app(PricingProjectCalculationService::class)->calculate($this->project)['failed']);
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class, PricingForeignRetailCalculations::class,
+            PricingWholesaleCalculations::class, PricingDistributorCalculations::class, ListPricingCalculationRows::class,
+            PricingProductOverview::class, PricingProductWorkspace::class] as $class) {
+            $page = Livewire::test($class)->assertTableColumnExists('product.exclusivity')
+                ->sortTable('product.exclusivity', 'asc');
+            $column = $page->instance()->getTable()->getColumn('product.exclusivity');
+            $this->assertSame('Exkluzivitás', $column->getLabel());
+            $this->assertTrue($column->isToggleable());
+            $this->assertTrue($column->isSearchable());
+            $this->assertTrue($column->isSortable());
+            $this->assertSame($this->other->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id, $class);
+            $page->searchTableColumns(['product.exclusivity' => 'ŐŐ']);
+            $rows = $page->instance()->getFilteredTableQuery()->get();
+            $this->assertSame([$this->product->id], $rows->pluck('product_id')->unique()->values()->all(), $class);
+            $export = new AdminTableExport($page->instance()->getTableQueryForExport(), [$column]);
+            $this->assertSame(['Exkluzivitás'], $export->headings());
+            $this->assertSame([$value], $export->map($rows->first()));
+            // No price recalculation is necessary to show a changed master value.
+            $this->product->update(['exclusivity' => 'Friss jelölés']);
+            $this->assertSame(['Friss jelölés'], $export->map($rows->first()->fresh()));
+            $this->product->update(['exclusivity' => $value]);
+        }
+    }
+
+    public function test_project_product_lists_and_pricing_errors_also_include_exclusivity(): void
+    {
+        $this->product->update(['exclusivity' => 'B partner']);
+        $this->other->update(['exclusivity' => 'A partner']);
+        Livewire::test(ProductsRelationManager::class, ['ownerRecord' => $this->project, 'pageClass' => EditPricingProject::class])
+            ->assertTableColumnExists('exclusivity')->sortTable('exclusivity')
+            ->assertCanSeeTableRecords([$this->other, $this->product], inOrder: true)
+            ->searchTable('B partner')->assertCountTableRecords(1)->assertCanSeeTableRecords([$this->product]);
+        $this->project->products()->detach();
+        Livewire::test(SelectPricingProjectProducts::class, ['record' => $this->project->id])
+            ->assertTableColumnExists('exclusivity')->sortTable('exclusivity')
+            ->assertCanSeeTableRecords([$this->other, $this->product], inOrder: true)
+            ->searchTable('B partner')->assertCountTableRecords(1)->assertCanSeeTableRecords([$this->product]);
+        foreach ([$this->product, $this->other] as $product) {
+            PricingCalculationError::create(['pricing_project_id' => $this->project->id, 'product_id' => $product->id,
+                'run_id' => (string) Str::uuid(), 'price_type' => 'cost', 'severity' => 'error', 'message' => 'Teszt hiba']);
+        }
+        $page = Livewire::test(ListPricingCalculationErrors::class)->assertTableColumnExists('product.exclusivity')
+            ->sortTable('product.exclusivity')->searchTableColumns(['product.exclusivity' => 'B partner'])->assertCountTableRecords(1);
+        $column = $page->instance()->getTable()->getColumn('product.exclusivity');
+        $this->assertSame(['B partner'], (new AdminTableExport($page->instance()->getTableQueryForExport(), [$column]))
+            ->map($page->instance()->getFilteredTableQuery()->first()));
     }
 
     private function approve(): array
@@ -213,6 +274,88 @@ class ProductPricingWorkspaceTest extends TestCase
         $column = $page->instance()->getTable()->getColumn($ratio);
         $export = new AdminTableExport($page->instance()->getFilteredTableQuery(), [$column]);
         $this->assertIsFloat($export->map($cost)[0]);
+    }
+
+    public function test_overview_purchase_target_matches_each_huf_retail_list_with_sort_search_decimals_and_export(): void
+    {
+        $retail = PricingCalculationRow::where('product_id', $this->product->id)->where('price_list_id', $this->lists['rh']->id)->sole();
+        $retail->update(['manual_price' => 10000]);
+        $secondList = $this->lists['rh']->replicate();
+        $secondList->code = 'RH_SECOND';
+        $secondList->save();
+        $higher = $retail->replicate();
+        $higher->price_list_id = $secondList->id;
+        $higher->manual_price = 30000;
+        $higher->save();
+        $expected = (float) $retail->fresh()->target_purchase_price;
+        $this->assertLessThan(10, $expected);
+        // A later cost change must not replace the retail calculation's saved
+        // purchase offer/currency or supply the base for the target calculation.
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->sole();
+        $cost->update(['purchase_price' => 500, 'purchase_currency_id' => $this->lists['re']->currency_id]);
+        $before = $retail->fresh()->getAttributes();
+        $page = Livewire::test(PricingProductOverview::class);
+        $name = 'overview_'.$this->lists['rh']->id.'_target_purchase_price';
+        $second = 'overview_'.$secondList->id.'_target_purchase_price';
+        $page->assertTableColumnExists($name)->assertTableColumnExists($second);
+        $shown = $page->instance()->getFilteredTableQuery()->where('product_id', $this->product->id)->sole();
+        $this->assertEqualsWithDelta($expected, $shown->{$name}, .0000001);
+        $this->assertEquals(10, $shown->{$second}); // Never increase the original purchase price.
+        $page->sortTable($name, 'asc');
+        $this->assertSame($this->product->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id);
+        $page->sortTable($name, 'desc');
+        $this->assertSame($this->other->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id);
+        $page->searchTableColumns([$name => number_format($expected, 4, ',', '')])->assertCountTableRecords(1)->assertCanSeeTableRecords([$cost]);
+        $page->call('savePricingDecimalPlaces', [$name => 2])->assertHasNoErrors();
+        $column = $page->instance()->getTable()->getColumn($name)->record($shown);
+        $this->assertTrue($column->isToggleable());
+        $this->assertSame(number_format($expected, 2, ',', ' ').' USD', $column->formatState($column->getState()));
+        $this->assertSame('danger', $column->getColor($shown->{$name}));
+        $higherColumn = $page->instance()->getTable()->getColumn($second)->record($shown);
+        $this->assertNull($higherColumn->getColor($shown->{$second}));
+        $export = new AdminTableExport($page->instance()->getTableQueryForExport(), [$column],
+            $page->instance()->pricingDecimalExportFormats([$column]));
+        $this->assertSame([$this->lists['rh']->code.' – Cél beszerzési ár'], $export->headings());
+        $this->assertIsFloat($export->map($shown)[0]);
+        $this->assertEqualsWithDelta($expected, $export->map($shown)[0], .0000001);
+        $this->assertSame(['A' => '#,##0.00'], $export->columnFormats());
+        $currencyColumn = $page->instance()->getTable()->getColumn($name.'_currency');
+        $this->assertSame(['USD'], (new AdminTableExport($page->instance()->getTableQueryForExport(), [$currencyColumn]))->map($shown));
+        $this->assertFalse($currencyColumn->isNumeric());
+        $this->assertSame($before, $retail->fresh()->getAttributes());
+    }
+
+    public function test_overview_purchase_target_is_color_and_project_scoped_and_preserves_missing_values(): void
+    {
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->sole();
+        $retail = PricingCalculationRow::where('product_id', $this->product->id)->where('price_list_id', $this->lists['rh']->id)->sole();
+        $color = Color::create(['product_id' => $this->product->id, 'code' => 'NV', 'name_hu' => 'NAVY', 'active' => true]);
+        $colorCost = $cost->replicate();
+        $colorCost->color_id = $color->id;
+        $colorCost->save();
+        $colorRetail = $retail->replicate();
+        $colorRetail->color_id = $color->id;
+        $colorRetail->retained_price = 10000;
+        $colorRetail->save();
+        PricingCalculationRow::where('product_id', $this->other->id)->where('price_list_id', $this->lists['rh']->id)->delete();
+        $otherProject = $this->project->replicate();
+        $otherProject->save();
+        $unrelated = $retail->replicate();
+        $unrelated->pricing_project_id = $otherProject->id;
+        $unrelated->manual_price = 1;
+        $unrelated->save();
+        $name = 'overview_'.$this->lists['rh']->id.'_target_purchase_price';
+        $page = Livewire::test(PricingProductOverview::class)->call('selectPricingProject', $this->project->id);
+        $rows = $page->instance()->getFilteredTableQuery()->get()->keyBy('id');
+        $this->assertCount(3, $rows);
+        $this->assertEquals(10, $rows[$cost->id]->{$name});
+        $this->assertEqualsWithDelta((float) $colorRetail->fresh()->target_purchase_price, $rows[$colorCost->id]->{$name}, .0000001);
+        $missing = $rows->firstWhere('product_id', $this->other->id);
+        $this->assertNull($missing->{$name});
+        $column = $page->instance()->getTable()->getColumn($name);
+        $this->assertSame([null], (new AdminTableExport($page->instance()->getTableQueryForExport(), [$column]))->map($missing));
+        $retail->update(['purchase_price' => null]);
+        $this->assertNull($page->instance()->getFilteredTableQuery()->whereKey($cost->id)->sole()->{$name});
     }
 
     public function test_workspace_modal_previews_then_one_button_commits_all_prices(): void

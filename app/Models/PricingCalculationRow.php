@@ -45,18 +45,24 @@ class PricingCalculationRow extends Model
 
     }
 
-    public static function targetPurchasePriceSql(): string
+    public static function targetPurchasePriceSql(?string $table = null): string
     {
-        $price = 'COALESCE(manual_price, retained_price, calculated_price)';
-        $scaled = '1.0 * purchase_price * '.$price.' / NULLIF(base_price * multiplier, 0) * 10000';
+        $prefix = $table === null ? '' : $table.'.';
+        $purchase = $prefix.'purchase_price';
+        $base = $prefix.'base_price';
+        $multiplier = $prefix.'multiplier';
+        $manual = $prefix.'manual_price';
+        $retained = $prefix.'retained_price';
+        $price = 'COALESCE('.$manual.', '.$retained.', '.$prefix.'calculated_price)';
+        $scaled = '1.0 * '.$purchase.' * '.$price.' / NULLIF('.$base.' * '.$multiplier.', 0) * 10000';
         // The local SQLite build has no optional math functions. Values are nonnegative, so truncation is floor.
         $rounded = (new static)->getConnection()->getDriverName() === 'sqlite'
             ? 'CAST(('.$scaled.') AS INTEGER)' : 'FLOOR('.$scaled.')';
 
-        return 'CASE WHEN purchase_price IS NULL OR purchase_price < 0 THEN NULL'
-            .' WHEN manual_price IS NULL AND retained_price IS NULL THEN purchase_price'
-            .' WHEN base_price IS NULL OR base_price <= 0 OR multiplier IS NULL OR multiplier <= 0 OR '.$price.' <= 0 THEN NULL'
-            .' WHEN '.$price.' >= base_price * multiplier THEN purchase_price ELSE '.$rounded.' / 10000.0 END';
+        return 'CASE WHEN '.$purchase.' IS NULL OR '.$purchase.' < 0 THEN NULL'
+            .' WHEN '.$manual.' IS NULL AND '.$retained.' IS NULL THEN '.$purchase
+            .' WHEN '.$base.' IS NULL OR '.$base.' <= 0 OR '.$multiplier.' IS NULL OR '.$multiplier.' <= 0 OR '.$price.' <= 0 THEN NULL'
+            .' WHEN '.$price.' >= '.$base.' * '.$multiplier.' THEN '.$purchase.' ELSE '.$rounded.' / 10000.0 END';
     }
 
     public const TYPE_COST = 'cost';

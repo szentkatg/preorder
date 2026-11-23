@@ -38,6 +38,7 @@ class PricingCalculationErrorsTable
                     ->color(fn (string $state): string => $state === PricingCalculationError::SEVERITY_WARNING ? 'warning' : 'danger'),
                 TextColumn::make('product.model_code')
                     ->label('Modell'),
+                TextColumn::make('product.exclusivity')->label('Exkluzivitás'),
                 TextColumn::make('color.code')
                     ->label('Szín')
                     ->placeholder('Általános'),

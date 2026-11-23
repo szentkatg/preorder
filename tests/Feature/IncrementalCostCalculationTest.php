@@ -69,6 +69,7 @@ class IncrementalCostCalculationTest extends TestCase
             'parameter_type' => 'customs_percent', 'scope_type' => $scope, 'value' => $value, 'active' => true,
             'product_id' => $scope === 'product' ? $this->products[0]->id : null,
             'item_main_group_id' => $scope === 'item_main_group' ? $this->products[0]->item_main_group_id : null,
+            'item_main_group_pattern' => $scope === 'item_main_group_pattern' ? 'A*' : null,
             'material_composition' => $scope === 'material_composition' ? 'PU' : null,
             'supplier_country_code' => $scope === 'supplier_country' ? 'PL' : null]);
     }
@@ -76,6 +77,7 @@ class IncrementalCostCalculationTest extends TestCase
     public static function scopes(): array
     {
         return ['model' => ['product', [0]], 'group' => ['item_main_group', [0, 1]],
+            'group pattern' => ['item_main_group_pattern', [0, 1]],
             'material' => ['material_composition', [0, 2]], 'country' => ['supplier_country', [0, 2, 3]],
             'global' => ['global', [0, 1, 2, 3]]];
     }

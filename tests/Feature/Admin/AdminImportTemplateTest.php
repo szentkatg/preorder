@@ -79,6 +79,7 @@ class AdminImportTemplateTest extends TestCase
                 $this->assertNotContains('catalog_group_name_en', $headers);
                 if ($name === 'products') {
                     $this->assertContains('visible_to_partners', $headers);
+                    $this->assertContains('exclusivity', $headers);
                 }
                 if ($name === 'price_lists') {
                     $this->assertNotContains('season_code', $headers);

@@ -29,6 +29,7 @@ class HufRetailCalculationsTable
             TextColumn::make('product.itemMainGroup.name')->label('Főcsoport')->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('product.model_code')->label('Modell kód'),
             TextColumn::make('product.name_hu')->label('Modell név'),
+            TextColumn::make('product.exclusivity')->label('Exkluzivitás'),
             TextColumn::make('color.name_hu')->label('Szín'),
             TextColumn::make('previous_season_price')->label('Előző szezon kisker '.$currency)
                 ->numeric()->placeholder('-')
@@ -49,6 +50,7 @@ class HufRetailCalculationsTable
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('purchaseCurrency.code')->label('Besz. pénznem')
                 ->toggleable(isToggledHiddenByDefault: true),
+            ...($currency === 'HUF' ? self::seasonPurchaseColumns() : []),
             TextColumn::make('source_retail_price')->label('Forrás HUF kisker')
                 ->formatStateUsing(fn ($state, $livewire) => $livewire->formatPricingDecimal($state, 'source_retail_price'))->visible($currency !== 'HUF'),
             TextColumn::make('retail_exchange_rate')->label('Kisker árfolyam (HUF/'.$currency.')')
@@ -141,6 +143,26 @@ class HufRetailCalculationsTable
             ->deselectAllRecordsWhenFiltered()
             ->defaultSort('updated_at', 'desc')->reorderableColumns()
             ->defaultPaginationPageOption(100)->paginationPageOptions([50, 100, 250, 500, 'all']);
+    }
+
+    private static function seasonPurchaseColumns(): array
+    {
+        $columns = [];
+        foreach (['previous_season' => 'Előző évi beszerzési ár', 'current_season' => 'Aktuális szezon beszerzési ára'] as $prefix => $label) {
+            $field = $prefix.'_purchase_price';
+            $currency = $prefix.'_purchase_currency';
+            $columns[] = TextColumn::make($field)->label($label)->numeric()->alignEnd()->placeholder('—')
+                ->extraAttributes(['data-pricing-season-purchase-column' => true])
+                ->formatStateUsing(fn ($state, PricingCalculationRow $record, $livewire) => $livewire->formatPricingDecimal($state, $field)
+                    .(filled($record->{$currency}) ? ' '.$record->{$currency} : ''))
+                ->tooltip($prefix === 'previous_season'
+                    ? 'A párosított termék legolcsóbb aktív ajánlata, az előző azonos típusú szezon árfolyamán összehasonlítva. Vegyes pénznemnél hiányzó árfolyam esetén nincs érték.'
+                    : 'A kalkulációhoz kiválasztott aktív beszerzési ajánlat aktuális törzsadata. Az Eredeti besz. ár továbbra is a kalkulációkor mentett érték.');
+            $columns[] = TextColumn::make($currency)->label($label.' pénzneme')->toggleable(isToggledHiddenByDefault: true)
+                ->extraAttributes(['data-pricing-season-purchase-column' => true]);
+        }
+
+        return $columns;
     }
 
     private static function multiplierAverageAttributes(?float $average, string $description = 'Értékkel súlyozott szorzó: osztandók összege / osztók összege a teljes szűrt találati halmazon'): array

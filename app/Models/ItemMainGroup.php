@@ -19,4 +19,9 @@ class ItemMainGroup extends Model
     {
         return $this->translate('name');
     }
+
+    public function codeAndName(): string
+    {
+        return implode(' - ', array_filter([$this->code, $this->name], fn ($value) => filled($value)));
+    }
 }

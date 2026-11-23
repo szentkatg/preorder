@@ -271,6 +271,42 @@ class ProductMasterImportTest extends TestCase
         $this->assertNull($rows[3]['visible_to_partners']);
     }
 
+    public function test_exclusivity_import_is_optional_supports_a_hundred_unicode_characters_and_can_be_cleared(): void
+    {
+        $this->createProductReferences();
+        $row = ['model_code' => 'TEST001', 'season_code' => 'S01', 'brand_code' => 'BR', 'order_sheet_type_code' => 'STD',
+            'item_main_group_code' => 'TST', 'name_hu' => 'Model', 'active' => 1];
+        $value = str_repeat('Ő', 100);
+        $page = $this->importPage();
+        $this->assertSame([], $page->validateProductRows([$row + ['exclusivity' => $value]]));
+        $page->importProductRows([$row + ['exclusivity' => $value]]);
+        $product = Product::where('model_code', 'TEST001')->firstOrFail();
+        $this->assertSame($value, $product->exclusivity);
+        $page->importProductRows([$row]);
+        $this->assertSame($value, $product->fresh()->exclusivity);
+        $page->importProductRows([$row + ['exclusivity' => '']]);
+        $this->assertNull($product->fresh()->exclusivity);
+        $sheet = (new Spreadsheet)->getActiveSheet();
+        $sheet->fromArray([['exclusivity', 'model_code'], ['Partner neve', 'TEST001']]);
+        $this->assertSame('Partner neve', $page->rowsFromSheet($sheet)[0]['exclusivity']);
+    }
+
+    public function test_overlength_exclusivity_is_a_model_validation_error_and_does_not_overwrite_existing_data(): void
+    {
+        $this->createProductReferences();
+        $row = ['model_code' => 'TEST001', 'season_code' => 'S01', 'brand_code' => 'BR', 'order_sheet_type_code' => 'STD',
+            'item_main_group_code' => 'TST', 'name_hu' => 'Model', 'active' => 1, 'exclusivity' => 'Eredeti jelölés'];
+        $page = $this->importPage();
+        $page->importProductRows([$row]);
+        $invalid = array_replace($row, ['exclusivity' => str_repeat('Á', 101), 'name_hu' => 'Must not change']);
+        $errors = $page->validateProductRows([$invalid]);
+        $this->assertStringContainsString('exclusivity legfeljebb 100 karakter', implode(' ', $errors));
+        $page->importProductRows([$invalid]);
+        $product = Product::where('model_code', 'TEST001')->firstOrFail();
+        $this->assertSame('Eredeti jelölés', $product->exclusivity);
+        $this->assertSame('Model', $product->name_hu);
+    }
+
     private function createProductReferences(): void
     {
         $timestamps = [

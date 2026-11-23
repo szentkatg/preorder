@@ -14,6 +14,7 @@ use App\Filament\Support\Concerns\HasProductPricingEditor;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use App\Services\Pricing\PricingMultiplierAverage;
+use App\Services\Pricing\RetailSeasonPurchasePriceComparison;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -121,6 +122,8 @@ class PricingHufRetailCalculations extends Page implements HasTable
             'unrounded_price' => 'Kerekítés előtti HUF', 'calculated_price' => 'Kalkulált kisker HUF',
             'final_price' => 'Végleges kisker HUF', 'target_purchase_price' => 'Cél beszerzési ár',
             'previous_season_price' => 'Előző szezon kisker ár',
+            'previous_season_purchase_price' => 'Előző évi beszerzési ár',
+            'current_season_purchase_price' => 'Aktuális szezon beszerzési ára',
             ...$this->outletDecimalColumns(),
         ];
     }
@@ -131,9 +134,13 @@ class PricingHufRetailCalculations extends Page implements HasTable
         $filters = $table->getFilters();
         unset($filters['pricing_project_id']);
         $table->filters(array_values($filters))
-            ->modifyQueryUsing(fn (Builder $query) => app(PreviousSeasonRetailPriceService::class)->addColumns(
-                $this->scopePricingProjectContext($query), $this->pricingSelectedProject?->season_id,
-            ));
+            ->modifyQueryUsing(function (Builder $query): Builder {
+                $seasonId = $this->pricingSelectedProject?->season_id;
+                $query = app(PreviousSeasonRetailPriceService::class)->addColumns($this->scopePricingProjectContext($query), $seasonId);
+
+                return $this->retailCurrencyCode() === 'HUF'
+                    ? app(RetailSeasonPurchasePriceComparison::class)->addColumns($query, $seasonId) : $query;
+            });
 
         return AdminResourceTable::configure(
             $table->query(

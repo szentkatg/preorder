@@ -27,6 +27,7 @@ class ProductsRelationManager extends RelationManager
         return $table->columns([
             TextColumn::make('model_code')->label('Modellkód')->searchable()->sortable(),
             TextColumn::make('name_hu')->label('Név')->searchable()->sortable(),
+            TextColumn::make('exclusivity')->label('Exkluzivitás')->searchable()->sortable()->toggleable(),
             TextColumn::make('brand.code')->label('Márka')
                 ->formatStateUsing(fn ($state, $record) => $record->brand?->translate('name') ?: $state),
             TextColumn::make('orderSheetType.code')->label('Rendelőlap típusa')

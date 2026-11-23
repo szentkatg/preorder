@@ -42,6 +42,11 @@ class ProductForm
                 Textarea::make('material_composition')
                     ->label('Anyagösszetétel')
                     ->rows(1),
+                TextInput::make('exclusivity')
+                    ->label('Exkluzivitás')
+                    ->maxLength(100)
+                    ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state)
+                    ->helperText('Opcionális, szabad szöveges jelölés. Nem korlátozza a rendelhetőséget.'),
 
                 Select::make('brand_id')
                     ->label('Márka')

@@ -111,6 +111,17 @@ class HufRetailCalculationTest extends TestCase
         $this->assertSame('2990.0000', $row->calculated_price);
     }
 
+    public function test_group_code_pattern_is_used_and_preserved_in_audit_snapshot(): void
+    {
+        $parameter = PricingParameter::create(['pricing_project_id' => $this->project->id,
+            'parameter_type' => 'retail_multiplier', 'scope_type' => 'item_main_group_pattern',
+            'item_main_group_pattern' => 'B*', 'value' => 5]);
+        $this->calculate();
+        $this->assertSame('5.000000', $this->retail()->multiplier);
+        $this->assertSame($parameter->id, $this->retail()->calculation_snapshot['retail_parameter']['id']);
+        $this->assertSame('B*', $this->retail()->calculation_snapshot['retail_parameter']['item_main_group_pattern']);
+    }
+
     public function test_price_list_rounding_overrides_global_and_recalculation_does_not_duplicate_rows(): void
     {
         $specific = PricingRoundingRule::create(['pricing_project_id' => $this->project->id,

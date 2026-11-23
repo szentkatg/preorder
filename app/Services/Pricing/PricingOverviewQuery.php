@@ -3,6 +3,7 @@
 namespace App\Services\Pricing;
 
 use App\Models\PriceList;
+use App\Models\PricingCalculationRow;
 use Illuminate\Support\Facades\DB;
 
 class PricingOverviewQuery
@@ -37,10 +38,21 @@ class PricingOverviewQuery
         if ($list->type === 'distributor') {
             $values['wholesale_ratio'] = ['Nettó nagyker / ár', $wholesale.' / NULLIF(overview_price.final_price, 0)'];
         }
+        if ($list->type === 'retail' && $list->currency->code === 'HUF') {
+            $values['target_purchase_price'] = ['Cél beszerzési ár', PricingCalculationRow::targetPurchasePriceSql('overview_price')];
+        }
         $result = [];
         foreach ($values as $key => [$label, $sql]) {
             $result['overview_'.$list->id.'_'.$key] = ['label' => $list->code.' – '.$label, 'kind' => $key,
                 'query' => (clone $base)->selectRaw($sql)];
+            if ($key === 'target_purchase_price') {
+                // Keep the currency and original offer of the retail snapshot, even
+                // when costs have since changed and retail is awaiting review.
+                $result['overview_'.$list->id.'_'.$key]['purchase_query'] = (clone $base)->select('overview_price.purchase_price');
+                $result['overview_'.$list->id.'_'.$key.'_currency'] = ['label' => $list->code.' – Cél beszerzési ár pénzneme', 'kind' => 'currency',
+                    'query' => (clone $base)->join('currencies as target_currency', 'target_currency.id', '=', 'overview_price.purchase_currency_id')
+                        ->select('target_currency.code')];
+            }
         }
 
         return $result;

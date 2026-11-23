@@ -29,6 +29,7 @@ class ProductBulkUpdateService
             'model_code' => ['label' => 'Modellkód', 'type' => 'text', 'required' => true],
             'name_hu' => ['label' => 'Név', 'type' => 'text', 'required' => true],
             'material_composition' => ['label' => 'Anyagösszetétel', 'type' => 'textarea'],
+            'exclusivity' => ['label' => 'Exkluzivitás', 'type' => 'text', 'max_length' => 100],
             'brand_id' => ['label' => 'Márka', 'type' => 'relation', 'model' => Brand::class, 'required' => true],
             'order_sheet_type_id' => ['label' => 'Rendelőlap típusa', 'type' => 'relation', 'model' => OrderSheetType::class, 'required' => true],
             'rounding_rule_id' => ['label' => 'Gyártási kerekítés', 'type' => 'relation', 'model' => RoundingRule::class],
@@ -73,7 +74,7 @@ class ProductBulkUpdateService
             'integer' => ['integer', ($definition['unsigned'] ?? false) ? 'min:0' : 'min:-2147483648',
                 ($definition['unsigned'] ?? false) ? 'max:4294967295' : 'max:2147483647'],
             'textarea' => ['string', 'max:16000'],
-            default => ['string', 'max:255'],
+            default => ['string', 'max:'.($definition['max_length'] ?? 255)],
         }];
     }
 

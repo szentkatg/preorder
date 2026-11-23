@@ -3,18 +3,24 @@
 namespace Tests\Feature;
 
 use App\Exports\AdminTableExport;
+use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
 use App\Models\Brand;
+use App\Models\Color;
 use App\Models\Currency;
+use App\Models\ExchangeRate;
 use App\Models\ItemMainGroup;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\PricingCalculationRow;
 use App\Models\PricingProject;
 use App\Models\Product;
+use App\Models\ProductPurchasePrice;
 use App\Models\Season;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
+use App\Services\Pricing\RetailSeasonPurchasePriceComparison;
 use DomainException;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -257,6 +263,173 @@ class PreviousSeasonRetailPriceTest extends TestCase
         } finally {
             DB::disableQueryLog();
         }
+    }
+
+    public function test_season_purchase_comparison_uses_master_prices_and_prior_season_fx_not_raw_or_current_fx(): void
+    {
+        $usd = $this->offer($this->pair, 10, 'USD');
+        $eur = $this->offer($this->pair, 9, 'EUR');
+        $this->offer($this->pair, .1, 'USD', active: false);
+        $current = $this->offer($this->product, 8.8, 'USD');
+        $this->row->update(['product_purchase_price_id' => $current->getKey(), 'purchase_currency_id' => $current->currency_id,
+            'supplier_id' => $current->supplier_id, 'purchase_price' => 8]);
+        foreach ([[$usd->currency_id, 380, 1000], [$eur->currency_id, 450, 100]] as [$currency, $previousRate, $currentRate]) {
+            ExchangeRate::create(['season_id' => $this->previous->id, 'currency_id' => $currency, 'rate_to_huf' => $previousRate, 'active' => true]);
+            ExchangeRate::create(['season_id' => $this->current->id, 'currency_id' => $currency, 'rate_to_huf' => $currentRate, 'active' => true]);
+        }
+        $shown = $this->purchaseComparison();
+        $this->assertEquals(10, $shown->previous_season_purchase_price); // USD 3800 HUF beats EUR 4050 HUF.
+        $this->assertSame('USD', $shown->previous_season_purchase_currency);
+        $this->assertEquals(8.8, $shown->current_season_purchase_price);
+        $current->update(['purchase_price' => 9.1234, 'currency_id' => $eur->currency_id]);
+        $shown = $this->purchaseComparison();
+        $this->assertEquals(9.1234, $shown->current_season_purchase_price);
+        $this->assertSame('EUR', $shown->current_season_purchase_currency);
+        $this->assertSame('8.0000', $this->row->fresh()->purchase_price); // Snapshot is not rewritten.
+        $this->offer($this->pair, 3600, 'HUF');
+        $this->assertEquals(3600, $this->purchaseComparison()->previous_season_purchase_price);
+        $this->assertSame('HUF', $this->purchaseComparison()->previous_season_purchase_currency);
+    }
+
+    public function test_previous_purchase_obeys_manual_pairs_none_and_ambiguous_automatic_pairs(): void
+    {
+        $this->offer($this->pair, 5, 'USD');
+        $duplicate = $this->product($this->previous, 'NACK', 'DUP');
+        $this->offer($duplicate, 1, 'USD');
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_price);
+        $pairing = app(PreviousSeasonRetailPriceService::class);
+        $pairing->setPair($this->project, $this->product, 'manual', $this->pair->id);
+        $this->assertEquals(5, $this->purchaseComparison()->previous_season_purchase_price);
+        $pairing->setPair($this->project, $this->product, 'manual', $duplicate->id);
+        $this->assertEquals(1, $this->purchaseComparison()->previous_season_purchase_price);
+        $pairing->setPair($this->project, $this->product, 'none', null);
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_price);
+        $pairing->setPair($this->project, $this->product, 'auto', null);
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_price);
+    }
+
+    public function test_previous_purchase_uses_matching_color_or_model_offers_never_another_color(): void
+    {
+        $currentColor = Color::create(['product_id' => $this->product->id, 'code' => 'NV', 'name_hu' => 'NAVY', 'active' => true]);
+        $oldColor = Color::create(['product_id' => $this->pair->id, 'code' => 'NV', 'name_hu' => 'NAVY', 'active' => true]);
+        $wrongColor = Color::create(['product_id' => $this->pair->id, 'code' => 'BK', 'name_hu' => 'BLACK', 'active' => true]);
+        $this->offer($this->pair, 7, 'USD');
+        $navy = $this->offer($this->pair, 5, 'USD', $oldColor->id);
+        $this->offer($this->pair, .1, 'USD', $wrongColor->id);
+        $this->row->update(['color_id' => $currentColor->id]);
+        $this->assertEquals(5, $this->purchaseComparison()->previous_season_purchase_price);
+        $navy->update(['active' => false]);
+        $this->assertEquals(7, $this->purchaseComparison()->previous_season_purchase_price);
+        $this->row->update(['color_id' => null]);
+        $this->assertEquals(7, $this->purchaseComparison()->previous_season_purchase_price);
+    }
+
+    public function test_mixed_currency_missing_fx_is_not_silently_skipped_but_same_currency_needs_no_conversion(): void
+    {
+        $usd = $this->offer($this->pair, 10, 'USD');
+        $this->offer($this->pair, 12, 'USD');
+        $this->assertEquals(10, $this->purchaseComparison()->previous_season_purchase_price);
+        $eur = $this->offer($this->pair, 1, 'EUR');
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_price);
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_currency);
+        ExchangeRate::create(['season_id' => $this->previous->id, 'currency_id' => $usd->currency_id, 'rate_to_huf' => 380, 'active' => true]);
+        $rate = ExchangeRate::create(['season_id' => $this->previous->id, 'currency_id' => $eur->currency_id, 'rate_to_huf' => 400, 'active' => true]);
+        $this->assertEquals(1, $this->purchaseComparison()->previous_season_purchase_price);
+        $this->assertSame('EUR', $this->purchaseComparison()->previous_season_purchase_currency);
+        $rate->update(['active' => false]);
+        $this->assertNull($this->purchaseComparison()->previous_season_purchase_price);
+        $eur->update(['active' => false]);
+        $this->assertEquals(10, $this->purchaseComparison()->previous_season_purchase_price);
+    }
+
+    public function test_current_purchase_does_not_substitute_inactive_or_unrelated_offers(): void
+    {
+        $current = $this->offer($this->product, 8, 'USD');
+        $this->row->update(['product_purchase_price_id' => $current->getKey()]);
+        $this->assertEquals(8, $this->purchaseComparison()->current_season_purchase_price);
+        $current->update(['active' => false]);
+        $this->offer($this->product, 1, 'USD');
+        $this->assertNull($this->purchaseComparison()->current_season_purchase_price);
+        $unrelated = $this->offer($this->pair, 2, 'USD');
+        $this->row->update(['product_purchase_price_id' => $unrelated->getKey()]);
+        $this->assertNull($this->purchaseComparison()->current_season_purchase_price);
+        $this->row->update(['product_purchase_price_id' => null]);
+        $this->assertNull($this->purchaseComparison()->current_season_purchase_price);
+    }
+
+    public function test_season_purchase_columns_support_sort_search_precision_and_numeric_export(): void
+    {
+        $current = $this->offer($this->product, 8.8, 'USD');
+        $this->row->update(['product_purchase_price_id' => $current->getKey(), 'purchase_price' => 8]);
+        $this->offer($this->pair, 5, 'USD');
+        $other = $this->product($this->current, 'OTHERW27', 'OTHER');
+        $oldOther = $this->product($this->previous, 'OTHERW26', 'OLD_OTHER');
+        $otherOffer = $this->offer($other, 4, 'USD');
+        $this->offer($oldOther, 9, 'USD');
+        $otherRow = $this->row->replicate();
+        $otherRow->product_id = $other->id;
+        $otherRow->product_purchase_price_id = $otherOffer->getKey();
+        $otherRow->save();
+        $page = Livewire::test(PricingHufRetailCalculations::class)
+            ->assertTableColumnExists('current_season_purchase_price')->assertTableColumnExists('previous_season_purchase_price')
+            ->sortTable('current_season_purchase_price')->assertCanSeeTableRecords([$otherRow, $this->row], inOrder: true)
+            ->sortTable('previous_season_purchase_price', 'desc')->assertCanSeeTableRecords([$otherRow, $this->row], inOrder: true)
+            ->searchTableColumns(['current_season_purchase_price' => '8,8', 'previous_season_purchase_price' => '5'])->assertCountTableRecords(1)
+            ->call('savePricingDecimalPlaces', ['current_season_purchase_price' => 2, 'previous_season_purchase_price' => 3]);
+        $shown = $page->instance()->getFilteredTableQuery()->sole();
+        $table = $page->instance()->getTable();
+        $currentColumn = $table->getColumn('current_season_purchase_price')->record($shown);
+        $priorColumn = $table->getColumn('previous_season_purchase_price')->record($shown);
+        $this->assertSame('8,80 USD', $currentColumn->formatState($currentColumn->getState()));
+        $this->assertSame('5,000 USD', $priorColumn->formatState($priorColumn->getState()));
+        $this->assertTrue($currentColumn->isToggleable());
+        $columns = [$currentColumn, $priorColumn, $table->getColumn('current_season_purchase_currency'), $table->getColumn('previous_season_purchase_currency')];
+        $export = new AdminTableExport($page->instance()->getTableQueryForExport(), $columns, $page->instance()->pricingDecimalExportFormats($columns));
+        $this->assertEquals([8.8, 5.0, 'USD', 'USD'], $export->map($shown));
+        $this->assertFalse(is_string($export->map($shown)[0]));
+        $this->assertFalse(is_string($export->map($shown)[1]));
+        $this->assertSame(['A' => '#,##0.00', 'B' => '#,##0.000'], $export->columnFormats());
+        $this->assertNull(Livewire::test(PricingForeignRetailCalculations::class)->instance()->getTable()->getColumn('current_season_purchase_price'));
+    }
+
+    public function test_season_purchase_comparison_has_no_per_row_database_queries(): void
+    {
+        for ($index = 1; $index <= 30; $index++) {
+            $current = $this->product($this->current, 'COMPARE'.$index.'W27', 'C'.$index);
+            $prior = $this->product($this->previous, 'COMPARE'.$index.'W26', 'P'.$index);
+            $offer = $this->offer($current, 8, 'USD');
+            $this->offer($prior, 5, 'USD');
+            $row = $this->row->replicate();
+            $row->product_id = $current->id;
+            $row->product_purchase_price_id = $offer->getKey();
+            $row->save();
+        }
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        try {
+            $rows = app(RetailSeasonPurchasePriceComparison::class)->addColumns(
+                PricingCalculationRow::where('pricing_project_id', $this->project->id), $this->current->id,
+            )->get();
+            $this->assertCount(31, $rows);
+            $this->assertCount(30, $rows->whereNotNull('previous_season_purchase_price'));
+            $this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
+        } finally {
+            DB::disableQueryLog();
+        }
+    }
+
+    private function purchaseComparison(): PricingCalculationRow
+    {
+        return app(RetailSeasonPurchasePriceComparison::class)->addColumns(PricingCalculationRow::whereKey($this->row->id), $this->current->id)->sole();
+    }
+
+    private function offer(Product $product, float $price, string $currency, ?int $color = null, bool $active = true): ProductPurchasePrice
+    {
+        $currency = Currency::firstOrCreate(['code' => $currency], ['name' => $currency, 'active' => true]);
+        $supplier = Supplier::create(['erp_partner_code' => 'OFFER'.(Supplier::count() + 1), 'name' => 'Teszt ajánlat', 'active' => true]);
+
+        return ProductPurchasePrice::create(['product_id' => $product->id, 'color_id' => $color, 'currency_id' => $currency->id,
+            'supplier_id' => $supplier->getKey(), 'purchase_price' => $price, 'active' => $active]);
     }
 
     private function product(Season $season, string $name, string $code): Product

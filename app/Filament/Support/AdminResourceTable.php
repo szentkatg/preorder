@@ -9,11 +9,13 @@ use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
 use App\Models\PricingCalculationRow;
+use App\Models\PricingParameter;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\Pricing\DistributorComparison;
 use App\Services\Pricing\OutletComparison;
 use App\Services\Pricing\PreviousSeasonRetailPriceService;
+use App\Services\Pricing\RetailSeasonPurchasePriceComparison;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Support\Enums\Width;
@@ -143,6 +145,24 @@ class AdminResourceTable
         $column
             ->sortable()
             ->searchable(isIndividual: true);
+
+        if ($modelClass === PricingCalculationRow::class && ($column->getExtraAttributes()['data-pricing-season-purchase-column'] ?? false)) {
+            $projection = fn ($livewire) => app(RetailSeasonPurchasePriceComparison::class)->fieldQuery($column->getName(), $livewire->pricingSelectedProject?->season_id);
+            $column->sortable(query: fn (Builder $query, string $direction, $livewire) => $query->orderBy($projection($livewire), $direction))
+                ->searchable(query: function (Builder $query, string $search, $livewire) use ($projection): Builder {
+                    $value = $projection($livewire);
+
+                    return $query->whereRaw('CAST(('.$value->toSql().') AS CHAR) LIKE ?', [...$value->getBindings(), '%'.str_replace(',', '.', $search).'%']);
+                }, isIndividual: true);
+
+            return;
+        }
+
+        if ($modelClass === PricingParameter::class && $column->getName() === 'itemMainGroup.name') {
+            $column->searchable(query: fn (Builder $query, string $search) => $query->whereHas('itemMainGroup',
+                fn (Builder $group) => $group->where(fn (Builder $fields) => $fields
+                    ->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%'))), isIndividual: true);
+        }
 
         if ($modelClass === PricingCalculationRow::class && ($column->getExtraAttributes()['data-pricing-outlet-column'] ?? false)) {
             $expression = OutletComparison::sql($column->getName());

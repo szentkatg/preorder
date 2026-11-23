@@ -50,6 +50,11 @@ class ProductsTable
                     ->searchable()
                     ->limit(40)
                     ->toggleable(),
+                TextColumn::make('exclusivity')
+                    ->label('Exkluzivitás')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
 
                 TextColumn::make('itemMainGroup.code')
                     ->label('Főcsoport')

@@ -45,6 +45,7 @@ class PricingParameterResolver
                         $query->where('scope_type', PricingParameter::SCOPE_ITEM_MAIN_GROUP)
                             ->where('item_main_group_id', $product->item_main_group_id);
                     })
+                    ->orWhere('scope_type', PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN)
                     ->orWhere(function ($query) use ($product): void {
                         $query->where('scope_type', PricingParameter::SCOPE_MATERIAL_COMPOSITION)
                             ->whereNotNull('material_composition')
@@ -56,10 +57,12 @@ class PricingParameterResolver
                             ->where('product_id', $product->id);
                     });
             })
-            ->get();
+            ->get()->filter(fn (PricingParameter $parameter): bool => $parameter->scope_type !== PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN
+                || ItemMainGroupCodePattern::matches((string) $parameter->item_main_group_pattern, $product->itemMainGroup?->code));
 
         $sorted = $this->sortBySpecificity($parameters);
-        if ($requireUnique && $sorted->count() > 1 && $this->specificity($sorted[0]) === $this->specificity($sorted[1])) {
+        if ($sorted->count() > 1 && $this->specificity($sorted[0]) === $this->specificity($sorted[1])
+            && ($requireUnique || $sorted[0]->scope_type === PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN)) {
             throw new \DomainException('Több azonos szintű aktív árképzési paraméter van. Csak egy maradjon aktív.');
         }
 
@@ -72,12 +75,14 @@ class PricingParameterResolver
      */
     private function sortBySpecificity(Collection $parameters): Collection
     {
-        return $parameters->sortByDesc(fn (PricingParameter $parameter): int => $this->specificity($parameter))->values();
+        return $parameters->sortByDesc(fn (PricingParameter $parameter): array => $this->specificity($parameter))->values();
     }
 
-    private function specificity(PricingParameter $parameter): int
+    private function specificity(PricingParameter $parameter): array
     {
-        return $this->scopeWeight($parameter) + ($parameter->price_list_id ? 10 : 0) + ($parameter->currency_id ? 5 : 0);
+        return [$this->scopeWeight($parameter) + ($parameter->price_list_id ? 10 : 0) + ($parameter->currency_id ? 5 : 0),
+            ...($parameter->scope_type === PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN
+                ? ItemMainGroupCodePattern::specificity($parameter->item_main_group_pattern) : [0, 0, 0])];
     }
 
     private function scopeWeight(PricingParameter $parameter): int
@@ -86,6 +91,7 @@ class PricingParameterResolver
             PricingParameter::SCOPE_PRODUCT => 400,
             PricingParameter::SCOPE_MATERIAL_COMPOSITION => 350,
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => 300,
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN => 250,
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => 200,
             default => 100,
         };

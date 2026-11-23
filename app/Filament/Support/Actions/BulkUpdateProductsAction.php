@@ -91,7 +91,7 @@ class BulkUpdateProductsAction
             'date' => DatePicker::make('value')->native(false)->displayFormat('Y.m.d.')->format('Y-m-d'),
             'textarea' => Textarea::make('value')->rows(3)->maxLength(16000),
             'integer' => TextInput::make('value')->integer(),
-            default => TextInput::make('value')->maxLength(255),
+            default => TextInput::make('value')->maxLength($definition['max_length'] ?? 255),
         };
 
         // A non-native DatePicker validates its raw Y-m-d H:i:s state first,

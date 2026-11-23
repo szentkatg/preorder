@@ -260,6 +260,7 @@ class CostCalculationService
             PricingParameter::SCOPE_GLOBAL => null,
             PricingParameter::SCOPE_PRODUCT => $products->whereKey($parameter->product_id),
             PricingParameter::SCOPE_ITEM_MAIN_GROUP => $products->where('item_main_group_id', $parameter->item_main_group_id),
+            PricingParameter::SCOPE_ITEM_MAIN_GROUP_PATTERN => $products->whereIn('item_main_group_id', ItemMainGroupCodePattern::groupIds($parameter->item_main_group_pattern)),
             PricingParameter::SCOPE_MATERIAL_COMPOSITION => $products->where('material_composition', $parameter->material_composition),
             PricingParameter::SCOPE_SUPPLIER_COUNTRY => $products->whereHas('purchasePrices', fn ($query) => $query
                 ->where('active', true)->whereHas('supplier', fn ($supplier) => $supplier->where('country_code', $parameter->supplier_country_code))),

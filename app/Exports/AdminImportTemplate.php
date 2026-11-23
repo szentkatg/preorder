@@ -67,6 +67,7 @@ class AdminImportTemplate implements WithMultipleSheets
                     'size_range_code' => 'Létező méretsorkód; a mező üresen is hagyható.',
                     'name_hu' => 'A modell neve, pl. EMIRO. Külön angol terméknév nem szükséges.',
                     'material_composition' => 'Anyagösszetétel, pl. 100% poliészter. Opcionális mező.',
+                    'exclusivity' => 'Modellszintű exkluzivitási megjegyzés, legfeljebb 100 karakter. Opcionális. Hiányzó oszlop esetén megmarad a korábbi érték; üres cella törli. Tájékoztató mező, nem korlátozza a rendelhetőséget.',
                     'promised_delivery_date' => 'Ígért szállítási határidő. Valódi Excel-dátum, 2027-03-01 vagy 2027.03.01 is használható. Üresen törli a dátumot.',
                     'catalog_group_name_hu' => 'Katalóguscsoport neve, pl. SIDE BAGS.',
                     'catalog_group_sort' => 'A katalóguscsoport sorrendje, egész szám.',

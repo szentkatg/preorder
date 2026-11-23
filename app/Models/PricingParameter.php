@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Exceptions\PricingParameterConflictException;
 use App\Models\Concerns\ProtectsClosedPricingProjectDeletion;
+use App\Services\Pricing\ItemMainGroupCodePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,6 +33,8 @@ class PricingParameter extends Model
 
     public const SCOPE_ITEM_MAIN_GROUP = 'item_main_group';
 
+    public const SCOPE_ITEM_MAIN_GROUP_PATTERN = 'item_main_group_pattern';
+
     public const SCOPE_MATERIAL_COMPOSITION = 'material_composition';
 
     public const SCOPE_PRODUCT = 'product';
@@ -44,6 +47,7 @@ class PricingParameter extends Model
         'scope_type',
         'supplier_country_code',
         'item_main_group_id',
+        'item_main_group_pattern',
         'material_composition',
         'product_id',
         'price_list_id',
@@ -73,6 +77,8 @@ class PricingParameter extends Model
                             fn ($query) => $query->where('product_id', $attributes['product_id']))
                         ->when(($attributes['scope_type'] ?? '') === self::SCOPE_ITEM_MAIN_GROUP,
                             fn ($query) => $query->whereHas('product', fn ($product) => $product->where('item_main_group_id', $attributes['item_main_group_id'])))
+                        ->when(($attributes['scope_type'] ?? '') === self::SCOPE_ITEM_MAIN_GROUP_PATTERN,
+                            fn ($query) => $query->whereHas('product', fn ($product) => $product->whereIn('item_main_group_id', ItemMainGroupCodePattern::groupIds($attributes['item_main_group_pattern']))))
                         ->when(($attributes['scope_type'] ?? '') === self::SCOPE_MATERIAL_COMPOSITION,
                             fn ($query) => $query->whereHas('product', fn ($product) => $product->where('material_composition', $attributes['material_composition'])))
                         ->when(($attributes['scope_type'] ?? '') === self::SCOPE_SUPPLIER_COUNTRY,
@@ -94,6 +100,8 @@ class PricingParameter extends Model
             'supplier_country_code' => $this->scope_type === self::SCOPE_SUPPLIER_COUNTRY
                 ? strtoupper(trim((string) $this->supplier_country_code)) : null,
             'item_main_group_id' => $this->scope_type === self::SCOPE_ITEM_MAIN_GROUP ? $this->item_main_group_id : null,
+            'item_main_group_pattern' => $this->scope_type === self::SCOPE_ITEM_MAIN_GROUP_PATTERN
+                ? ItemMainGroupCodePattern::normalize((string) $this->item_main_group_pattern) : null,
             'material_composition' => $this->scope_type === self::SCOPE_MATERIAL_COMPOSITION ? $this->material_composition : null,
             'product_id' => $this->scope_type === self::SCOPE_PRODUCT ? $this->product_id : null,
         ];
@@ -109,6 +117,7 @@ class PricingParameter extends Model
         $field = match ($this->scope_type) {
             self::SCOPE_SUPPLIER_COUNTRY => 'supplier_country_code',
             self::SCOPE_ITEM_MAIN_GROUP => 'item_main_group_id',
+            self::SCOPE_ITEM_MAIN_GROUP_PATTERN => 'item_main_group_pattern',
             self::SCOPE_MATERIAL_COMPOSITION => 'material_composition',
             self::SCOPE_PRODUCT => 'product_id',
             default => null,
@@ -116,8 +125,8 @@ class PricingParameter extends Model
         if ($field !== null) {
             // Ignore stale values in irrelevant dimensions of legacy records too.
             $value = $this->scopeAttributes()[$field];
-            if ($field === 'supplier_country_code') {
-                $query->whereRaw('UPPER(TRIM(supplier_country_code)) = ?', [$value]);
+            if (in_array($field, ['supplier_country_code', 'item_main_group_pattern'], true)) {
+                $query->whereRaw('UPPER(TRIM('.$field.')) = ?', [$value]);
             } else {
                 $query->where($field, $value);
             }
@@ -135,6 +144,7 @@ class PricingParameter extends Model
             PricingProject::whereKey(array_unique($projectIds))->orderBy('id')->lockForUpdate()->get();
             $this->fill($this->scopeAttributes());
             if ($this->active) {
+                $this->assertNoAmbiguousGroupPattern();
                 $conflicts = $this->matchingParametersQuery()->where('active', true)
                     ->when($this->exists, fn ($query) => $query->whereKeyNot($this->getKey()))
                     ->orderBy('id')->lockForUpdate()->pluck('id');
@@ -146,6 +156,22 @@ class PricingParameter extends Model
 
             return parent::save($options);
         });
+    }
+
+    private function assertNoAmbiguousGroupPattern(): void
+    {
+        if ($this->scope_type !== self::SCOPE_ITEM_MAIN_GROUP_PATTERN) {
+            return;
+        }
+        $ids = ItemMainGroupCodePattern::groupIds($this->item_main_group_pattern);
+        $sameLevel = $this->newQuery()->where($this->only(['pricing_project_id', 'parameter_type', 'scope_type', 'price_list_id', 'currency_id']))
+            ->where('active', true)->when($this->exists, fn ($query) => $query->whereKeyNot($this->id))->lockForUpdate()->get();
+        foreach ($sameLevel as $other) {
+            if (ItemMainGroupCodePattern::specificity($other->item_main_group_pattern) === ItemMainGroupCodePattern::specificity($this->item_main_group_pattern)
+                && array_intersect($ids, ItemMainGroupCodePattern::groupIds($other->item_main_group_pattern))) {
+                throw new PricingParameterConflictException('Egyenrangú, átfedő főcsoportkód-minták: '.$this->item_main_group_pattern.' / '.$other->item_main_group_pattern.' (#'.$other->id.'). Adj meg pontosabb mintát.');
+            }
+        }
     }
 
     public function pricingProject(): BelongsTo

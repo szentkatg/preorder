@@ -1425,6 +1425,61 @@ git pull --ff-only
 
 ## Beszállítói oszlopok, alku-célár és átlagos szorzó
 
+### Cél beszerzési ár a teljes áráttekintésben
+
+A **Teljes áráttekintés** a projekt minden HUF kiskerárlistájához külön
+**Cél beszerzési ár** oszlopot kínál, ugyanazzal a számítással, mint a HUF
+kiskeráras munkalap. A célár a megfelelő projekt/modell/szín/árlista mentett
+kiskerárából származik, nem az áttekintés alapjául szolgáló bekerülési sorból.
+A csökkentendő beszerzési ár piros; felfelé nem emeljük az eredeti árat.
+Hiányzó kiskerár vagy beszerzési adat üresen marad, nem helyettesítjük más
+árlista, szín vagy projekt adatával.
+
+A célár rendezhető, oszloponként kereshető, elrejthető és Excelbe numerikus
+értékként exportálható. A tizedesjegyek a szokásos felhasználói beállításban
+változtathatók (alapból legfeljebb négy). A cellában a mentett beszerzés
+pénznemkódja is szerepel. Ennek külön, alapból rejtett oszlopa is elérhető és
+bekerül az Excel-exportba; ezért egy későbbi bekerülésiérték-változás esetén
+sem lehet összekeverni a régi kiskerkalkuláció és az új beszerzés pénznemét.
+Az áttekintés örökölt termékenkénti munkalapján is ugyanígy elérhető.
+
+### HUF kiskeráras lista
+
+#### Beszerzési árak szezonok közötti összehasonlítása
+
+A HUF kiskeráras listában két további, alapból látható oszlop van:
+
+- **Előző évi beszerzési ár**: ugyanannak az előző azonos típusú szezonnak
+  (W27 → W26, S27 → S26) a párosított termékéből, mint az előző kiskerár.
+  Az automatikus névpárosítás, a kézi termékválasztás és a „nincs pár” mód
+  egyaránt érvényes. A forrás a `product_purchase_prices` törzs, nem egy
+  korábbi kalkuláció. Csak aktív, nem negatív ajánlat választható.
+  Több pénznem esetén a **korábbi szezon aktív árfolyamain** HUF-ra átszámított
+  legolcsóbb ajánlat nyer; szállítás és vám nélkül. A listában az eredeti
+  beszerzési ár és annak pénzneme látszik. Azonos HUF-értéknél a kisebb
+  beszerzésiár-rekordazonosító dönt, így az ár és a pénznem mindig összetartozik.
+- **Aktuális szezon beszerzési ára**: a HUF kalkulációhoz kiválasztott
+  beszerzésiár-rekord jelenlegi, aktív törzsértéke. Nem választ új ajánlatot,
+  és nem indít újraszámítást. Ha a kiválasztott ajánlat már inaktív, hiányzik,
+  vagy nem a sor termékéhez/színéhez tartozik, az érték üres.
+
+Az eddigi **Eredeti besz. ár** a kalkulációban mentett pillanatkép marad;
+ezért a későbbi törzsmódosítás eltérése visszanézhető. A két új oszlop
+kereshető, rendezhető, elrejthető, tizedesjegyei külön állíthatók. Az
+Excel-export numerikus árat és külön, a listában alapból rejtett pénznemkódot
+tartalmaz, nem pénznemmel összefűzött szöveget.
+
+Modellszintű korábbi ajánlat minden színhez illeszkedik; színár csak azonos
+színkódhoz választható. Más szín, más szezon vagy nem egyértelmű termékpár
+árát nem helyettesítjük be. Ha az ajánlatok egyetlen pénznemben vannak,
+azok árfolyam nélkül is összehasonlíthatók. Vegyes pénznem és hiányzó/inaktív/
+nem pozitív korábbi árfolyam esetén nincs találgatás: az előző ár üres marad,
+amíg a szükséges árfolyamot nem pótolják. A HUF árfolyama mindig 1.
+
+Az oszlopok lekérdezéses vetületek; nem keletkezik tárolt másolat és nem kell
+új migráció. A megjelenítés, a szűrés és a rendezés ugyanazt az ajánlatot
+használja, soronkénti külön adatbázis-lekérdezések nélkül.
+
 - Az oszlopválasztóban elérhető **Beszállító kód** (`erp_partner_code`),
   **Beszállító neve**, **Eredeti besz. ár** és **Besz. pénznem**.
   Ezek az adott kalkulációhoz kiválasztott beszerzési ár beszállítóját/pénznemét mutatják.

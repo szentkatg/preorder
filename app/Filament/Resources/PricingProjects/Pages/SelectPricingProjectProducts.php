@@ -51,6 +51,7 @@ class SelectPricingProjectProducts extends Page implements HasTable
             ->columns([
                 TextColumn::make('model_code')->label('Modellkód')->searchable()->sortable(),
                 TextColumn::make('name_hu')->label('Név')->searchable()->sortable(),
+                TextColumn::make('exclusivity')->label('Exkluzivitás')->searchable()->sortable()->toggleable(),
                 TextColumn::make('brand.code')->label('Márka')->sortable()
                     ->formatStateUsing(fn ($state, $record) => $record->brand?->translate('name') ?: $state),
                 TextColumn::make('orderSheetType.code')->label('Rendelőlap típusa')->sortable()

@@ -38,6 +38,7 @@ class PricingCalculationRowsTable
                 TextColumn::make('product.name_hu')
                     ->label('Modell név')
                     ->toggleable(),
+                TextColumn::make('product.exclusivity')->label('Exkluzivitás'),
                 TextColumn::make('product.material_composition')
                     ->label('Anyagösszetétel')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -248,8 +249,7 @@ class PricingCalculationRowsTable
         if (filled($record->product?->item_main_group_id)) {
             $options[PricingParameter::SCOPE_ITEM_MAIN_GROUP] =
                 'Főcsoport - '.(
-                    $record->product->itemMainGroup?->name
-                    ?: $record->product->itemMainGroup?->code
+                    $record->product->itemMainGroup?->codeAndName()
                     ?: $record->product->item_main_group_id
                 );
         }
