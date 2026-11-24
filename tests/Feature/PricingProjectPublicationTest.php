@@ -104,6 +104,138 @@ class PricingProjectPublicationTest extends TestCase
         $this->publish();
         $this->assertGreaterThan(0, PriceListItem::where('season_id', $this->project->season_id)->count());
         $this->assertFalse($this->project->season->fresh()->visible_to_partners);
+        $this->assertFalse($this->product->fresh()->visible_to_partners);
+    }
+
+    public function test_publication_can_make_all_project_products_visible_without_enabling_season_or_inactive_products(): void
+    {
+        $inactive = $this->product->replicate();
+        $inactive->model_code = 'INACTIVE-MEMBER';
+        $inactive->active = false;
+        $inactive->save();
+        $this->project->products()->attach($inactive->id);
+        $outside = $this->product->replicate();
+        $outside->model_code = 'OUTSIDE-PROJECT';
+        $outside->save();
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        $before = $this->row->fresh()->getAttributes();
+        $publication = app(PricingProjectPublicationService::class)->publish($this->project, true);
+        $this->assertTrue($this->product->fresh()->visible_to_partners);
+        $this->assertTrue($inactive->fresh()->visible_to_partners);
+        $this->assertFalse((bool) $inactive->fresh()->active);
+        $this->assertFalse(Product::visibleToPartners()->whereKey($inactive->id)->exists());
+        $this->assertFalse($outside->fresh()->visible_to_partners);
+        $this->assertFalse($this->project->season->fresh()->visible_to_partners);
+        $this->assertSame(['requested' => true, 'selected' => 2, 'updated' => 2, 'unchanged' => 0], $publication->snapshot['product_visibility']);
+        $this->assertSame($before, $this->row->fresh()->getAttributes());
+        $this->assertSame('closed', $this->project->fresh()->status);
+    }
+
+    public function test_publication_no_choice_preserves_mixed_existing_product_visibility(): void
+    {
+        $this->product->update(['visible_to_partners' => true]);
+        $hidden = $this->product->replicate();
+        $hidden->model_code = 'HIDDEN-MEMBER';
+        $hidden->visible_to_partners = false;
+        $hidden->active = false;
+        $hidden->save();
+        $this->project->products()->attach($hidden->id);
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        app(PricingProjectPublicationService::class)->publish($this->project, false);
+        $this->assertTrue($this->product->fresh()->visible_to_partners);
+        $this->assertFalse($hidden->fresh()->visible_to_partners);
+    }
+
+    public function test_failed_publication_never_changes_product_visibility(): void
+    {
+        $this->expectException(DomainException::class);
+        try {
+            app(PricingProjectPublicationService::class)->publish($this->project, true); // Not approved.
+        } finally {
+            $this->assertFalse($this->product->fresh()->visible_to_partners);
+            $this->assertSame('active', $this->project->fresh()->status);
+            $this->assertDatabaseCount('price_list_items', 0);
+            $this->assertDatabaseCount('pricing_project_publications', 0);
+        }
+    }
+
+    public function test_price_write_failure_rolls_back_preceding_visibility_updates_too(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        Event::listen('eloquent.saving: '.PriceListItem::class, fn () => throw new DomainException('Simulated publication failure'));
+        $this->expectException(DomainException::class);
+        try {
+            app(PricingProjectPublicationService::class)->publish($this->project, true);
+        } finally {
+            $this->assertFalse($this->product->fresh()->visible_to_partners);
+            $this->assertSame('active', $this->project->fresh()->status);
+            $this->assertDatabaseCount('price_list_items', 0);
+            $this->assertDatabaseCount('pricing_project_publications', 0);
+        }
+    }
+
+    public function test_publication_visibility_option_requires_product_update_permissions(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        $user = User::factory()->create();
+        foreach (['Publish:PricingProjectLifecycle', 'View:PricingProject', 'ViewAny:Product'] as $permission) {
+            $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($user);
+        $this->expectException(AuthorizationException::class);
+        try {
+            app(PricingProjectPublicationService::class)->publish($this->project, true);
+        } finally {
+            $this->assertFalse($this->product->fresh()->visible_to_partners);
+            $this->assertSame('active', $this->project->fresh()->status);
+            $this->assertDatabaseCount('price_list_items', 0);
+        }
+    }
+
+    public function test_publication_can_still_close_without_product_update_permission_when_visibility_is_not_requested(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::findOrCreate('Publish:PricingProjectLifecycle', 'web'));
+        $this->actingAs($user);
+        app(PricingProjectPublicationService::class)->publish($this->project);
+        $this->assertSame('closed', $this->project->fresh()->status);
+        $this->assertFalse($this->product->fresh()->visible_to_partners);
+    }
+
+    public function test_close_modal_defaults_to_unchanged_visibility_and_can_explicitly_enable_products(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        $page = Livewire::test(ViewPricingProject::class, ['record' => $this->project->id])->mountAction('publishProject')
+            ->assertSet('mountedActions.0.data.make_products_visible', 0);
+        $this->assertFalse($this->product->fresh()->visible_to_partners);
+        $page->set('mountedActions.0.data.make_products_visible', '1')->callMountedAction()->assertHasNoActionErrors();
+        $this->assertSame('closed', $this->project->fresh()->status);
+        $this->assertTrue($this->product->fresh()->visible_to_partners);
+        $this->assertFalse($this->project->season->fresh()->visible_to_partners);
+    }
+
+    public function test_cancelling_close_modal_with_yes_does_not_change_visibility_or_publish_prices(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        Livewire::test(ViewPricingProject::class, ['record' => $this->project->id])->mountAction('publishProject')
+            ->set('mountedActions.0.data.make_products_visible', '1')->call('unmountAction');
+        $this->assertFalse($this->product->fresh()->visible_to_partners);
+        $this->assertSame('active', $this->project->fresh()->status);
+        $this->assertDatabaseCount('price_list_items', 0);
+    }
+
+    public function test_close_modal_still_works_for_a_publisher_without_product_edit_permissions(): void
+    {
+        app(RetailPriceReviewService::class)->approveCurrentPrice($this->row);
+        $user = User::factory()->create();
+        foreach (['Publish:PricingProjectLifecycle', 'View:PricingProject', 'ViewAny:PricingProject'] as $permission) {
+            $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($user);
+        Livewire::test(ViewPricingProject::class, ['record' => $this->project->id])->callAction('publishProject')->assertHasNoActionErrors();
+        $this->assertSame('closed', $this->project->fresh()->status);
+        $this->assertFalse($this->product->fresh()->visible_to_partners);
     }
 
     public function test_project_item_delete_waits_for_confirmation_and_preserves_published_prices_and_snapshot(): void

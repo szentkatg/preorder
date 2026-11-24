@@ -34,6 +34,32 @@ A lezárás egy adatbázis-tranzakcióban:
 5. Lezárja a projektet (`closed_at`, `closed_by`). Bármilyen hiba esetén
    az egész tranzakció visszagördül, nincs részleges publikálás.
 
+### Termékek elérhetővé tétele lezáráskor
+
+A lezárás megerősítő ablakában külön kérdés jelenik meg:
+**„Szeretnéd az árprojekt összes termékét elérhetővé tenni az előrendelési
+felületen?”** Az alapértelmezett **Nem** megőrzi a termékek vegyes
+láthatósági beállításait, nem rejti el a már látható termékeket.
+
+**Igen** esetén a projekt minden tagtermékének `visible_to_partners` jelzője
+igaz lesz, az inaktív tagoké is; az `active` jelző és a szezon láthatósága
+nem változik. A rejtett szezon nem jelenik meg ettől a partnerportálon,
+és az inaktív termék nem válik rendelhetővé. A projektbe nem tartozó
+termékek változatlanok maradnak.
+
+Az elérhetővé tétel ugyanabban a tranzakcióban fut, mint az árak publikálása:
+ár-, jogosultsági vagy mentési hiba esetén a láthatóság is visszagördül.
+A kérés és a kijelölt/módosított/változatlan termékszám a publikálási
+snapshot `product_visibility` adatai között megmarad.
+
+A kérdés csak projektmegtekintési és termékmódosítási joggal használható
+(`View:PricingProject`, `ViewAny:Product`, az összes tagtermék `Update:Product`
+joga). A csak publikálási jogú felhasználó továbbra is lezárhat változatlan
+termékláthatóság mellett; a szolgáltatás a kézzel küldött kérelmet is ellenőrzi.
+
+A láthatóság később, **lezárt projektnél is** állítható a terméklistában,
+kijelöléssel és a **Partneroldali láthatóság állítása** csoportos művelettel.
+
 Az árlistatétel modellszintű. Az azonos modell/szezon/árlista színenkénti
 azonos árait egy tételbe vonjuk össze. Eltérő színárnál, vagy színenként
 eltérő/hiányzó HUF bekerülési értéknél a rendszer hibát jelez, nem választ

@@ -13,8 +13,9 @@
    akkor is, ha még nincs kalkuláció. Innen újra megnyitható a termékválasztó.
 
 Az inaktív termékek is kijelölhetők, állapotuk külön látszik, de a kalkulációk
-továbbra is csak aktív termékekkel dolgoznak. Lezárt projekt termékei nem
-változtathatók és azok termékei sem kínálhatók fel másik projektben.
+továbbra is csak aktív termékekkel dolgoznak. Lezárt projekt tagsága nem
+változtatható és termékei sem kínálhatók fel másik projektben. A partneroldali
+láthatóság ettől függetlenül, az alábbi külön művelettel állítható.
 
 Az új `pricing_project_products` kapcsolat a teljes modellre vonatkozik,
 tehát annak minden színére. A `product_id` adatbázis-szinten is egyedi.
@@ -36,6 +37,29 @@ snapshotok változatlanok. A terméktörzs, beszerzési árak és paraméterek i
 megmaradnak. Az újraszámítás nem veszi vissza automatikusan a terméket.
 A kalkulációs sorok régi, modell–szín szintű törlése nem egyenlő a modell
 projektből való kivételével.
+
+### Partneroldali láthatóság tömeges állítása
+
+**Árprojektek → Megtekintés vagy Szerkesztés → Árprojekt termékei**:
+jelöld ki a termékeket, majd válaszd a **Partneroldali láthatóság állítása**
+csoportos műveletet. Válassz **Igen – látható** vagy **Nem – rejtett** értéket,
+majd a kijelölt darabszám ellenőrzése után erősítsd meg. A szűrt lista teljes
+kijelölése és az egyedi kijelölés is használható. A **Partnerportálon látható**
+oszlop visszajelzi a tárolt jelzőt.
+
+Ez a külön törzsadat-művelet **lezárt projektnél és a megtekintőoldalon is
+elérhető**, visszanyitás nélkül. Nem oldja fel a projekt/kalkuláció zárolását,
+nem módosít árat, publikálási pillanatképet, projektstátuszt vagy tagságot.
+A termék `active` és a szezon `visible_to_partners` jelzője sem változik;
+a tényleges partneroldali eléréshez ezeknek és a partner jogosultságainak is
+megfelelőknek kell lenniük. Meglévő rendeléseket/sorokat nem töröl.
+
+Jogok: a projekt `View` joga, valamint `ViewAny:Product` és minden kijelölt
+termék `Update:Product` joga. Ehhez nem kell projekt-visszanyitási, publikálási
+vagy projektmódosítási jog; új jogosultságobjektum nincs. A szolgáltatás a
+projekt, termékek és tagság zárolásával, tranzakcióban újraellenőriz minden
+kijelölt azonosítót. Idegen/eltávolított termék, megváltozott kijelölés vagy
+mentési/jogosultsági hiba esetén semmi sem változik.
 
 Jogok: `ViewAny:PricingProject`, `View:PricingProject`, `Update:PricingProject`,
 `ViewAny:Product`, és a kijelölt termékek `View:Product` joga. Kivételhez kell

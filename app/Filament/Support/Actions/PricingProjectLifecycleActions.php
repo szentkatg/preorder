@@ -7,9 +7,11 @@ use App\Filament\Resources\PricingProjects\PricingProjectResource;
 use App\Filament\Support\Schemas\ErpPricingExportForm;
 use App\Models\PricingProject;
 use App\Services\Pricing\ErpPricingExportService;
+use App\Services\Pricing\PricingProjectProductVisibilityService;
 use App\Services\Pricing\PricingProjectPublicationService;
 use DomainException;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Gate;
@@ -24,10 +26,19 @@ class PricingProjectLifecycleActions
             ->visible(fn (PricingProject $record) => $record->isOpenForPricing() && Gate::allows('publish', $record))
             ->authorize(fn (PricingProject $record) => $record->isOpenForPricing() && Gate::allows('publish', $record))
             ->modalDescription('A jóváhagyott, aktuális árakat a szezon végleges árlistatételeibe írjuk, a meglévő árakat felülírva. Hiba esetén semmi nem változik. Visszanyitás csak külön jogosultsággal lehetséges.')
-            ->action(function (PricingProject $record, $livewire): void {
+            ->schema([
+                Radio::make('make_products_visible')->label('Szeretnéd az árprojekt összes termékét elérhetővé tenni az előrendelési felületen?')
+                    ->options([0 => 'Nem – a meglévő láthatósági beállítások maradjanak', 1 => 'Igen – az árprojekt összes termékét jelöljük láthatónak'])
+                    ->default(0)->required()->rules(['boolean'])
+                    ->visible(fn (PricingProject $record) => PricingProjectProductVisibilityService::canChange($record))
+                    ->helperText('Csak a Partnerportálon látható jelző változik. Az Aktív jelző és a szezon láthatósága nem változik; a rejtett szezon ettől még nem válik elérhetővé.'),
+            ])
+            ->action(function (PricingProject $record, array $data, $livewire): void {
                 try {
-                    $publication = app(PricingProjectPublicationService::class)->publish($record);
-                    Notification::make()->success()->title('Árprojekt lezárva')->body('Publikált árak: '.count($publication->snapshot['prices']).'.')->send();
+                    $publication = app(PricingProjectPublicationService::class)->publish($record, (bool) ($data['make_products_visible'] ?? false));
+                    $visibility = $publication->snapshot['product_visibility'] ?? null;
+                    Notification::make()->success()->title('Árprojekt lezárva')->body('Publikált árak: '.count($publication->snapshot['prices']).'.'
+                        .($visibility ? ' Partneroldalon láthatónak jelölt termékek: '.$visibility['selected'].' (módosított: '.$visibility['updated'].').' : ' A termékek láthatósága változatlan.'))->send();
                     $livewire->redirect(PricingProjectResource::getUrl('view', ['record' => $record]));
                 } catch (DomainException $exception) {
                     Notification::make()->danger()->title('Nem zárható le az árprojekt')->body($exception->getMessage())->send();

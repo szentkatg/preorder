@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Gate;
 
 class PricingProjectPublicationService
 {
-    public function publish(PricingProject $project): PricingProjectPublication
+    public function publish(PricingProject $project, bool $makeProductsVisible = false): PricingProjectPublication
     {
         Gate::authorize('publish', $project);
 
-        return DB::transaction(function () use ($project): PricingProjectPublication {
+        return DB::transaction(function () use ($project, $makeProductsVisible): PricingProjectPublication {
             $project = PricingProject::lockForUpdate()->findOrFail($project->id);
             Gate::authorize('publish', $project);
             if (! $project->isOpenForPricing()) {
@@ -28,6 +28,10 @@ class PricingProjectPublicationService
             }
             Season::whereKey($project->season_id)->lockForUpdate()->firstOrFail();
             $snapshot = $this->prepare($project);
+            if ($makeProductsVisible) {
+                $snapshot['product_visibility'] = ['requested' => true]
+                    + app(PricingProjectProductVisibilityService::class)->makeAllVisible($project);
+            }
             foreach ($snapshot['prices'] as &$price) {
                 $old = PriceListItem::where('price_list_id', $price['price_list_id'])->where('season_id', $project->season_id)
                     ->where('product_id', $price['product_id'])->lockForUpdate()->first();
