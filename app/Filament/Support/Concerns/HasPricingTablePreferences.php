@@ -3,8 +3,8 @@
 namespace App\Filament\Support\Concerns;
 
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Grid;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\View;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\Column;
 use Illuminate\Support\Facades\Validator;
@@ -27,8 +27,9 @@ trait HasPricingTablePreferences
     {
         $fields = [];
         foreach ($this->pricingDecimalColumns() as $name => $label) {
-            $fields[] = Select::make($name)->label($label)
-                ->options(array_combine(range(0, 6), array_map(fn (int $digits): string => $digits.' tizedesjegy', range(0, 6))))
+            $fields[] = TextInput::make($name)->label($label)->hiddenLabel()
+                ->type('number')->inputMode('numeric')->rules(['integer'])->minValue(0)->maxValue(6)->step(1)
+                ->extraInputAttributes(['style' => 'text-align: right; padding-block: .25rem;'])
                 ->placeholder('Alapértelmezett')->nullable();
         }
 
@@ -36,7 +37,7 @@ trait HasPricingTablePreferences
             ->icon('heroicon-o-adjustments-horizontal')->color('gray')
             ->modalHeading('Tizedesjegyek beállítása')->modalWidth(Width::ThreeExtraLarge)
             ->modalDescription('Oszloponként, csak a kijelzés és az Excel-formátum változik. A pontos értékek, számítások és szerkeszthető beviteli mezők változatlanok. A beállítást felhasználónként megjegyezzük.')
-            ->schema([Grid::make(2)->schema($fields)])
+            ->schema([View::make('filament.pricing.decimal-places')->schema($fields)])
             ->fillForm(fn (): array => array_replace(array_fill_keys(array_keys($this->pricingDecimalColumns()), null), $this->pricingDecimalPlaces))
             ->modalSubmitActionLabel('Mentés')->modalCancelActionLabel('Mégse')
             ->action(fn (array $data) => $this->savePricingDecimalPlaces($data));

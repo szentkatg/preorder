@@ -4,7 +4,12 @@ namespace Tests\Feature;
 
 use App\Exports\AdminTableExport;
 use App\Filament\Pages\PricingCostCalculations;
+use App\Filament\Pages\PricingDistributorCalculations;
+use App\Filament\Pages\PricingForeignRetailCalculations;
 use App\Filament\Pages\PricingHufRetailCalculations;
+use App\Filament\Pages\PricingProductOverview;
+use App\Filament\Pages\PricingProductWorkspace;
+use App\Filament\Pages\PricingWholesaleCalculations;
 use App\Models\AdminUiPreference;
 use App\Models\Currency;
 use App\Models\ItemMainGroup;
@@ -18,9 +23,12 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Support\Enums\Alignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\Validation\ValidationException;
+use Livewire\Drawer\Utils;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use Livewire\Mechanisms\ExtendBlade\ExtendBlade;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -77,6 +85,66 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->assertSame(0, PricingParameter::count());
         $input = $page->instance()->getTable()->getColumn('manual_price')->record($this->retail);
         $this->assertSame('496.1299', $input->getState());
+    }
+
+    public function test_every_decimal_modal_renders_one_compact_two_column_row_per_setting(): void
+    {
+        foreach ([PricingCostCalculations::class, PricingHufRetailCalculations::class, PricingForeignRetailCalculations::class,
+            PricingWholesaleCalculations::class, PricingDistributorCalculations::class,
+            PricingProductOverview::class, PricingProductWorkspace::class] as $class) {
+            $page = Livewire::test($class)->mountAction('decimalPlaces')->assertActionMounted('decimalPlaces');
+            $labels = (new \ReflectionMethod($class, 'pricingDecimalColumns'))->invoke($page->instance());
+            $schema = (new \ReflectionMethod($class, 'getMountedActionSchema'))->invoke($page->instance());
+            $blade = app(ExtendBlade::class);
+            $blade->startLivewireRendering($page->instance());
+            $restoreErrors = Utils::shareWithViews('errors', (new ViewErrorBag)->put('default', $page->instance()->getErrorBag()));
+            $dom = new \DOMDocument;
+            $previous = libxml_use_internal_errors(true);
+            try {
+                $dom->loadHTML('<?xml encoding="UTF-8">'.$schema->toHtml());
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous);
+                $restoreErrors();
+                $blade->endLivewireRendering();
+            }
+            $xpath = new \DOMXPath($dom);
+            $lists = $xpath->query('//div[@data-pricing-decimal-list]');
+            $this->assertSame(1, $lists->length, $class);
+            $this->assertStringContainsString('overflow-y: auto', $lists->item(0)->getAttribute('style'));
+            $this->assertSame(2, $xpath->query('.//thead/tr/th', $lists->item(0))->length);
+            $rows = $xpath->query('.//tbody/tr', $lists->item(0));
+            $this->assertSame(count($labels), $rows->length, $class);
+            foreach ($rows as $row) {
+                $name = $row->getAttribute('data-pricing-decimal-row');
+                $this->assertSame($labels[$name], trim($xpath->query('./th', $row)->item(0)->textContent));
+                $this->assertSame(1, $xpath->query('./td', $row)->length);
+                $inputs = $xpath->query('./td//input', $row);
+                $this->assertSame(1, $inputs->length);
+                $input = $inputs->item(0);
+                foreach (['type' => 'number', 'min' => '0', 'max' => '6', 'step' => '1'] as $attribute => $value) {
+                    $this->assertSame($value, $input->getAttribute($attribute), $class.': '.$name);
+                }
+                $this->assertStringContainsString('.'.$name, $input->getAttribute('wire:model'));
+                $this->assertSame(1, $xpath->query('./td//label[@for="'.$input->getAttribute('id').'"]', $row)->length);
+            }
+            $first = array_key_first($labels);
+            $page->unmountAction()->callAction('decimalPlaces', [$first => '0'])->assertHasNoErrors()->assertActionNotMounted('decimalPlaces');
+            $this->assertSame(0, $page->instance()->pricingDecimalPlacesFor($first), $class);
+            $page->callAction('decimalPlaces', [$first => '6'])->assertHasNoErrors();
+            $this->assertSame(6, $page->instance()->pricingDecimalPlacesFor($first), $class);
+            $page->callAction('decimalPlaces', [$first => ''])->assertHasNoErrors();
+            $this->assertNull($page->instance()->pricingDecimalPlacesFor($first), $class);
+        }
+    }
+
+    public function test_numeric_decimal_inputs_reject_invalid_values_instead_of_coercing_them(): void
+    {
+        foreach ([-1, 7, '2.5', 'not-a-number'] as $value) {
+            Livewire::test(PricingHufRetailCalculations::class)->callAction('decimalPlaces', ['final_price' => $value])
+                ->assertHasActionErrors(['final_price']);
+        }
+        $this->assertSame(0, AdminUiPreference::where('preference_key', 'pricing_huf_retail_calculation_decimal_places')->count());
     }
 
     public function test_settings_survive_page_reentry_without_disturbing_layout_or_filters(): void

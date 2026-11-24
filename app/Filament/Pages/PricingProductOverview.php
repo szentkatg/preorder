@@ -78,7 +78,7 @@ class PricingProductOverview extends Page implements HasTable
 
     public function pricingWorkspaceDescription(): string
     {
-        return 'Csak olvasható végső áttekintés, modellenként/színenként. Kizárólag végleges árakat mutatunk, a kerekítés köztes lépései nélkül. Bekerülési szorzó = az adott ár HUF értéke / HUF bekerülési érték; a mentett devizás kisker árfolyamot használjuk. A kereskedelmi szorzók iránya: bruttó kisker / nettó nagyker, illetve bruttó kisker / nettó disztribútor és nettó nagyker / nettó disztribútor. Hiányzó adatnál nem helyettesítünk nullával vagy más pénznem árával.';
+        return 'Csak olvasható végső áttekintés, modellenként/színenként. A végleges árak mellett a kisker árlisták kalkulált árai is megjeleníthetők, a kerekítés köztes lépései nélkül. A szorzók a végleges árakból számolódnak. Bekerülési szorzó = az adott ár HUF értéke / HUF bekerülési érték; a mentett devizás kisker árfolyamot használjuk. A kereskedelmi szorzók iránya: bruttó kisker / nettó nagyker, illetve bruttó kisker / nettó disztribútor és nettó nagyker / nettó disztribútor. Hiányzó adatnál nem helyettesítünk nullával vagy más pénznem árával.';
     }
 
     protected function pricingPreferencePrefix(): string

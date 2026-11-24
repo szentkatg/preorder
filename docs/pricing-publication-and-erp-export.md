@@ -168,6 +168,12 @@ kalkulációt. Első publikálás előtt nem készül ERP-export.
   Nem publikálunk `price_list_items` adatot: az továbbra is a projektlezárás feladata.
 - **Teljes áráttekintés**: külön, csak olvasható lista modellenként/színenként,
   a tárolt végleges árakkal és használt paraméterekkel, köztes kerekítések nélkül.
+  Minden kiskerárlistához külön **Kalkulált kisker HUF/EUR/…** oszlop is elérhető:
+  a kerekítés utáni `calculated_price`, a manuális vagy megtartott végleges ártól
+  függetlenül. Ugyanahhoz a projekthez, modellhez, színhez és árlistához tartozó
+  kalkulációból származik; hiányzó érték üres marad. A kalkulált ár is rendezhető,
+  kereshető, elrejthető, tizedesei állíthatók, Excelbe teljes pontosságú számként
+  exportálható. Az összehasonlító szorzók továbbra is a végleges árakból számolódnak.
   Pénznemek közti bekerülési összehasonlításhoz a kalkuláció mentett devizás
   kisker árfolyamát használjuk. Szorzók: ár HUF-ban / bekerülés; bruttó kisker /
   nettó nagyker; nettó nagyker / nettó disztribútor; bruttó kisker / nettó

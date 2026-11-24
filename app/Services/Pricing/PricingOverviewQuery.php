@@ -29,6 +29,9 @@ class PricingOverviewQuery
             }],
             'cost_ratio' => ['Ár / bekerülési érték (HUF)', 'CASE WHEN '.$rate.' > 0 THEN overview_price.final_price * '.$rate.' / NULLIF('.$table.'.final_price, 0) ELSE NULL END'],
             'status' => ['Státusz', 'overview_price.status'], 'review' => ['Felülvizsgálandó', 'overview_price.requires_review']];
+        if ($list->type === 'retail') {
+            $values = ['calculated_price' => ['Kalkulált kisker '.$list->currency->code, 'overview_price.calculated_price']] + $values;
+        }
         if ($list->currency->code !== 'HUF') {
             $values['rate'] = ['Használt árfolyam (HUF/'.$list->currency->code.')', $rate];
         }

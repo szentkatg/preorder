@@ -1161,10 +1161,12 @@ git pull --ff-only
 
 ### Oszloponkénti tizedesbeállítás
 
-A Bekerülési értékek és HUF kisker árak munkafelület felső **Tizedesjegyek**
-gombja egy beállító ablakot nyit. Oszloponként választható az Alapértelmezett,
-vagy 0–6 tizedesjegy. A Mentés bezárja az ablakot és frissíti a kijelzést.
-Alapértelmezett választással az eredeti megjelenítés áll vissza: a kisker áraknál
+A bekerülési, HUF/devizás kisker-, nagyker-, disztribútori és teljes áttekintő
+munkafelületek felső **Tizedesjegyek** gombja egységes beállító ablakot nyit.
+A kompakt, függőlegesen görgethető táblázat minden sorában balra az oszlop neve,
+jobbra a tizedesjegyek számának beviteli mezője látszik. A megadható érték 0–6;
+üres mezőnél az Alapértelmezett érvényes. A Mentés bezárja az ablakot és frissíti
+a kijelzést. Alapértelmezett választással az eredeti megjelenítés áll vissza: a kisker áraknál
 a felesleges záró nullák elmaradnak, a bekerülési táblázat korábbi pontossága megmarad.
 A konkrét szám kiválasztása pontosan annyi tizedest jelenít meg, záró nullákkal is.
 

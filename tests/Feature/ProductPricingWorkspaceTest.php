@@ -276,6 +276,111 @@ class ProductPricingWorkspaceTest extends TestCase
         $this->assertIsFloat($export->map($cost)[0]);
     }
 
+    public function test_overview_shows_each_retail_calculated_price_independently_of_manual_and_retained_prices(): void
+    {
+        $this->assertSame(0, app(PricingProjectCalculationService::class)->calculate($this->project)['failed']);
+        $rows = [];
+        foreach (['rh' => [12345.6789, 23456.7891], 're' => [39.9567, 11.4599]] as $key => $values) {
+            foreach ([$this->product, $this->other] as $index => $product) {
+                $row = PricingCalculationRow::where('product_id', $product->id)->where('price_list_id', $this->lists[$key]->id)->sole();
+                $row->update(['calculated_price' => $values[$index], 'manual_price' => $key === 'rh' ? 9000 + $index : null,
+                    'retained_price' => $key === 're' ? 50 + $index : null]);
+                $rows[$key][$index] = $row->fresh()->getAttributes();
+            }
+        }
+        $page = Livewire::test(PricingProductOverview::class);
+        $huf = 'overview_'.$this->lists['rh']->id.'_calculated_price';
+        $eur = 'overview_'.$this->lists['re']->id.'_calculated_price';
+        $page->assertTableColumnExists($huf)->assertTableColumnExists($eur);
+        $this->assertNull($page->instance()->getTable()->getColumn('overview_'.$this->lists['we']->id.'_calculated_price'));
+        $shown = $page->instance()->getFilteredTableQuery()->get()->keyBy('product_id');
+        $first = $shown[$this->product->id];
+        $this->assertEqualsWithDelta(12345.6789, $first->{$huf}, .000001);
+        $this->assertEqualsWithDelta(39.9567, $first->{$eur}, .000001);
+        $this->assertEquals(9000, $first->{'overview_'.$this->lists['rh']->id.'_price'});
+        $this->assertEquals(50, $first->{'overview_'.$this->lists['re']->id.'_price'});
+        $this->assertEqualsWithDelta(9000 / (float) $first->final_price, $first->{'overview_'.$this->lists['rh']->id.'_cost_ratio'}, .000001);
+        $page->sortTable($huf, 'asc');
+        $this->assertSame($this->product->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id);
+        $page->sortTable($eur, 'asc');
+        $this->assertSame($this->other->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id);
+        $page->sortTable($huf, 'desc');
+        $this->assertSame($this->other->id, $page->instance()->getFilteredSortedTableQuery()->first()->product_id);
+        $page->searchTableColumns([$huf => '12345,6789'])->assertCountTableRecords(1);
+        $page->callAction('decimalPlaces', [$huf => 0, $eur => 2])->assertHasNoErrors();
+        $columns = [$page->instance()->getTable()->getColumn($huf)->record($first), $page->instance()->getTable()->getColumn($eur)->record($first)];
+        $this->assertSame('12 346', $columns[0]->formatState($columns[0]->getState()));
+        $this->assertSame('39,96', $columns[1]->formatState($columns[1]->getState()));
+        $export = new AdminTableExport($page->instance()->getTableQueryForExport(), $columns, $page->instance()->pricingDecimalExportFormats($columns));
+        $this->assertSame(['RH – Kalkulált kisker HUF', 'RE – Kalkulált kisker EUR'], $export->headings());
+        $this->assertSame([12345.6789, 39.9567], $export->map($first));
+        $this->assertSame(['A' => '#,##0', 'B' => '#,##0.00'], $export->columnFormats());
+        $previousBinder = Cell::getValueBinder();
+        $bytes = \Maatwebsite\Excel\Facades\Excel::raw($export, Excel::XLSX);
+        $file = tempnam(sys_get_temp_dir(), 'calculated-retail-test-');
+        try {
+            file_put_contents($file, $bytes);
+            Cell::setValueBinder(new DefaultValueBinder);
+            $sheet = IOFactory::load($file)->getActiveSheet();
+            foreach (['A2' => 12345.6789, 'B2' => 39.9567] as $cell => $expected) {
+                $this->assertSame('n', $sheet->getCell($cell)->getDataType());
+                $this->assertEqualsWithDelta($expected, $sheet->getCell($cell)->getValue(), .000001);
+            }
+        } finally {
+            Cell::setValueBinder($previousBinder);
+            unlink($file);
+        }
+        foreach ($rows as $key => $values) {
+            foreach ($values as $before) {
+                $this->assertSame($before, PricingCalculationRow::findOrFail($before['id'])->getAttributes());
+            }
+        }
+    }
+
+    public function test_overview_calculated_retail_prices_are_color_list_and_project_scoped_and_keep_zero_and_missing_values(): void
+    {
+        $cost = PricingCalculationRow::where('product_id', $this->product->id)->where('price_type', 'cost')->sole();
+        $retail = PricingCalculationRow::where('product_id', $this->product->id)->where('price_list_id', $this->lists['rh']->id)->sole();
+        $retail->update(['calculated_price' => 111.1234]);
+        $color = Color::create(['product_id' => $this->product->id, 'code' => 'NV', 'name_hu' => 'NAVY', 'active' => true]);
+        $colorCost = $cost->replicate();
+        $colorCost->color_id = $color->id;
+        $colorCost->save();
+        $colorRetail = $retail->replicate();
+        $colorRetail->color_id = $color->id;
+        $colorRetail->calculated_price = 0;
+        $colorRetail->manual_price = 999;
+        $colorRetail->save();
+        $secondList = $this->lists['rh']->replicate();
+        $secondList->code = 'RH_SECOND';
+        $secondList->save();
+        $secondRetail = $retail->replicate();
+        $secondRetail->price_list_id = $secondList->id;
+        $secondRetail->calculated_price = 333;
+        $secondRetail->save();
+        $otherProject = $this->project->replicate();
+        $otherProject->save();
+        $unrelated = $retail->replicate();
+        $unrelated->pricing_project_id = $otherProject->id;
+        $unrelated->calculated_price = 1;
+        $unrelated->save();
+        PricingCalculationRow::where('product_id', $this->other->id)->where('price_list_id', $this->lists['rh']->id)->delete();
+        $name = 'overview_'.$this->lists['rh']->id.'_calculated_price';
+        $secondName = 'overview_'.$secondList->id.'_calculated_price';
+        $page = Livewire::test(PricingProductOverview::class)->call('selectPricingProject', $this->project->id);
+        $rows = $page->instance()->getFilteredTableQuery()->get()->keyBy('id');
+        $this->assertEqualsWithDelta(111.1234, $rows[$cost->id]->{$name}, .000001);
+        $this->assertEquals(333, $rows[$cost->id]->{$secondName});
+        $this->assertEquals(0, $rows[$colorCost->id]->{$name});
+        $this->assertNull($rows[$colorCost->id]->{$secondName});
+        $missing = $rows->firstWhere('product_id', $this->other->id);
+        $this->assertNull($missing->{$name});
+        $column = $page->instance()->getTable()->getColumn($name);
+        $this->assertSame([null], (new AdminTableExport($page->instance()->getTableQueryForExport(), [$column]))->map($missing));
+        $this->assertTrue($column->isToggleable());
+        $this->assertTrue($column->isNumeric());
+    }
+
     public function test_overview_purchase_target_matches_each_huf_retail_list_with_sort_search_decimals_and_export(): void
     {
         $retail = PricingCalculationRow::where('product_id', $this->product->id)->where('price_list_id', $this->lists['rh']->id)->sole();
