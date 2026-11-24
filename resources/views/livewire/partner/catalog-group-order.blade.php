@@ -433,6 +433,10 @@
                     -
                     {{ $order->partner?->name ?? '' }}
                 </div>
+                <div class="mt-1" data-order-reference-number>
+                    {{ __('partner.reference_number') }}:
+                    <strong>{{ $order->reference_number }}</strong>
+                </div>
             
                 <div class="mt-1">
                     {{ $order->partnerAddress?->name ?? $order->partnerAddress?->addrid }}

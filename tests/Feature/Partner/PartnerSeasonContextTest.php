@@ -257,8 +257,31 @@ class PartnerSeasonContextTest extends TestCase
         $share = OrderShareLink::create(['order_id' => $otherOrder->id, 'token' => str_repeat('c', 64), 'expires_at' => now()->addDay(),
             'price_list_id' => $otherOrder->price_list_id, 'created_by_partner_user_id' => $this->user->id]);
         Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $share, 'catalogGroupName' => 'Bags'])
-            ->assertSuccessful()->assertSee('Other summer')->assertDontSeeHtml('href="'.route('partner.seasons.select').'"');
+            ->assertSuccessful()->assertSee('Other summer')->assertDontSeeHtml('href="'.route('partner.seasons.select').'"')
+            ->assertSeeHtml('data-order-reference-number')->assertSee($otherOrder->reference_number);
         $this->assertSame($this->season->id, session(PartnerSeasonContext::SESSION_KEY));
+    }
+
+    #[DataProvider('orderReferenceHeaders')]
+    public function test_order_details_show_reference_number_with_a_translated_label(string $locale, string $label, string $status): void
+    {
+        session(['partner.locale' => $locale, 'partner.language_id' => Language::where('code', strtoupper($locale))->value('id')]);
+        $order = $this->orders[$this->season->id];
+        $order->update(['status' => $status, 'reference_number' => 'REF-2027-123']);
+
+        Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])
+            ->assertSuccessful()->assertSeeHtml('data-order-reference-number')
+            ->assertSeeInOrder(['P01', 'Partner', $label.':', 'REF-2027-123', 'Address']);
+    }
+
+    public static function orderReferenceHeaders(): array
+    {
+        return [
+            ['hu', 'Hivatkozási szám', 'draft'],
+            ['en', 'Reference number', 'draft'],
+            ['hu', 'Hivatkozási szám', 'submitted'],
+            ['en', 'Reference number', 'submitted'],
+        ];
     }
 
     public function test_order_header_shows_season_and_translated_brand_and_sheet_type(): void

@@ -1,5 +1,10 @@
 # NAS-frissítés egy paranccsal
 
+A szokásos NAS- és tesztfrissítések elsődleges, állandó belépési pontja már a
+[`deploy-preorder.ps1`](preorder-deployment.md). Az alábbi régebbi, csak NAS-ra
+szolgáló parancs kompatibilitási segéd; új kiadásonkénti telepítő helyett az
+állandó közös munkafolyamatot használjuk.
+
 A Windows alatt futó `infrastructure/scripts/deploy-nas.ps1` a Synology NAS
 `preorder-v2-dev-app` konténerét frissíti a meglévő `preorder-admin` segédprogramon
 keresztül. A célgép mindig `ds.szeganet.hu:500`; az éles cPanel környezetet nem érinti.
