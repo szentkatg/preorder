@@ -18,6 +18,7 @@ use App\Services\Pricing\PreviousSeasonRetailPriceService;
 use App\Services\Pricing\RetailSeasonPurchasePriceComparison;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Contracts\HasTable;
@@ -72,14 +73,23 @@ class AdminResourceTable
         }
 
         if (! $table->hasAction('exportExcel')) {
-            $columns = array_values(array_filter($table->getColumns(), fn (Column $column) => $column->getName() !== 'pricing_operations'));
             $tableName = (new $modelClass)->getTable();
 
             $table->pushHeaderActions([
                 Action::make('exportExcel')
                     ->label('Exportálás Excelbe')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->action(function (HasTable $livewire) use ($columns, $tableName) {
+                    ->action(function (HasTable $livewire) use ($tableName) {
+                        // Read the current table at click time: the column manager
+                        // applies both visibility and ordering after configuration.
+                        $columns = array_values(array_filter($livewire->getTable()->getVisibleColumns(),
+                            fn (Column $column): bool => $column->getName() !== 'pricing_operations'));
+                        if ($columns === []) {
+                            Notification::make()->warning()->title('Nincs exportálható oszlop')
+                                ->body('Kapcsolj be legalább egy adatoszlopot az oszlopválasztóban.')->send();
+
+                            return null;
+                        }
                         $query = $livewire->getTableQueryForExport();
 
                         foreach ($columns as $column) {

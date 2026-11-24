@@ -10,6 +10,7 @@ use App\Filament\Support\PricingGrid;
 use App\Models\PriceList;
 use App\Models\PricingCalculationRow;
 use App\Services\Pricing\PricingOverviewQuery;
+use App\Services\Pricing\RetailSeasonPurchasePriceComparison;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
@@ -93,7 +94,7 @@ class PricingProductOverview extends Page implements HasTable
 
     protected function pricingDecimalColumns(): array
     {
-        $columns = ['purchase_price' => 'Beszerzési ár', 'exchange_rate' => 'Beszerzési árfolyam',
+        $columns = ['purchase_price' => 'Beszerzési ár', 'previous_season_purchase_price' => 'Előző évi beszerzési ár', 'exchange_rate' => 'Beszerzési árfolyam',
             'shipping_cost_percent' => 'Szállítás %', 'customs_percent' => 'Vám %', 'final_price' => 'Bekerülési HUF'];
         foreach ($this->overviewLists as $list) {
             foreach (app(PricingOverviewQuery::class)->columns($list) as $name => $column) {
@@ -111,6 +112,8 @@ class PricingProductOverview extends Page implements HasTable
         $query = $this->scopePricingProjectContext(PricingCalculationRow::query()->where('price_type', 'cost')->where('price_list_key', 0)
             ->whereHas('product', fn ($q) => $q->where('active', true))->with(['product.itemMainGroup', 'product.brand', 'color', 'supplier', 'purchaseCurrency', 'pricingProject']))
             ->select('pricing_calculation_rows.*');
+        app(RetailSeasonPurchasePriceComparison::class)->addColumns($query, $this->pricingSelectedProject?->season_id,
+            fields: ['previous_season_purchase_price', 'previous_season_purchase_currency']);
         $columns = [TextColumn::make('product.model_code')->label('Modell kód'), TextColumn::make('product.name_hu')->label('Modell név'),
             TextColumn::make('product.exclusivity')->label('Exkluzivitás'),
             TextColumn::make('product.itemMainGroup.name')->label('Főcsoport'), TextColumn::make('product.catalog_group_name_hu')->label('Katalóguscsoport'),
@@ -122,6 +125,13 @@ class PricingProductOverview extends Page implements HasTable
             $columns[] = TextColumn::make($name)->label($label)->numeric()->alignEnd()
                 ->formatStateUsing(fn ($state) => $this->formatPricingDecimal($state, $name));
         }
+        $columns[] = TextColumn::make('previous_season_purchase_price')->label('Előző évi beszerzési ár')->numeric()->alignEnd()->placeholder('—')
+            ->extraAttributes(['data-pricing-season-purchase-column' => true])
+            ->formatStateUsing(fn ($state, PricingCalculationRow $record) => $this->formatPricingDecimal($state, 'previous_season_purchase_price')
+                .(filled($record->previous_season_purchase_currency) ? ' '.$record->previous_season_purchase_currency : ''))
+            ->tooltip('A párosított termék legolcsóbb aktív beszerzési ajánlata, az előző azonos típusú szezon árfolyamán összehasonlítva. Hiányzó vagy nem egyértelmű pár, illetve vegyes pénznemnél hiányzó árfolyam esetén nincs érték.');
+        $columns[] = TextColumn::make('previous_season_purchase_currency')->label('Előző évi beszerzési ár pénzneme')
+            ->extraAttributes(['data-pricing-season-purchase-column' => true])->toggleable(isToggledHiddenByDefault: true);
         $expressions = [];
         foreach ($this->overviewLists as $list) {
             foreach (app(PricingOverviewQuery::class)->columns($list) as $name => $definition) {

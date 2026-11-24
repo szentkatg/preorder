@@ -288,11 +288,22 @@ class PricingDecimalPreferencesTest extends TestCase
         $this->assertSame(8.8, $mapped[2]);
         $this->assertSame(496.1299, $mapped[3]);
         $this->assertSame($formats, $export->columnFormats());
+        // The download now follows the actual column-manager selection, not
+        // the complete list that was captured when the table was configured.
+        $names = ['multiplier', 'product.model_code', 'purchase_price', 'final_price'];
+        $state = $page->instance()->tableColumns;
+        foreach ($state as &$column) {
+            $column['isToggled'] = in_array($column['name'], $names, true);
+        }
+        unset($column);
+        $keyed = array_column($state, null, 'name');
+        $page->call('applyTableColumnManager', [...array_map(fn ($name) => $keyed[$name], $names),
+            ...array_values(array_diff_key($keyed, array_flip($names)))], true);
         Excel::fake();
         $this->travelTo(now()->setTime(12, 0, 0));
         $page->callTableAction('exportExcel');
         Excel::assertDownloaded('pricing_calculation_rows-'.now()->format('Ymd-His').'.xlsx', function (AdminTableExport $export): bool {
-            return count($export->columnFormats()) === 3 && $export->query()->count() === 1;
+            return $export->columnFormats() === ['A' => '#,##0.00', 'C' => '#,##0.0000', 'D' => '#,##0'] && $export->query()->count() === 1;
         });
         $this->travelBack();
     }

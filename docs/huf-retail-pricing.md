@@ -999,6 +999,16 @@ git pull --ff-only
 
 ## Excel-export és tizedeselválasztó
 
+A közös **Exportálás Excelbe** művelet az export gomb megnyomásakor látható
+adatoszlopokat viszi a fájlba, az oszlopválasztóban alkalmazott sorrendben.
+A kikapcsolt, feltételesen rejtett és műveleti oszlopok kimaradnak. A szűrés
+és a sorbarendezés megmarad; az export továbbra is az összes szűrt sort,
+nem csak az aktuális lapot tartalmazza. A tizedesformátumok a ténylegesen
+exportált oszlopok helyéhez igazodnak. Minden adatoszlop kikapcsolásakor
+figyelmeztetés jelenik meg, fájl nem készül. Ez a közös exportot használó
+törzslistákra és kapcsolódó listákra is érvényes; a kötött ERP- és partnerárlista-
+exportok struktúráját nem változtatja meg.
+
 A közös admin-táblázat export a numerikus oszlopokat és a modell numerikus
 castjait valódi Excel-számcellaként menti, a kapcsolódó rekordok mezőit is.
 A kisker kalkuláció számított cél-beszerzési ára és kalkulációs szorzója is
@@ -1426,6 +1436,20 @@ git pull --ff-only
 ```
 
 ## Beszállítói oszlopok, alku-célár és átlagos szorzó
+
+### Előző évi beszerzési ár a teljes áráttekintésben
+
+A teljes áttekintésben **Előző évi beszerzési ár** is megjeleníthető, az eredeti
+pénznem kódjával együtt; a pénznem külön, alapból kikapcsolt oszlopként is elérhető.
+Forrása a párosított előző szezonbeli modell beszerzésiártörzsének legolcsóbb aktív
+ajánlata, az előző azonos típusú szezon árfolyamain összehasonlítva, ugyanúgy, mint
+a HUF kisker oldalon. A kézi párosítást és az azonos színkódot figyelembe veszi;
+modellajánlat minden színre érvényes lehet. Hiányzó/nem egyértelmű pár vagy nem
+összehasonlítható vegyes pénznemű ajánlatok esetén üres marad, nem nulla.
+Rendezhető, kereshető, tizedesjegyei állíthatók és Excelbe valódi számként kerül.
+A jelenlegi beszerzési ár továbbra is a kalkuláció eredeti **Beszerzési ár** mezője;
+külön aktuális-törzsár oszloppárt itt nem adunk hozzá. Az oszlop megtekintése nem
+módosít párosítást, beszerzési árat, kalkulációt vagy jóváhagyást.
 
 ### Cél beszerzési ár a teljes áráttekintésben
 

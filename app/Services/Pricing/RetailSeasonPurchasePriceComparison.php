@@ -27,16 +27,20 @@ class RetailSeasonPurchasePriceComparison
             ->select(self::FIELDS[$field]);
     }
 
-    public function addColumns(Builder $query, ?int $seasonId): Builder
+    /** @param array<string>|null $fields */
+    public function addColumns(Builder $query, ?int $seasonId, ?array $fields = null): Builder
     {
         if ($query->getQuery()->columns === null) {
             $query->select('pricing_calculation_rows.*');
         }
         $current = $this->currentOffer();
         $previous = $this->previousOffer($seasonId);
-        foreach (self::FIELDS as $field => $column) {
+        foreach ($fields ?? array_keys(self::FIELDS) as $field) {
+            if (! isset(self::FIELDS[$field])) {
+                throw new DomainException('Ismeretlen beszerzésiár-összehasonlító oszlop.');
+            }
             $offer = str_starts_with($field, 'current_') ? $current : $previous;
-            $query->selectSub((clone $offer)->select($column), $field);
+            $query->selectSub((clone $offer)->select(self::FIELDS[$field]), $field);
         }
 
         return $query;
