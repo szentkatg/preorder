@@ -151,10 +151,34 @@ function preorderReleaseTarget(string $target): array
     };
 }
 
-function preorderReleaseCheckPaths(array $paths): void
+function preorderAuditMigrationPath(): string
+{
+    return 'database/migrations/2026_11_26_090000_create_order_status_logs_table.php';
+}
+
+function preorderAuditMigrationValidate(string $contents): void
+{
+    syncGuard(hash('sha256', str_replace("\r\n", "\n", $contents)) === 'b315e15326a85730fdd853efa9adb6c58c0fee1cbfdc89cc12e6e783d7b2c168', 'Reviewed audit migration content changed');
+}
+
+function preorderAuditAddedRows(string $table, array $rows, array $existingIds, int $batch): void
+{
+    syncGuard(in_array($table, ['permissions', 'migrations'], true), 'Unsupported audit migration table');
+    $existingIds = array_map('strval', $existingIds);
+    $added = array_values(array_filter($rows, static fn ($row) => ! in_array((string) $row['id'], $existingIds, true)));
+    syncGuard(count($added) === 1, 'Unexpected added rows: '.$table);
+    syncGuard($table === 'permissions'
+        ? $added[0]['name'] === 'View:OrderStatusHistory' && $added[0]['guard_name'] === 'web'
+        : $added[0]['migration'] === basename(preorderAuditMigrationPath(), '.php') && (int) $added[0]['batch'] === $batch, 'Unexpected migration/permission addition');
+}
+
+function preorderReleaseCheckPaths(array $paths, bool $prepareOrderStatusAudit = false): void
 {
     foreach ($paths as $path) {
         syncGuard(is_string($path) && $path !== '' && ! str_contains($path, "\n"), 'Invalid changed path');
+        if ($prepareOrderStatusAudit && $path === preorderAuditMigrationPath()) {
+            continue;
+        }
         syncGuard(! preg_match('~^(?:\.env(?:$|\.)|public/(?:\.htaccess|error_log)$|composer\.(?:json|lock)$|package(?:-lock)?\.json$|yarn\.lock$|pnpm-lock\.|vite\.config\.|resources/(?:js|css)/|database/migrations/|infrastructure/(?:docker/|compose\.|docker-compose)|docker-compose|\.github/workflows/|\.gitmodules$|\.codex/|\.agents/)~', $path),
             'Requires separate schema/build/dependency/configuration preparation: '.$path);
     }
@@ -171,6 +195,7 @@ try {
     $expected = '__COMMIT__';
     $baseline = '__BASE_COMMIT__';
     $runId = '__RUN_ID__';
+    $prepareOrderStatusAudit = '__PREPARE_ORDER_STATUS_AUDIT__' === '1';
     $spec = preorderReleaseTarget($target);
     $nas = $target === 'Nas';
     $root = $spec['root'];
@@ -228,6 +253,11 @@ try {
         syncGuard($head === $expected && ! $app->isDownForMaintenance() && $pending === [], 'Installed version, maintenance or migrations not ready');
         config(['session.driver' => 'array', 'cache.default' => 'array']);
         $checks = [];
+        if ($prepareOrderStatusAudit) {
+            $db->query('SELECT id, order_id, event, occurred_at, email_status FROM order_status_logs LIMIT 0')->closeCursor();
+            syncGuard((int) $db->query("SELECT COUNT(*) FROM permissions WHERE name='View:OrderStatusHistory' AND guard_name='web'")->fetchColumn() === 1, 'Audit permission missing');
+            $checks[] = ['audit_schema_and_permission' => true];
+        }
         if ($nas) {
             $web = posix_getpwnam('www-data');
             syncGuard($web !== false, 'Missing web-worker account');
@@ -275,13 +305,31 @@ try {
         syncRead(['git', 'fetch', '--no-tags', 'origin', 'refs/heads/'.$spec['branch']], $root);
         syncGuard(syncRead(['git', 'rev-parse', 'FETCH_HEAD'], $root) === $expected, 'Published target changed');
         $changes = array_values(array_filter(explode("\n", syncRead(['git', 'diff', '--name-only', $baseline, $expected], $root))));
-        preorderReleaseCheckPaths($changes);
+        preorderReleaseCheckPaths($changes, $prepareOrderStatusAudit);
+        $prepareAudit = $prepareOrderStatusAudit && in_array(preorderAuditMigrationPath(), $changes, true);
+        $migrationPreparation = null;
+        if ($prepareAudit) {
+            preorderAuditMigrationValidate(syncRead(['git', 'show', $expected.':'.preorderAuditMigrationPath()], $root)."\n");
+            syncGuard(! in_array('order_status_logs', $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN), true), 'Audit table already exists; review baseline');
+            syncGuard((int) $db->query("SELECT COUNT(*) FROM permissions WHERE name='View:OrderStatusHistory' AND guard_name='web'")->fetchColumn() === 0, 'Audit permission already exists; review baseline');
+            $migrationPreparation = [
+                'permissions' => $db->query('SELECT id FROM permissions ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+                'migrations' => $db->query('SELECT id FROM migrations ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+                'batch' => (int) $db->query('SELECT MAX(batch) FROM migrations')->fetchColumn() + 1,
+            ];
+        }
         if (! is_dir($auditRoot)) {
             syncGuard(mkdir($auditRoot, 0700, true), 'Cannot create private audit root');
         }
         syncGuard(! is_link($auditRoot) && mkdir($audit, 0700), 'Cannot create private release audit');
         syncRun([$php, 'artisan', 'down', '--retry=30', '--no-interaction'], 'maintenance-down', $root, $audit);
         $releaseOwnsMaintenance = true;
+        if ($migrationPreparation !== null) {
+            foreach (['permissions', 'migrations'] as $table) {
+                $migrationPreparation[$table] = $db->query('SELECT id FROM `'.$table.'` ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
+            }
+            $migrationPreparation['batch'] = (int) $db->query('SELECT MAX(batch) FROM migrations')->fetchColumn() + 1;
+        }
         $volatile = ['cache', 'cache_locks', 'sessions', 'jobs', 'job_batches', 'failed_jobs', 'password_reset_tokens', 'imports', 'exports', 'failed_import_rows'];
         $fingerprints = [];
         foreach ($db->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME")->fetchAll(PDO::FETCH_COLUMN) as $table) {
@@ -302,6 +350,8 @@ try {
             }
         }
         $before = ['head' => $head, 'target' => $expected, 'fingerprints' => $fingerprints, 'view_definitions' => $views,
+            'migration_preparation' => $migrationPreparation,
+            'tables' => $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN),
             'env_sha256' => hash_file('sha256', $root.'/.env'), 'htaccess_sha256' => hash_file('sha256', $root.'/public/.htaccess'),
             'production_head' => $nas ? null : syncRead(['git', 'rev-parse', 'HEAD'], '/home/szeganet/preorder-production-git')];
         syncWrite($audit.'/before.json', json_encode($before, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
@@ -314,12 +364,21 @@ try {
     syncGuard(is_file($audit.'/before.json') && is_file($audit.'/backup.json'), 'Verified backup is required');
     $before = json_decode(file_get_contents($audit.'/before.json'), true, flags: JSON_THROW_ON_ERROR);
     syncGuard($before['target'] === $expected && $before['head'] === $baseline, 'Backup does not match this release');
+    $migrationPreparation = $before['migration_preparation'] ?? null;
+    syncGuard($migrationPreparation === null || $prepareOrderStatusAudit, 'This release requires the explicit audit migration option');
     if ($mode === 'deploy') {
         syncGuard($head === $baseline && $app->isDownForMaintenance(), 'Server changed after backup');
         syncGuard(syncRead(['git', 'rev-parse', 'FETCH_HEAD'], $root) === $expected, 'Fetched target changed');
-        preorderReleaseCheckPaths(array_values(array_filter(explode("\n", syncRead(['git', 'diff', '--name-only', $baseline, $expected], $root)))));
+        preorderReleaseCheckPaths(array_values(array_filter(explode("\n", syncRead(['git', 'diff', '--name-only', $baseline, $expected], $root)))), $prepareOrderStatusAudit);
+        if ($migrationPreparation !== null) {
+            preorderAuditMigrationValidate(syncRead(['git', 'show', $expected.':'.preorderAuditMigrationPath()], $root)."\n");
+        }
         syncRun(['git', 'merge', '--ff-only', $expected], 'fast-forward', $root, $audit);
         syncRun([$php, 'artisan', 'optimize:clear', '--no-interaction'], 'optimize-clear', $root, $audit);
+        if ($migrationPreparation !== null) {
+            preorderAuditMigrationValidate(file_get_contents($root.'/'.preorderAuditMigrationPath()));
+            syncRun([$php, 'artisan', 'migrate', '--path='.preorderAuditMigrationPath(), '--force', '--no-interaction'], 'audit-migration', $root, $audit);
+        }
         if (array_key_exists('filament:optimize-clear', Artisan::all())) {
             syncRun([$php, 'artisan', 'filament:optimize-clear', '--no-interaction'], 'filament-clear', $root, $audit);
         }
@@ -335,7 +394,22 @@ try {
         syncGuard(syncRead(['git', 'rev-parse', 'HEAD'], '/home/szeganet/preorder-production-git') === $before['production_head'], 'Production code changed during staging release');
     }
     foreach ($before['fingerprints'] as $table => $fingerprint) {
-        syncGuard(syncFingerprint($db, $table, null, $fingerprint['columns']) === $fingerprint, 'Existing data changed: '.$table);
+        $ids = $migrationPreparation[$table] ?? null;
+        // Empty old tables still need an empty-set fingerprint (never WHERE id IN ()).
+        $actual = $ids === [] ? ['rows' => 0, 'sha256' => hash('sha256', ''), 'columns' => $fingerprint['columns']]
+            : syncFingerprint($db, $table, $ids, $fingerprint['columns']);
+        syncGuard($actual === $fingerprint, 'Existing data changed: '.$table);
+    }
+    if ($migrationPreparation !== null) {
+        foreach (['permissions', 'migrations'] as $table) {
+            $rows = $db->query('SELECT * FROM `'.$table.'` ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+            preorderAuditAddedRows($table, $rows, $migrationPreparation[$table], $migrationPreparation['batch']);
+        }
+        $expectedTables = [...$before['tables'], 'order_status_logs'];
+        $actualTables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+        sort($expectedTables);
+        sort($actualTables);
+        syncGuard($expectedTables === $actualTables && (int) $db->query('SELECT COUNT(*) FROM order_status_logs')->fetchColumn() === 0, 'Unexpected schema or initial audit data');
     }
     foreach ($before['view_definitions'] as $view => $definition) {
         $quoted = chr(96).str_replace(chr(96), chr(96).chr(96), $view).chr(96);

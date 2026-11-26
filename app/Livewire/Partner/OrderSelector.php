@@ -987,14 +987,8 @@ class OrderSelector extends Component
 
         abort_unless($order instanceof Order, 403);
 
-        if (! $order->isSubmitted()) {
-            return;
-        }
-
-        $order->update([
-            'status' => 'draft',
-            'submitted_at' => null,
-        ]);
+        app(OrderSubmissionService::class)->reopen((int) $order->id);
+        $order->refresh();
         $this->dispatch('order-summary-changed');
         $this->dispatch('$refresh');
     }

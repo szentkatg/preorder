@@ -56,6 +56,8 @@ class DatabaseMigrationTest extends TestCase
         $this->assertTrue(Schema::hasTable('order_types'));
         $this->assertTrue(Schema::hasColumns('sku_replacements', ['season_id', 'old_sku_code', 'new_sku_code']));
         $this->assertTrue(Schema::hasTable('order_share_links'));
+        $this->assertTrue(Schema::hasColumns('order_status_logs', ['order_id', 'reference_number', 'partner_user_id', 'ip_address',
+            'event', 'source', 'from_status', 'to_status', 'occurred_at', 'email_requested', 'email_status']));
         $this->assertTrue(Schema::hasColumns('login_logs', ['guard', 'user_id', 'user_name', 'user_email', 'ip_address', 'logged_in_at']));
         $this->assertTrue(Schema::hasTable('pricing_projects'));
         $this->assertTrue(Schema::hasColumns('pricing_projects', ['closed_at', 'closed_by']));

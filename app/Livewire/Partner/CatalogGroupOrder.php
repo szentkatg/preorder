@@ -16,6 +16,7 @@ use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Sku;
 use App\Services\Partner\OrderSharePriceLists;
+use App\Services\Partner\OrderSubmissionService;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -89,6 +90,28 @@ class CatalogGroupOrder extends Component
     public int $shareExpiresInDays = 14;
 
     public ?string $generatedShareUrl = null;
+
+    public function getCanReopenOrderProperty(): bool
+    {
+        if ($this->sharedMode || ! $this->order->isSubmitted()) {
+            return false;
+        }
+        $user = PartnerUser::find(auth('partner')->id());
+
+        return $user?->active && $user->role === PartnerUser::ROLE_SALES_REP;
+    }
+
+    public function resetOrderToDraft(): void
+    {
+        abort_if($this->sharedMode, 403);
+        app(OrderSubmissionService::class)->reopen((int) $this->order->id);
+        $this->order->refresh();
+        $this->pieceQuantities = [];
+        $this->assortmentQuantities = [];
+        $this->loadExistingQuantities();
+        $this->matrixGroupsCache = null;
+        $this->dispatch('order-summary-changed');
+    }
 
     public function deleteOrder(): void
     {

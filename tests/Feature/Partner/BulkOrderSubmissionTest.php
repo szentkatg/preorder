@@ -13,6 +13,7 @@ use App\Models\ItemMainGroup;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSheetType;
+use App\Models\OrderStatusLog;
 use App\Models\Partner;
 use App\Models\PartnerAddress;
 use App\Models\PartnerUser;
@@ -24,8 +25,10 @@ use App\Models\Size;
 use App\Models\Sku;
 use App\Services\Partner\OrderSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -239,6 +242,144 @@ class BulkOrderSubmissionTest extends TestCase
         $this->assertSame(['submitted' => false, 'email_failed' => false], $service->submit($this->orders['first']->id, sendEmail: false));
         $this->assertSame([], $this->messages);
         $this->assertSame(0, $this->excelExportCount);
+    }
+
+    #[DataProvider('emailChoices')]
+    public function test_submission_audit_keeps_identity_ip_status_and_email_choice(bool $sendEmail): void
+    {
+        $this->freezeTime();
+        $this->app->instance('request', Request::create('/partner/test', 'POST', server: [
+            'REMOTE_ADDR' => '2001:db8::123', 'HTTP_X_FORWARDED_FOR' => '203.0.113.99',
+            'HTTP_AUTHORIZATION' => 'Bearer do-not-record-this',
+        ]));
+        app(OrderSubmissionService::class)->submit($this->orders['first']->id, sendEmail: $sendEmail);
+        $this->assertDatabaseCount('order_status_logs', 1);
+        $entry = OrderStatusLog::firstOrFail();
+        $this->assertSame($this->orders['first']->id, $entry->order_id);
+        $this->assertSame('REF-first', $entry->reference_number);
+        $this->assertSame('P01', $entry->partner_code);
+        $this->assertSame('Partner', $entry->partner_name);
+        $this->assertSame('A01', $entry->address_code);
+        $this->assertSame('W27', $entry->season_code);
+        $this->assertSame($this->user->id, $entry->partner_user_id);
+        $this->assertSame('Partner user', $entry->user_name);
+        $this->assertSame('user@example.test', $entry->user_email);
+        $this->assertSame('2001:db8::123', $entry->ip_address);
+        $this->assertSame('submitted', $entry->event);
+        $this->assertSame('single', $entry->source);
+        $this->assertSame('draft', $entry->from_status);
+        $this->assertSame('submitted', $entry->to_status);
+        $this->assertSame(now()->utc()->format('Y-m-d H:i:s'), $entry->occurred_at->format('Y-m-d H:i:s'));
+        $this->assertSame($sendEmail, $entry->email_requested);
+        $this->assertSame($sendEmail ? 'sent' : 'not_requested', $entry->email_status);
+        $sendEmail ? $this->assertNotNull($entry->email_finished_at) : $this->assertNull($entry->email_finished_at);
+        $this->assertStringNotContainsString('do-not-record-this', $entry->toJson());
+    }
+
+    public function test_bulk_audit_records_only_real_transitions_and_labels_the_source(): void
+    {
+        $this->page()->call('openBulkSubmission')->set('sendConfirmationEmail', false)->call('startBulkSubmission')->call('processBulkSubmission');
+        $this->assertDatabaseCount('order_status_logs', 2);
+        $this->assertSame(['REF-first', 'REF-second'], OrderStatusLog::orderBy('id')->pluck('reference_number')->all());
+        $this->assertSame(['bulk'], OrderStatusLog::distinct()->pluck('source')->all());
+        $this->assertSame(['not_requested'], OrderStatusLog::distinct()->pluck('email_status')->all());
+        $this->assertSame(['draft', 'editing'], OrderStatusLog::orderBy('id')->pluck('from_status')->all());
+        app(OrderSubmissionService::class)->submit($this->orders['first']->id);
+        $this->assertDatabaseCount('order_status_logs', 2);
+    }
+
+    public function test_reopening_preserves_history_across_resubmission_and_later_deletion(): void
+    {
+        $service = app(OrderSubmissionService::class);
+        $order = $this->orders['first'];
+        $service->submit($order->id, sendEmail: false);
+        $service->reopen($order->id);
+        $service->reopen($order->id);
+        $service->submit($order->id);
+        $this->assertSame(['submitted', 'reopened', 'submitted'], OrderStatusLog::orderBy('id')->pluck('event')->all());
+        $entry = OrderStatusLog::where('event', 'reopened')->firstOrFail();
+        $this->assertSame('submitted', $entry->from_status);
+        $this->assertSame('draft', $entry->to_status);
+        $this->assertFalse($entry->email_requested);
+        $this->assertSame('not_applicable', $entry->email_status);
+        $this->assertNull($entry->email_finished_at);
+        $this->user->update(['name' => 'Changed name', 'email' => 'changed@example.test']);
+        $this->user->delete();
+        $order->items()->delete();
+        $order->delete();
+        $this->assertDatabaseCount('order_status_logs', 3);
+        $this->assertSame('Partner user', $entry->fresh()->user_name);
+        $this->assertSame('user@example.test', $entry->fresh()->user_email);
+        $this->assertSame('REF-first', $entry->fresh()->reference_number);
+    }
+
+    public function test_email_failure_is_recorded_without_saving_exception_messages(): void
+    {
+        $this->mailFails = true;
+        app(OrderSubmissionService::class)->submit($this->orders['first']->id);
+        $entry = OrderStatusLog::firstOrFail();
+        $this->assertSame('failed', $entry->email_status);
+        $this->assertSame(RuntimeException::class, $entry->email_error_type);
+        $this->assertNotNull($entry->email_finished_at);
+        $this->assertStringNotContainsString('Mail unavailable', $entry->toJson());
+        $this->assertSame('submitted', $this->orders['first']->fresh()->status);
+    }
+
+    public function test_invalid_ip_is_not_saved_and_missing_recipient_has_an_explicit_outcome(): void
+    {
+        $this->app->instance('request', Request::create('/partner/test', server: ['REMOTE_ADDR' => 'not-an-ip']));
+        $this->user->update(['email' => '']);
+        $result = app(OrderSubmissionService::class)->submit($this->orders['first']->id);
+        $entry = OrderStatusLog::firstOrFail();
+        $this->assertNull($entry->ip_address);
+        $this->assertSame('no_recipient', $entry->email_status);
+        $this->assertTrue($result['email_failed']);
+        $this->assertSame(0, $this->excelExportCount);
+        $this->assertSame([], $this->messages);
+    }
+
+    public function test_failed_audit_insert_rolls_back_submission_and_does_not_send_mail(): void
+    {
+        OrderStatusLog::creating(fn () => throw new RuntimeException('Audit unavailable'));
+        try {
+            app(OrderSubmissionService::class)->submit($this->orders['first']->id);
+            $this->fail('Submission must not proceed without its audit record');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Audit unavailable', $error->getMessage());
+        }
+        $this->assertSame('draft', $this->orders['first']->fresh()->status);
+        $this->assertNull($this->orders['first']->fresh()->submitted_at);
+        $this->assertDatabaseCount('order_status_logs', 0);
+        $this->assertSame([], $this->messages);
+    }
+
+    public function test_failed_audit_insert_also_rolls_back_reopening(): void
+    {
+        $order = $this->orders['submitted'];
+        $oldTimestamp = $order->submitted_at;
+        OrderStatusLog::creating(fn () => throw new RuntimeException('Audit unavailable'));
+        try {
+            app(OrderSubmissionService::class)->reopen($order->id);
+            $this->fail('Reopening must not proceed without its audit record');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Audit unavailable', $error->getMessage());
+        }
+        $this->assertSame('submitted', $order->fresh()->status);
+        $this->assertEquals($oldTimestamp, $order->fresh()->submitted_at);
+        $this->assertDatabaseCount('order_status_logs', 0);
+    }
+
+    public function test_failed_email_audit_update_keeps_unknown_outcome_without_mislabeling_sent_mail(): void
+    {
+        OrderStatusLog::updating(fn () => throw new RuntimeException('Audit update unavailable'));
+        Log::shouldReceive('error')->once()->with('Order email audit result persistence failed', \Mockery::on(fn ($context) => array_keys($context) === ['audit_id', 'order_id', 'exception_type']));
+        $result = app(OrderSubmissionService::class)->submit($this->orders['first']->id);
+        $this->assertFalse($result['email_failed']);
+        $this->assertCount(1, $this->messages);
+        $entry = OrderStatusLog::firstOrFail();
+        $this->assertSame('pending', $entry->email_status);
+        $this->assertNull($entry->email_finished_at);
+        $this->assertSame('submitted', $this->orders['first']->fresh()->status);
     }
 
     public function test_empty_selection_has_a_clear_validation_message(): void

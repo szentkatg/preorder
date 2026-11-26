@@ -40,15 +40,6 @@
                         >
                             {{ __('partner.submit_order') }}
                         </button>
-                    @elseif ($this->isSalesRep)
-                        <button
-                            type="button"
-                            wire:click="resetSelectedOrderToDraft"
-                            wire:confirm="{{ __('partner.confirm_reset_order_to_draft') }}"
-                            class="rounded bg-yellow-600 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-500"
-                        >
-                            {{ __('partner.reset_order_to_draft') }}
-                        </button>
                     @endif
                 </div>
             </div>

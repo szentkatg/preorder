@@ -36,9 +36,11 @@ use App\Services\Partner\PartnerPortalNotice;
 use App\Services\Partner\PartnerSeasonContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Facades\Excel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -576,13 +578,100 @@ class PartnerSeasonContextTest extends TestCase
         $order = $this->orders[$this->season->id];
         $order->update(['status' => 'submitted']);
         $overview = Livewire::test(OrderOverview::class, ['order' => $order->id])->assertSuccessful();
+        $overview->assertDontSeeHtml('wire:click="resetSelectedOrderToDraft"');
+        $sheet = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])->assertSuccessful();
         if ($role === 'sales_rep') {
-            $overview->assertSeeHtml('wire:click="resetSelectedOrderToDraft"')->call('resetSelectedOrderToDraft');
+            $sheet->assertSeeHtml('wire:click="resetOrderToDraft"')->call('resetOrderToDraft')
+                ->assertDontSeeHtml('data-order-reopen');
             $this->assertSame('draft', $order->fresh()->status);
         } else {
             $overview->assertDontSeeHtml('wire:click="resetSelectedOrderToDraft"')->call('resetSelectedOrderToDraft')->assertForbidden();
+            $sheet->assertDontSeeHtml('wire:click="resetOrderToDraft"')->call('resetOrderToDraft')->assertForbidden();
             $this->assertSame('submitted', $order->fresh()->status);
         }
+    }
+
+    #[DataProvider('reopenLanguages')]
+    public function test_sheet_header_reopens_without_changing_order_lines_or_sending_email(string $locale, string $label): void
+    {
+        session(['partner.locale' => $locale, 'partner.language_id' => Language::where('code', strtoupper($locale))->value('id')]);
+        $order = $this->orders[$this->season->id];
+        $order->update(['status' => 'submitted', 'submitted_at' => now()->subDay()]);
+        $beforeItems = $order->items()->get()->toArray();
+        Mail::shouldReceive('raw')->never();
+        Excel::shouldReceive('raw')->never();
+        $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])
+            ->assertSee($label)->assertSeeHtml('data-order-reopen')
+            ->assertSeeHtml('wire:confirm="'.e(__('partner.confirm_reset_order_to_draft')).'"');
+        $this->assertMatchesRegularExpression('/data-order-navigation[\s\S]*data-order-reopen[\s\S]*data-order-reference-number/', $page->html());
+        $page->call('resetOrderToDraft')->assertSet('order.status', 'draft')->assertDontSeeHtml('data-order-reopen')
+            ->assertDispatched('order-summary-changed');
+        $this->assertNull($order->fresh()->submitted_at);
+        $this->assertSame($beforeItems, $order->items()->get()->toArray());
+        $page->call('savePieceQuantity', $this->skus[$this->season->id]->id, 3);
+        $this->assertEquals(3, $order->items()->first()->quantity);
+    }
+
+    public static function reopenLanguages(): array
+    {
+        return [['hu', 'Visszaállítás piszkozatba'], ['en', 'Reset to draft']];
+    }
+
+    #[DataProvider('reopenAccessRevocations')]
+    public function test_sheet_reopen_rechecks_activity_role_and_address_access(string $change): void
+    {
+        $order = $this->orders[$this->season->id];
+        $order->update(['status' => 'submitted', 'submitted_at' => now()->subDay()]);
+        $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags']);
+        if ($change === 'inactive') {
+            PartnerUser::whereKey($this->user->id)->update(['active' => false]);
+        } elseif ($change === 'role') {
+            PartnerUser::whereKey($this->user->id)->update(['role' => 'partner_admin']);
+        } else {
+            $this->user->partners()->detach();
+            $this->user->addresses()->detach();
+        }
+        $page->call('resetOrderToDraft')->assertForbidden();
+        $this->assertSame('submitted', $order->fresh()->status);
+        $this->assertNotNull($order->fresh()->submitted_at);
+    }
+
+    public static function reopenAccessRevocations(): array
+    {
+        return [['inactive'], ['role'], ['address']];
+    }
+
+    public function test_stale_season_tab_cannot_reopen_an_order(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $order->update(['status' => 'submitted']);
+        $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags']);
+        session([PartnerSeasonContext::SESSION_KEY => $this->other->id]);
+        $page->call('resetOrderToDraft')->assertNotFound();
+        $this->assertSame('submitted', $order->fresh()->status);
+    }
+
+    public function test_draft_order_has_no_reopen_button_and_repeating_reopen_is_a_no_op(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $before = $order->fresh()->toArray();
+        Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])
+            ->assertDontSeeHtml('data-order-reopen')->call('resetOrderToDraft');
+        $this->assertSame($before, $order->fresh()->toArray());
+    }
+
+    public function test_shared_link_cannot_reopen_even_when_a_sales_rep_is_logged_in(): void
+    {
+        $order = $this->orders[$this->season->id];
+        $share = OrderShareLink::create(['order_id' => $order->id, 'token' => str_repeat('r', 64),
+            'price_list_id' => $order->price_list_id, 'expires_at' => now()->addDay(), 'created_by_partner_user_id' => $this->user->id]);
+        $page = Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $share, 'catalogGroupName' => 'Bags'])
+            ->assertDontSeeHtml('data-order-reopen');
+        $page->call('resetOrderToDraft')->assertForbidden();
+        $this->assertSame('draft', $order->fresh()->status);
+        $order->update(['status' => 'submitted']);
+        Livewire::test(SharedCatalogGroupOrder::class, ['shareLink' => $share, 'catalogGroupName' => 'Bags'])->assertNotFound();
+        $this->assertSame('submitted', $order->fresh()->status);
     }
 
     public function test_address_type_permissions_restrict_choices_and_update_when_switching_addresses(): void

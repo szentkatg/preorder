@@ -32,29 +32,40 @@ class OrderSubmissionService
     }
 
     /** @return array{submitted: bool, email_failed: bool} */
-    public function submit(int $orderId, bool $sendEmail = true): array
+    public function submit(int $orderId, bool $sendEmail = true, string $source = 'single'): array
     {
         $user = $this->user();
-        $order = DB::transaction(function () use ($user, $orderId): ?Order {
+        abort_unless(in_array($source, ['single', 'bulk'], true), 422);
+        $recorder = app(OrderStatusAuditRecorder::class);
+        $transition = DB::transaction(function () use ($user, $orderId, $sendEmail, $source, $recorder): ?array {
             $order = $user->accessibleOrdersQuery()->whereKey($orderId)
                 ->where('season_id', PartnerSeasonContext::id())->lockForUpdate()->first();
             abort_unless($order instanceof Order, 403);
             if ($order->isSubmitted()) {
                 return null;
             }
+            $before = $order->status;
             $order->update(['status' => 'submitted', 'submitted_at' => now()]);
+            $entry = $recorder->transition($order, $user, $before, 'submitted', $sendEmail, $source);
 
-            return $order;
+            return [$order, $entry];
         });
-        if (! $order) {
+        if (! $transition) {
             return ['submitted' => false, 'email_failed' => false];
         }
+        [$order, $entry] = $transition;
         if (! $sendEmail) {
             return ['submitted' => true, 'email_failed' => false];
+        }
+        if (! $user->email) {
+            $recorder->emailResult($entry, 'no_recipient');
+
+            return ['submitted' => true, 'email_failed' => true];
         }
         try {
             $this->sendConfirmation($order, $user);
         } catch (Throwable $error) {
+            $recorder->emailResult($entry, 'failed', $error::class);
             // Submission succeeded: never revert it or resend blindly after a transport failure.
             Log::error('Order submission confirmation failed', [
                 'order_id' => $order->id, 'partner_user_id' => $user->id, 'exception_type' => $error::class,
@@ -62,8 +73,28 @@ class OrderSubmissionService
 
             return ['submitted' => true, 'email_failed' => true];
         }
+        $recorder->emailResult($entry, 'sent');
 
         return ['submitted' => true, 'email_failed' => false];
+    }
+
+    public function reopen(int $orderId): Order
+    {
+        $user = $this->user();
+        abort_unless($user->role === PartnerUser::ROLE_SALES_REP, 403);
+
+        return DB::transaction(function () use ($user, $orderId): Order {
+            $order = $user->accessibleOrdersQuery()->whereKey($orderId)
+                ->where('season_id', PartnerSeasonContext::id())->lockForUpdate()->first();
+            abort_unless($order instanceof Order, 403);
+            if ($order->isSubmitted()) {
+                $before = $order->status;
+                $order->update(['status' => 'draft', 'submitted_at' => null]);
+                app(OrderStatusAuditRecorder::class)->transition($order, $user, $before, 'reopened', false, 'single');
+            }
+
+            return $order;
+        });
     }
 
     private function user(): PartnerUser

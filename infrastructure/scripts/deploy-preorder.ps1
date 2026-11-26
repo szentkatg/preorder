@@ -3,6 +3,7 @@ param(
     [ValidateSet('Both', 'Nas', 'Staging')][string] $Target = 'Both',
     [ValidateSet('Check', 'Deploy', 'Resume')][string] $Mode = 'Check',
     [switch] $Publish,
+    [switch] $PrepareOrderStatusAudit,
     [string] $RunId
 )
 
@@ -23,6 +24,7 @@ function Invoke-ReleaseGit {
 function Assert-ReleasePaths {
     param([string[]] $Paths)
     foreach ($path in $Paths) {
+        if ($PrepareOrderStatusAudit -and $path -ceq 'database/migrations/2026_11_26_090000_create_order_status_logs_table.php') { continue }
         if ($path -match '^(?:\.env(?:$|\.)|public/(?:\.htaccess|error_log)$|composer\.(?:json|lock)$|package(?:-lock)?\.json$|yarn\.lock$|pnpm-lock\.|vite\.config\.|resources/(?:js|css)/|database/migrations/|infrastructure/(?:docker/|compose\.|docker-compose)|docker-compose|\.github/workflows/|\.gitmodules$|\.codex/|\.agents/)') {
             throw "Separate schema/build/dependency/configuration preparation required: $path. No maintenance has started."
         }
@@ -37,7 +39,8 @@ function Invoke-ReleaseRemote {
     )
     if ($Baseline -notmatch '^[a-f0-9]{40}$') { throw 'Invalid remote baseline' }
     $code = $releaseTemplate.Replace('__TARGET__', $Environment).Replace('__MODE__', $Operation).
-        Replace('__COMMIT__', $releaseCommit).Replace('__BASE_COMMIT__', $Baseline).Replace('__RUN_ID__', $RunId)
+        Replace('__COMMIT__', $releaseCommit).Replace('__BASE_COMMIT__', $Baseline).Replace('__RUN_ID__', $RunId).
+        Replace('__PREPARE_ORDER_STATUS_AUDIT__', $(if ($PrepareOrderStatusAudit) { '1' } else { '0' }))
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($code))
     $evaluation = "eval(substr(base64_decode('$encoded'), 5));"
     $remoteCommand = if ($Environment -eq 'Nas') {
@@ -95,6 +98,13 @@ try {
     $dirty = Invoke-ReleaseGit -Arguments @('status', '--porcelain', '--untracked-files=all')
     if ($dirty -and $Mode -eq 'Deploy') { throw 'Commit the reviewed local changes first. This command never creates a commit or discards files.' }
     if ($dirty -and $Mode -eq 'Check') { Write-Warning 'Local changes exist. Check describes committed HEAD only; nothing will be deployed.' }
+    if ($PrepareOrderStatusAudit) {
+        $migrationText = [IO.File]::ReadAllText((Join-Path $releaseRoot 'database/migrations/2026_11_26_090000_create_order_status_logs_table.php')).Replace("`r`n", "`n")
+        $migrationHasher = [Security.Cryptography.SHA256]::Create()
+        try { $migrationHash = [BitConverter]::ToString($migrationHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($migrationText))).Replace('-', '').ToLowerInvariant() }
+        finally { $migrationHasher.Dispose() }
+        if ($migrationHash -ne 'b315e15326a85730fdd853efa9adb6c58c0fee1cbfdc89cc12e6e783d7b2c168') { throw 'The reviewed audit migration content changed; no maintenance has started.' }
+    }
     Write-Host "Preorder $Mode | $Target | $($releaseCommit.Substring(0, 7)) | RunId: $RunId"
     $states = @{}
     foreach ($environment in $releaseTargets) {

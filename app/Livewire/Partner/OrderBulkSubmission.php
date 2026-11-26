@@ -85,7 +85,7 @@ class OrderBulkSubmission extends Component
         $index = $this->bulkSubmission['position'];
         $entry = $this->bulkSubmission['orders'][$index];
         try {
-            $result = app(OrderSubmissionService::class)->submit($entry['id'], sendEmail: $this->bulkSubmission['send_email'] ?? true);
+            $result = app(OrderSubmissionService::class)->submit($entry['id'], sendEmail: $this->bulkSubmission['send_email'] ?? true, source: 'bulk');
             $this->bulkSubmission[$result['submitted'] ? 'submitted' : 'skipped']++;
             if ($result['email_failed']) {
                 $this->bulkSubmission['email_failed'][] = $entry['reference'];

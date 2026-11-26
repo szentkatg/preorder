@@ -57,6 +57,23 @@ környezetkonfiguráció-változás előtt a parancs megáll. Ezek külön ellen
 előkészítést igényelnek; a script nem futtat önállóan migrációt vagy Composert.
 Különleges kiadáshoz sem használunk automatikusan új nevű ideiglenes telepítőt.
 
+### Ellenőrzött rendelési napló migrációja
+
+A 2026.11.26-i kiadás külön előkészített kivétel, nem általános migrációengedély:
+
+```powershell
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-preorder.ps1 -Target Both -Mode Deploy -Publish -PrepareOrderStatusAudit
+```
+
+Ez a kapcsoló kizárólag a `2026_11_26_090000_create_order_status_logs_table.php`
+nevű, SHA-256 lenyomattal rögzített migrációt engedi át. Más migráció vagy a
+jóváhagyott fájl megváltoztatása továbbra is megállítja a kiadást. A mentés után,
+maintenance alatt csak ezzel a konkrét `--path` értékkel fut a migráció. A meglévő
+adatok teljes lenyomata változatlan kell maradjon; csak egy új migrációs sor,
+egy `View:OrderStatusHistory` / `web` jogosultság és az üres `order_status_logs`
+tábla jelenhet meg. Nem módosít szerepkör-hozzárendeléseket. A Resume ugyanehhez
+a kiadáshoz szintén igényli a `-PrepareOrderStatusAudit` kapcsolót.
+
 A mentés helyét és az egyedi RunId-t a futás kiírja. A naplók és mentések
 privátak: NAS-on `storage/app/private/release-audit`, teszten a release-mappák
 melletti `.release-audit` könyvtárban. Nincs automatikus adatbázis-visszaállítás.
