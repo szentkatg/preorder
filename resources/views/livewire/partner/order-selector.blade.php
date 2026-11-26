@@ -1,6 +1,17 @@
-<div class="w-full min-w-0 max-w-none p-6">
+<div class="w-full min-w-0 max-w-none p-6" data-order-tabs
+    x-data="{
+        activeTab: 'selection',
+        summaryOpened: false,
+        selectTab(tab) {
+            if (! ['selection', 'summary'].includes(tab) || this.activeTab === tab) return;
+            this.activeTab = tab;
+            if (tab === 'summary' && ! this.summaryOpened) {
+                this.summaryOpened = true;
+                this.$dispatch('order-summary-tab-opened');
+            }
+        }
+    }">
     <div
-        x-data="{ open: true }"
         class="sticky top-0 z-50 -mx-6 bg-gray-100 px-6 pb-2 pt-6"
     >
         <div class="grid grid-cols-1 gap-3 rounded-lg border bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
@@ -23,7 +34,7 @@
             </div>
 
             <div class="min-w-0 space-y-2">
-                <h1 class="text-center text-2xl font-bold">{{ __('partner.order_selection') }}</h1>
+                <h1 class="text-center text-2xl font-bold">{{ __('partner.orders_workspace') }}</h1>
                 <x-partner-season-banner :season="$this->selectedSeason" />
             </div>
 
@@ -53,42 +64,46 @@
                     </button>
                 </form>
 
-                <button
-                    type="button"
-                    @click="open = ! open"
-                    :aria-expanded="open"
-                    aria-controls="order-selector-controls"
-                    aria-label="{{ __('partner.toggle_section') }}"
-                    title="{{ __('partner.toggle_section') }}"
-                    class="rounded border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        class="h-5 w-5 transition-transform"
-                        :class="{ 'rotate-180': ! open }"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                        />
-                    </svg>
-                </button>
             </div>
         </div>
 
-        <div id="order-selector-controls" x-show="open">
-            <div class="h-2"></div>
-
-            @include('livewire.partner.partials.order-selector-form')
+        <div role="tablist" aria-label="{{ __('partner.order_sections') }}"
+            class="mt-2 flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 shadow-sm">
+            <button type="button" role="tab" id="order-selection-tab" x-ref="selectionTab"
+                aria-controls="order-selection-panel" aria-selected="true" tabindex="0"
+                :aria-selected="activeTab === 'selection'" :tabindex="activeTab === 'selection' ? 0 : -1"
+                @click="selectTab('selection')"
+                @keydown.arrow-right.prevent="selectTab('summary'); $refs.summaryTab.focus()"
+                @keydown.arrow-left.prevent="selectTab('summary'); $refs.summaryTab.focus()"
+                @keydown.home.prevent="selectTab('selection'); $refs.selectionTab.focus()"
+                @keydown.end.prevent="selectTab('summary'); $refs.summaryTab.focus()"
+                :class="activeTab === 'selection' ? 'bg-sky-100 text-sky-950 border-sky-400' : 'bg-white text-gray-600 border-transparent hover:bg-gray-50'"
+                class="flex-1 whitespace-nowrap rounded-md border px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
+                {{ __('partner.order_selection') }}
+            </button>
+            <button type="button" role="tab" id="order-summary-tab" x-ref="summaryTab"
+                aria-controls="order-summary-panel" aria-selected="false" tabindex="-1"
+                :aria-selected="activeTab === 'summary'" :tabindex="activeTab === 'summary' ? 0 : -1"
+                @click="selectTab('summary')"
+                @keydown.arrow-right.prevent="selectTab('selection'); $refs.selectionTab.focus()"
+                @keydown.arrow-left.prevent="selectTab('selection'); $refs.selectionTab.focus()"
+                @keydown.home.prevent="selectTab('selection'); $refs.selectionTab.focus()"
+                @keydown.end.prevent="selectTab('summary'); $refs.summaryTab.focus()"
+                :class="activeTab === 'summary' ? 'bg-sky-100 text-sky-950 border-sky-400' : 'bg-white text-gray-600 border-transparent hover:bg-gray-50'"
+                class="flex-1 whitespace-nowrap rounded-md border px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
+                {{ __('partner.sales_rep_summary') }}
+            </button>
         </div>
     </div>
 
-    <livewire:partner.sales-rep-order-summary />
+    <section id="order-selection-panel" role="tabpanel" aria-labelledby="order-selection-tab"
+        x-show="activeTab === 'selection'" tabindex="0">
+        @include('livewire.partner.partials.order-selector-form')
+    </section>
+    <section id="order-summary-panel" role="tabpanel" aria-labelledby="order-summary-tab"
+        x-show="activeTab === 'summary'" style="display: none;" tabindex="0">
+        <livewire:partner.sales-rep-order-summary />
+    </section>
     <livewire:partner.order-bulk-submission />
     <livewire:partner.order-import />
 

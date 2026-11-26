@@ -510,6 +510,38 @@ class PartnerSeasonContextTest extends TestCase
             ->dispatch('partner-interface-language-changed', locale: 'en')->assertSet('summaryLoaded', false);
     }
 
+    #[DataProvider('interfaceLocales')]
+    public function test_order_sections_use_exclusive_accessible_tabs_and_translated_search_scopes(string $locale): void
+    {
+        session(['partner.locale' => $locale, 'partner.language_id' => Language::where('code', strtoupper($locale))->value('id')]);
+        $page = Livewire::test(OrderSelector::class)->assertSee(__('partner.orders_workspace'))
+            ->assertSee(__('partner.address_search_scope'))->assertDontSeeHtml('@click="open = ! open"');
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$page->html());
+        $xpath = new \DOMXPath($document);
+        $this->assertSame(1, $xpath->query('//*[@role="tablist"]')->length);
+        $this->assertSame(2, $xpath->query('//*[@role="tab"]')->length);
+        $this->assertSame(2, $xpath->query('//*[@role="tabpanel"]')->length);
+        foreach (['selection' => 'order_selection', 'summary' => 'sales_rep_summary'] as $tab => $label) {
+            $button = $xpath->query('//*[@id="order-'.$tab.'-tab"]')->item(0);
+            $panel = $xpath->query('//*[@id="order-'.$tab.'-panel"]')->item(0);
+            $this->assertSame(__('partner.'.$label), trim($button->textContent));
+            $this->assertSame($panel->getAttribute('id'), $button->getAttribute('aria-controls'));
+            $this->assertSame($button->getAttribute('id'), $panel->getAttribute('aria-labelledby'));
+            $this->assertSame("activeTab === '$tab'", $panel->getAttribute('x-show'));
+            $this->assertSame($tab === 'selection' ? 'true' : 'false', $button->getAttribute('aria-selected'));
+        }
+        $summary = Livewire::test(SalesRepOrderSummary::class)->dispatch('order-summary-tab-opened')
+            ->assertSee(__('partner.order_summary_search_label'))->assertSee(__('partner.order_summary_search_scope'))
+            ->assertDontSeeHtml('@click="open = ! open"');
+        $this->assertStringContainsString('aria-describedby="order-summary-search-scope"', $summary->html());
+    }
+
+    public static function interfaceLocales(): array
+    {
+        return [['hu'], ['en']];
+    }
+
     public function test_order_sheet_footer_has_scroll_space_and_wrapping_buttons_in_normal_and_shared_views(): void
     {
         $order = $this->orders[$this->season->id];

@@ -131,6 +131,36 @@ class OrderSummaryFiltersTest extends TestCase
         $this->assertSame('P000444 – Első képviselő', $this->representativeCell($page, 'a-draft'));
     }
 
+    public function test_summary_loads_on_first_tab_open_and_keeps_filters_and_selection_on_repeated_opens(): void
+    {
+        $page = Livewire::test(SalesRepOrderSummary::class)->assertSet('summaryLoaded', false)
+            ->assertDontSeeHtml('wire:init="loadSummary"')
+            ->dispatch('order-summary-tab-opened')->assertSet('summaryLoaded', true)
+            ->set('summarySearch', 'Partner a')->set('summaryStatus', 'draft');
+        $ids = $page->instance()->filteredSalesRepOrderSummaries->pluck('order_id')->map(fn ($id) => (string) $id)->all();
+        $this->assertNotEmpty($ids);
+        $page->set('selectedSummaryOrderIds', $ids);
+        $this->mock(SalesRepOrderSummaryService::class)->shouldNotReceive('build');
+        $page->dispatch('order-summary-tab-opened')->assertSet('summarySearch', 'Partner a')
+            ->assertSet('summaryStatus', 'draft')->assertSet('selectedSummaryOrderIds', $ids);
+        $this->assertSame($ids, $page->instance()->filteredSalesRepOrderSummaries->pluck('order_id')->map(fn ($id) => (string) $id)->all());
+    }
+
+    public function test_order_change_events_do_not_load_an_unopened_summary(): void
+    {
+        $this->mock(SalesRepOrderSummaryService::class)->shouldNotReceive('build');
+        Livewire::test(SalesRepOrderSummary::class)->dispatch('order-summary-changed')
+            ->assertSet('summaryLoaded', false);
+    }
+
+    public function test_empty_order_summary_displays_a_clear_message_after_opening_the_tab(): void
+    {
+        $this->user->partners()->detach();
+        $this->user->addresses()->detach();
+        Livewire::test(SalesRepOrderSummary::class)->dispatch('order-summary-tab-opened')
+            ->assertSet('summaryLoaded', true)->assertSee(__('partner.no_orders'));
+    }
+
     public function test_representative_column_uses_the_current_name_without_rebuilding_cached_order_totals(): void
     {
         Livewire::test(SalesRepOrderSummary::class)->call('loadSummary');

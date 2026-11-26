@@ -5,17 +5,20 @@
 
             {{-- 1. sor --}}
             <div class="md:col-span-6">
-                <label class="mb-1 block text-sm font-medium">
+                <label for="order-address-search" class="mb-1 block text-sm font-medium">
                     {{ __('partner.address_search') }}
                 </label>
 
                 <input
                     type="text"
+                    id="order-address-search"
+                    aria-describedby="order-address-search-scope"
                     wire:model.live.debounce.300ms="addressSearch"
                     placeholder="{{ __('partner.search_address_placeholder') }}"
                     class="mb-2 w-full rounded border"
                     @disabled(! $seasonId)
                 >
+                <p id="order-address-search-scope" class="mb-2 text-xs text-sky-900">{{ __('partner.address_search_scope') }}</p>
 
                 <select
                     wire:model.live="partnerAddressId"

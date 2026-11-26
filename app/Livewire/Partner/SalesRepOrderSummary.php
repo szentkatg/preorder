@@ -192,6 +192,14 @@ class SalesRepOrderSummary extends Component
             ->get();
     }
 
+    #[On('order-summary-tab-opened')]
+    public function openSummaryTab(): void
+    {
+        if (! $this->summaryLoaded) {
+            $this->loadSummary();
+        }
+    }
+
     public function loadSummary(): void
     {
         $summaries = app(SalesRepOrderSummaryService::class)
@@ -213,7 +221,9 @@ class SalesRepOrderSummary extends Component
         $this->accessibleOrdersCache = null;
         $this->salesRepOrderSummariesCache = null;
         $this->filteredSummariesCache = null;
-        $this->loadSummary();
+        if ($this->summaryLoaded) {
+            $this->loadSummary();
+        }
     }
 
     #[On('partner-interface-language-changed')]

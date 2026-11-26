@@ -1,7 +1,8 @@
-<div x-data="{ open: true }" class="mt-2">
+<div class="mt-2" data-order-summary-block>
     @if (! $summaryLoaded)
         <div
-            wire:init="loadSummary"
+            role="status"
+            aria-live="polite"
             class="rounded-lg border bg-white p-4 text-sm text-gray-600 shadow-sm"
         >
             {{ __('partner.loading') }}
@@ -14,7 +15,7 @@
                 </h2>
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
-                    <div x-show="open" class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button type="button" wire:click="openBulkSubmission" wire:loading.attr="disabled"
                             @disabled(count($selectedSummaryOrderIds) === 0)
                             class="rounded bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50">
@@ -60,35 +61,11 @@
                         @endif
                     </div>
 
-                    <button
-                        type="button"
-                        @click="open = ! open"
-                        :aria-expanded="open"
-                        aria-controls="sales-rep-summary-content"
-                        aria-label="{{ __('partner.toggle_section') }}"
-                        title="{{ __('partner.toggle_section') }}"
-                        class="rounded border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="2"
-                            stroke="currentColor"
-                            class="h-5 w-5 transition-transform"
-                            :class="{ 'rotate-180': ! open }"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                            />
-                        </svg>
-                    </button>
                 </div>
             </div>
 
-            <div x-show="open" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
+            <p id="order-summary-search-scope" class="mt-2 text-xs text-gray-600">{{ __('partner.order_summary_search_scope') }}</p>
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-6">
                 <select wire:model.live="summarySalesRepCode" aria-label="{{ __('partner.sales_representative') }}" class="rounded border">
                     <option value="">{{ __('partner.all_sales_representatives') }}</option>
                     @foreach ($summarySalesReps as $representative)
@@ -130,17 +107,16 @@
                     @endforeach
                 </select>
 
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="summarySearch"
-                    placeholder="{{ __('partner.order_summary_search_placeholder') }}"
-                    aria-label="{{ __('partner.order_summary_search_placeholder') }}"
-                    class="rounded border"
-                >
+                <div class="md:col-span-3">
+                    <label for="order-summary-search" class="mb-1 block text-sm font-medium">{{ __('partner.order_summary_search_label') }}</label>
+                    <input type="text" id="order-summary-search" wire:model.live.debounce.300ms="summarySearch"
+                        placeholder="{{ __('partner.order_summary_search_placeholder') }}"
+                        aria-describedby="order-summary-search-scope" class="w-full rounded border">
+                </div>
             </div>
         </div>
 
-        <div id="sales-rep-summary-content" x-show="open">
+        <div id="sales-rep-summary-content">
             @error('selectedSummaryOrderIds')
                 <div class="mt-4 rounded bg-red-100 p-3 text-sm text-red-800">
                     {{ $message }}
@@ -270,6 +246,8 @@
                 </div>
             </div>
         </div>
+    @else
+        <div class="rounded-lg border bg-white p-4 text-sm text-gray-600 shadow-sm">{{ __('partner.no_orders') }}</div>
     @endif
 
     <div

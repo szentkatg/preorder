@@ -1,5 +1,14 @@
 # Több rendelés beküldése
 
+A rendelésválasztó oldalon két, egymás mellett elhelyezett fül van:
+**Rendelés generálása/megnyitása** és **Rendelések listája**. Egyszerre csak az egyik
+tartalma látható; külön összecsukó gombok nincsenek. Alapból a kiválasztás nyílik
+meg. A címkereső csak a címválasztót szűri, az összesítő fül keresése és szűrői
+pedig az ottani rendeléslistára vonatkoznak. A két tartalom fülváltáskor nem
+szűnik meg, így a keresések, szűrők és kijelölések megmaradnak. Az összesítő
+adatok csak az összesítő fül első megnyitásakor töltődnek be. A fülek a
+nyílbillentyűkkel, valamint Home/End billentyűkkel is válthatók.
+
 A partner rendelésválasztó rendeléssorainak jelölőnégyzetei után a **Több rendelés
 beküldése** gombbal indítható. A megerősítő ablak megmutatja a kijelölt és a már
 korábban beküldött rendelések számát. Mégsem esetén nem változik semmi.
