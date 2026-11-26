@@ -126,7 +126,7 @@ class CatalogGroupOrder extends Component
         $this->order->items()->delete();
         $this->order->delete();
 
-        $this->redirectRoute('partner.orders.select', navigate: true);
+        $this->redirectRoute('partner.orders.select', ['tab' => 'summary'], navigate: true);
     }
 
     protected function matrixGroups(): array
@@ -883,7 +883,7 @@ class CatalogGroupOrder extends Component
             return null;
         }
 
-        return redirect()->route('partner.orders.select');
+        return redirect()->route('partner.orders.select', ['tab' => 'summary']);
     }
 
     public function sharePriceListOptions(): array

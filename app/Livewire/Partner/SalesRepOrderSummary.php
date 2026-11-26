@@ -49,6 +49,9 @@ class SalesRepOrderSummary extends Component
 
     public bool $summaryLoaded = false;
 
+    #[Locked]
+    public bool $loadOnInit = false;
+
     public bool $showErpExportModal = false;
 
     public string $erpExportNote = '';
@@ -114,8 +117,9 @@ class SalesRepOrderSummary extends Component
         app()->setLocale((string) session('partner.locale', 'hu'));
     }
 
-    public function mount(): void
+    public function mount(bool $loadOnInit = false): void
     {
+        $this->loadOnInit = $loadOnInit;
         $filters = session('order_selector.summary_filters', []);
 
         $this->summarySearch = $filters['search'] ?? '';

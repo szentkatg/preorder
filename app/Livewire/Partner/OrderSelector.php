@@ -46,6 +46,9 @@ class OrderSelector extends Component
     #[Locked]
     public ?int $seasonId = null;
 
+    #[Locked]
+    public string $initialTab = 'selection';
+
     public ?int $brandId = null;
 
     public ?int $partnerAddressId = null;
@@ -108,6 +111,10 @@ class OrderSelector extends Component
     public function mount(): void
     {
         $this->seasonId = PartnerSeasonContext::id();
+        // Only test existence, without loading or pricing the entire order list.
+        $showOrderList = request()->query('tab') === 'summary'
+            || auth('partner')->user()?->accessibleOrdersQuery()->where('season_id', $this->seasonId)->exists();
+        $this->initialTab = $showOrderList ? 'summary' : 'selection';
         if (session()->has('partner_order_selector.season_id') && (int) session('partner_order_selector.season_id') !== $this->seasonId) {
             session()->forget(['partner_order_selector', 'order_selector.open_order_id']);
         }

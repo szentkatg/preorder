@@ -2,8 +2,11 @@
 
 A rendelésválasztó oldalon két, egymás mellett elhelyezett fül van:
 **Rendelés generálása/megnyitása** és **Rendelések listája**. Egyszerre csak az egyik
-tartalma látható; külön összecsukó gombok nincsenek. Alapból a kiválasztás nyílik
-meg. A címkereső csak a címválasztót szűri, az összesítő fül keresése és szűrői
+tartalma látható; külön összecsukó gombok nincsenek. Ha a kiválasztott szezonban
+van hozzáférhető rendelés, alapból a lista nyílik meg; egyébként a
+generálás/megnyitás. A rendelőlapról és összesítőjéből visszatérve mindig a lista
+nyílik meg, az utolsó rendelés törlése után is. A címkereső csak a címválasztót
+szűri, az összesítő fül keresése és szűrői
 pedig az ottani rendeléslistára vonatkoznak. A két tartalom fülváltáskor nem
 szűnik meg, így a keresések, szűrők és kijelölések megmaradnak. Az összesítő
 adatok csak az összesítő fül első megnyitásakor töltődnek be. A fülek a

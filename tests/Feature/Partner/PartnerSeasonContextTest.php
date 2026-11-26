@@ -529,7 +529,7 @@ class PartnerSeasonContextTest extends TestCase
             $this->assertSame($panel->getAttribute('id'), $button->getAttribute('aria-controls'));
             $this->assertSame($button->getAttribute('id'), $panel->getAttribute('aria-labelledby'));
             $this->assertSame("activeTab === '$tab'", $panel->getAttribute('x-show'));
-            $this->assertSame($tab === 'selection' ? 'true' : 'false', $button->getAttribute('aria-selected'));
+            $this->assertSame($tab === 'summary' ? 'true' : 'false', $button->getAttribute('aria-selected'));
         }
         $summary = Livewire::test(SalesRepOrderSummary::class)->dispatch('order-summary-tab-opened')
             ->assertSee(__('partner.order_summary_search_label'))->assertSee(__('partner.order_summary_search_scope'))
@@ -540,6 +540,60 @@ class PartnerSeasonContextTest extends TestCase
     public static function interfaceLocales(): array
     {
         return [['hu'], ['en']];
+    }
+
+    #[DataProvider('roles')]
+    public function test_existing_accessible_orders_make_the_order_list_the_initial_tab(string $role): void
+    {
+        $this->user->update(['role' => $role]);
+        // An old search returning no matches must not hide the fact orders exist.
+        session(['order_selector.summary_filters.search' => 'no matching partner']);
+        Livewire::test(OrderSelector::class)->assertSet('initialTab', 'summary')
+            ->assertSeeHtml('wire:init="openSummaryTab"');
+    }
+
+    public function test_orders_from_other_seasons_do_not_open_the_order_list(): void
+    {
+        $this->orders[$this->season->id]->delete();
+        Livewire::test(OrderSelector::class)->assertSet('initialTab', 'selection')
+            ->assertDontSeeHtml('wire:init="openSummaryTab"');
+    }
+
+    public function test_inaccessible_orders_do_not_open_the_order_list(): void
+    {
+        $this->user->partners()->detach();
+        $this->user->addresses()->detach();
+        Livewire::test(OrderSelector::class)->assertSet('initialTab', 'selection');
+    }
+
+    public function test_explicit_return_to_orders_opens_the_list_even_if_it_is_empty(): void
+    {
+        $this->orders[$this->season->id]->delete();
+        Livewire::withQueryParams(['tab' => 'summary'])->test(OrderSelector::class)
+            ->assertSet('initialTab', 'summary')->assertSeeHtml('wire:init="openSummaryTab"');
+    }
+
+    public function test_unsupported_tab_query_does_not_override_the_safe_initial_tab(): void
+    {
+        $this->orders[$this->season->id]->delete();
+        Livewire::withQueryParams(['tab' => 'other'])->test(OrderSelector::class)->assertSet('initialTab', 'selection');
+    }
+
+    public function test_sheet_and_overview_back_links_explicitly_return_to_the_list(): void
+    {
+        $url = 'href="'.route('partner.orders.select', ['tab' => 'summary']).'"';
+        $order = $this->orders[$this->season->id];
+        Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])->assertSeeHtml($url);
+        Livewire::test(OrderOverview::class, ['order' => $order->id])->assertSeeHtml($url);
+        Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])
+            ->call('backToCatalogGroups')->assertRedirect(route('partner.orders.select', ['tab' => 'summary']));
+    }
+
+    public function test_deleting_the_last_order_returns_to_the_empty_order_list(): void
+    {
+        Livewire::test(CatalogGroupOrder::class, ['order' => $this->orders[$this->season->id], 'catalogGroupName' => 'Bags'])
+            ->call('deleteOrder')->assertRedirect(route('partner.orders.select', ['tab' => 'summary']));
+        $this->assertNull(Order::find($this->orders[$this->season->id]->id));
     }
 
     public function test_order_sheet_footer_has_scroll_space_and_wrapping_buttons_in_normal_and_shared_views(): void

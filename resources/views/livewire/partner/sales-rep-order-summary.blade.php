@@ -1,6 +1,7 @@
 <div class="mt-2" data-order-summary-block>
     @if (! $summaryLoaded)
         <div
+            @if ($loadOnInit) wire:init="openSummaryTab" @endif
             role="status"
             aria-live="polite"
             class="rounded-lg border bg-white p-4 text-sm text-gray-600 shadow-sm"

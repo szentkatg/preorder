@@ -1,7 +1,7 @@
 <div class="w-full min-w-0 max-w-none p-6" data-order-tabs
     x-data="{
-        activeTab: 'selection',
-        summaryOpened: false,
+        activeTab: @js($initialTab),
+        summaryOpened: @js($initialTab === 'summary'),
         selectTab(tab) {
             if (! ['selection', 'summary'].includes(tab) || this.activeTab === tab) return;
             this.activeTab = tab;
@@ -70,7 +70,7 @@
         <div role="tablist" aria-label="{{ __('partner.order_sections') }}"
             class="mt-2 flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 shadow-sm">
             <button type="button" role="tab" id="order-selection-tab" x-ref="selectionTab"
-                aria-controls="order-selection-panel" aria-selected="true" tabindex="0"
+                aria-controls="order-selection-panel" aria-selected="{{ $initialTab === 'selection' ? 'true' : 'false' }}" tabindex="{{ $initialTab === 'selection' ? '0' : '-1' }}"
                 :aria-selected="activeTab === 'selection'" :tabindex="activeTab === 'selection' ? 0 : -1"
                 @click="selectTab('selection')"
                 @keydown.arrow-right.prevent="selectTab('summary'); $refs.summaryTab.focus()"
@@ -82,7 +82,7 @@
                 {{ __('partner.order_selection') }}
             </button>
             <button type="button" role="tab" id="order-summary-tab" x-ref="summaryTab"
-                aria-controls="order-summary-panel" aria-selected="false" tabindex="-1"
+                aria-controls="order-summary-panel" aria-selected="{{ $initialTab === 'summary' ? 'true' : 'false' }}" tabindex="{{ $initialTab === 'summary' ? '0' : '-1' }}"
                 :aria-selected="activeTab === 'summary'" :tabindex="activeTab === 'summary' ? 0 : -1"
                 @click="selectTab('summary')"
                 @keydown.arrow-right.prevent="selectTab('selection'); $refs.selectionTab.focus()"
@@ -97,12 +97,12 @@
     </div>
 
     <section id="order-selection-panel" role="tabpanel" aria-labelledby="order-selection-tab"
-        x-show="activeTab === 'selection'" tabindex="0">
+        x-show="activeTab === 'selection'" @if ($initialTab !== 'selection') style="display: none;" @endif tabindex="0">
         @include('livewire.partner.partials.order-selector-form')
     </section>
     <section id="order-summary-panel" role="tabpanel" aria-labelledby="order-summary-tab"
-        x-show="activeTab === 'summary'" style="display: none;" tabindex="0">
-        <livewire:partner.sales-rep-order-summary />
+        x-show="activeTab === 'summary'" @if ($initialTab !== 'summary') style="display: none;" @endif tabindex="0">
+        <livewire:partner.sales-rep-order-summary :load-on-init="$initialTab === 'summary'" />
     </section>
     <livewire:partner.order-bulk-submission />
     <livewire:partner.order-import />

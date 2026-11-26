@@ -390,7 +390,7 @@
     <div class="z-40 flex flex-wrap items-center justify-between gap-6 border-b bg-white py-2 text-sm" data-order-navigation>
         <div class="flex flex-wrap items-center gap-3">
             @if (! $sharedMode)
-                <a href="{{ route('partner.orders.select') }}" wire:navigate class="rounded border border-slate-300 bg-slate-50 px-3 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
+                <a href="{{ route('partner.orders.select', ['tab' => 'summary']) }}" wire:navigate class="rounded border border-slate-300 bg-slate-50 px-3 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
                 <a href="{{ route('partner.orders.overview', $order) }}" wire:navigate class="rounded border border-sky-300 bg-sky-50 px-3 py-2 font-semibold">{{ __('partner.aggregated_data') }}</a>
             @else
                 <span class="font-semibold text-gray-700">

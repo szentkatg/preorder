@@ -1,7 +1,7 @@
 <div class="w-full min-w-0 space-y-4 p-6" data-order-overview>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('partner.orders.select') }}" wire:navigate class="rounded border bg-white px-4 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
+            <a href="{{ route('partner.orders.select', ['tab' => 'summary']) }}" wire:navigate class="rounded border bg-white px-4 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
             @if ($this->catalogGroups->isNotEmpty())
                 <button type="button" wire:click="openOrder" class="rounded border bg-white px-4 py-2">{{ __('partner.open_order') }}</button>
             @endif

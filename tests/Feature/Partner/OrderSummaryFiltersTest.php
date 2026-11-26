@@ -153,6 +153,15 @@ class OrderSummaryFiltersTest extends TestCase
             ->assertSet('summaryLoaded', false);
     }
 
+    public function test_initially_active_list_requests_a_deferred_load_and_other_tabs_do_not(): void
+    {
+        $this->mock(SalesRepOrderSummaryService::class)->shouldNotReceive('build');
+        Livewire::test(SalesRepOrderSummary::class, ['loadOnInit' => true])->assertSet('summaryLoaded', false)
+            ->assertSeeHtml('wire:init="openSummaryTab"');
+        Livewire::test(SalesRepOrderSummary::class, ['loadOnInit' => false])->assertSet('summaryLoaded', false)
+            ->assertDontSeeHtml('wire:init="openSummaryTab"');
+    }
+
     public function test_empty_order_summary_displays_a_clear_message_after_opening_the_tab(): void
     {
         $this->user->partners()->detach();
