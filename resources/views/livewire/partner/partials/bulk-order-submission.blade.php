@@ -7,12 +7,19 @@
             @if (! $bulkSubmission['started'])
                 <p class="mt-3">{{ __('partner.confirm_submit_multiple_orders', ['count' => $bulkSubmission['total']]) }}</p>
                 <p class="mt-2 text-sm text-gray-600">{{ __('partner.submit_multiple_skip', ['count' => $bulkSubmission['already_submitted']]) }}</p>
+                <label class="mt-4 flex items-start gap-2" for="bulk-submission-send-email">
+                    <input id="bulk-submission-send-email" type="checkbox" wire:model="sendConfirmationEmail"
+                        aria-describedby="bulk-submission-email-hint" class="mt-1 rounded border-gray-300">
+                    <span class="font-medium">{{ __('partner.submission_send_email') }}</span>
+                </label>
+                <p id="bulk-submission-email-hint" class="mt-1 text-sm text-gray-600">{{ __('partner.submission_send_email_hint') }}</p>
                 <div class="mt-4 flex justify-end gap-2">
                     <button type="button" wire:click="closeBulkSubmission" wire:loading.attr="disabled" class="rounded border px-4 py-2">{{ __('partner.erp_export_cancel') }}</button>
                     <button type="button" wire:click="startBulkSubmission" wire:loading.attr="disabled"
                         class="rounded bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{{ __('partner.submit_order') }}</button>
                 </div>
             @else
+                <p class="mt-3 text-sm text-gray-600">{{ ($bulkSubmission['send_email'] ?? true) ? __('partner.submission_with_email') : __('partner.submission_status_only') }}</p>
                 <p class="mt-3" role="status" aria-live="polite">{{ __('partner.submit_multiple_progress', ['done' => $bulkSubmission['processed'], 'total' => $bulkSubmission['total']]) }}</p>
                 <progress class="mt-2 w-full" value="{{ $bulkSubmission['processed'] }}" max="{{ $bulkSubmission['total'] }}"></progress>
                 @if ($bulkSubmission['running'])

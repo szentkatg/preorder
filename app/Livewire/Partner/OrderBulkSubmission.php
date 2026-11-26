@@ -19,6 +19,8 @@ class OrderBulkSubmission extends Component
 
     public array $selectedSummaryOrderIds = [];
 
+    public bool $sendConfirmationEmail = true;
+
     /** Server-owned snapshot, separate from the table's live selection and filters. */
     #[Locked]
     public array $bulkSubmission = [];
@@ -46,11 +48,12 @@ class OrderBulkSubmission extends Component
         abort_if($this->bulkSubmission['running'] ?? false, 409);
         $this->resetValidation('selectedSummaryOrderIds');
         $orders = app(OrderSubmissionService::class)->selectedOrders($this->selectedSummaryOrderIds);
+        $this->sendConfirmationEmail = true;
         $this->bulkSubmission = [
             'orders' => $orders->map(fn ($order) => ['id' => $order->id, 'reference' => $order->reference_number])->all(),
             'total' => $orders->count(), 'already_submitted' => $orders->filter->isSubmitted()->count(),
             'started' => false, 'running' => false, 'processed' => 0, 'position' => 0, 'submitted' => 0, 'skipped' => 0,
-            'failed' => [], 'email_failed' => [],
+            'failed' => [], 'email_failed' => [], 'send_email' => true,
         ];
     }
 
@@ -58,6 +61,8 @@ class OrderBulkSubmission extends Component
     {
         abort_unless($this->bulkSubmission !== [] && ! $this->bulkSubmission['started'], 409);
         $orders = app(OrderSubmissionService::class)->selectedOrders(array_column($this->bulkSubmission['orders'], 'id'));
+        // Keep one confirmed choice for the whole batch, including later polling requests.
+        $this->bulkSubmission['send_email'] = $this->sendConfirmationEmail;
         // Skip already submitted orders in one query, not one browser request per order.
         $this->bulkSubmission['skipped'] = $orders->filter->isSubmitted()->count();
         $this->bulkSubmission['processed'] = $this->bulkSubmission['skipped'];
@@ -80,7 +85,7 @@ class OrderBulkSubmission extends Component
         $index = $this->bulkSubmission['position'];
         $entry = $this->bulkSubmission['orders'][$index];
         try {
-            $result = app(OrderSubmissionService::class)->submit($entry['id']);
+            $result = app(OrderSubmissionService::class)->submit($entry['id'], sendEmail: $this->bulkSubmission['send_email'] ?? true);
             $this->bulkSubmission[$result['submitted'] ? 'submitted' : 'skipped']++;
             if ($result['email_failed']) {
                 $this->bulkSubmission['email_failed'][] = $entry['reference'];

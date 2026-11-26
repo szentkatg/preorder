@@ -32,7 +32,7 @@ class OrderSubmissionService
     }
 
     /** @return array{submitted: bool, email_failed: bool} */
-    public function submit(int $orderId): array
+    public function submit(int $orderId, bool $sendEmail = true): array
     {
         $user = $this->user();
         $order = DB::transaction(function () use ($user, $orderId): ?Order {
@@ -48,6 +48,9 @@ class OrderSubmissionService
         });
         if (! $order) {
             return ['submitted' => false, 'email_failed' => false];
+        }
+        if (! $sendEmail) {
+            return ['submitted' => true, 'email_failed' => false];
         }
         try {
             $this->sendConfirmation($order, $user);

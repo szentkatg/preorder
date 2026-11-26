@@ -50,6 +50,8 @@ class BulkOrderSubmissionTest extends TestCase
 
     private bool $mailFails = false;
 
+    private int $excelExportCount = 0;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -86,7 +88,11 @@ class BulkOrderSubmissionTest extends TestCase
         foreach ($this->orders as $order) {
             OrderItem::create(['order_id' => $order->id, 'sku_id' => $sku->id, 'quantity' => 3, 'unit_price' => 100, 'line_total' => 300]);
         }
-        Excel::shouldReceive('raw')->andReturn('xlsx-content');
+        Excel::shouldReceive('raw')->andReturnUsing(function (): string {
+            $this->excelExportCount++;
+
+            return 'xlsx-content';
+        });
         Mail::shouldReceive('raw')->andReturnUsing(function ($body, $callback): void {
             if ($this->mailFails) {
                 throw new RuntimeException('Mail unavailable');
@@ -166,6 +172,73 @@ class BulkOrderSubmissionTest extends TestCase
     public static function roles(): array
     {
         return [['partner_admin'], ['address_user'], ['sales_rep']];
+    }
+
+    public function test_confirmation_email_checkbox_defaults_on_and_resets_for_a_new_confirmation(): void
+    {
+        $this->page(['first'])->call('openBulkSubmission')->assertSet('sendConfirmationEmail', true)
+            ->assertSeeHtml('wire:model="sendConfirmationEmail"')->assertSee('Visszaigazoló e-mail küldése')
+            ->set('sendConfirmationEmail', false)->call('closeBulkSubmission')->call('openBulkSubmission')
+            ->assertSet('sendConfirmationEmail', true);
+        $this->assertSame('draft', $this->orders['first']->fresh()->status);
+        $this->assertSame([], $this->messages);
+        $this->assertSame(0, $this->excelExportCount);
+    }
+
+    #[DataProvider('roles')]
+    public function test_status_only_submission_never_creates_an_excel_file_or_sends_mail(string $role): void
+    {
+        $this->user->update(['role' => $role]);
+        $this->mailFails = true;
+        $beforeItems = OrderItem::orderBy('id')->get()->toArray();
+        $submittedAt = $this->orders['submitted']->submitted_at;
+        $this->page()->call('openBulkSubmission')->set('sendConfirmationEmail', false)->call('startBulkSubmission')
+            ->assertSet('bulkSubmission.send_email', false)->call('processBulkSubmission')
+            ->assertSet('bulkSubmission.submitted', 2)->assertSet('bulkSubmission.skipped', 1)
+            ->assertSet('bulkSubmission.email_failed', [])->assertSet('bulkSubmission.failed', [])
+            ->assertSee('Csak státuszállítás, e-mail-küldés nélkül.');
+        foreach (['first', 'second'] as $key) {
+            $this->assertSame('submitted', $this->orders[$key]->fresh()->status);
+            $this->assertNotNull($this->orders[$key]->fresh()->submitted_at);
+        }
+        $this->assertSame('draft', $this->orders['unselected']->fresh()->status);
+        $this->assertEquals($submittedAt, $this->orders['submitted']->fresh()->submitted_at);
+        $this->assertSame($beforeItems, OrderItem::orderBy('id')->get()->toArray());
+        $this->assertSame([], $this->messages);
+        $this->assertSame(0, $this->excelExportCount);
+    }
+
+    #[DataProvider('emailChoices')]
+    public function test_confirmed_email_choice_stays_fixed_for_later_processing_requests(bool $sendEmail): void
+    {
+        $this->page(['first', 'second'])->call('openBulkSubmission')->set('sendConfirmationEmail', $sendEmail)
+            ->call('startBulkSubmission')->assertSet('bulkSubmission.running', true)
+            ->set('sendConfirmationEmail', ! $sendEmail)->call('processBulkSubmission')
+            ->assertSet('bulkSubmission.send_email', $sendEmail)->assertSet('bulkSubmission.submitted', 2);
+        $this->assertCount($sendEmail ? 2 : 0, $this->messages);
+        $this->assertSame($sendEmail ? 2 : 0, $this->excelExportCount);
+    }
+
+    public static function emailChoices(): array
+    {
+        return [[true], [false]];
+    }
+
+    public function test_browser_cannot_override_the_confirmed_email_snapshot(): void
+    {
+        $page = $this->page(['first', 'second'])->call('openBulkSubmission')->set('sendConfirmationEmail', false)
+            ->call('startBulkSubmission');
+        $this->expectException(CannotUpdateLockedPropertyException::class);
+        $page->set('bulkSubmission.send_email', true);
+    }
+
+    public function test_status_only_service_call_is_idempotent_without_touching_email_or_export(): void
+    {
+        $service = app(OrderSubmissionService::class);
+        $this->assertSame(['submitted' => true, 'email_failed' => false], $service->submit($this->orders['first']->id, sendEmail: false));
+        $this->assertSame(['submitted' => false, 'email_failed' => false], $service->submit($this->orders['first']->id, sendEmail: false));
+        $this->assertSame([], $this->messages);
+        $this->assertSame(0, $this->excelExportCount);
     }
 
     public function test_empty_selection_has_a_clear_validation_message(): void
@@ -350,6 +423,7 @@ class BulkOrderSubmissionTest extends TestCase
     {
         session(['partner.locale' => 'en']);
         $this->page(['submitted'])->call('openBulkSubmission')->assertSee('Submit multiple orders')
+            ->assertSee('Send confirmation email')->assertSee('When unchecked, only the status and submission time change')
             ->assertSee('They cannot be edited after submission.')->call('startBulkSubmission')
             ->assertSet('bulkSubmission.processed', 1)->assertSet('bulkSubmission.running', false)
             ->assertSee('Already submitted, skipped: 1.');

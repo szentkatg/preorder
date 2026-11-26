@@ -4,6 +4,13 @@ A partner rendelésválasztó rendeléssorainak jelölőnégyzetei után a **Tö
 beküldése** gombbal indítható. A megerősítő ablak megmutatja a kijelölt és a már
 korábban beküldött rendelések számát. Mégsem esetén nem változik semmi.
 
+A **Visszaigazoló e-mail küldése** jelölőnégyzet alapból bejelölt. Kikapcsolva
+a beküldés csak a státuszt és a beküldés időpontját állítja; sem Excel-csatolmány,
+sem e-mail nem készül, a CC-címnek sem. A megerősítéskor rögzített választás
+a teljes kötegre érvényes, feldolgozás közben már nem változik. Új megerősítő
+ablak megnyitásakor ismét bejelölt az alapértelmezés. Az egyedi beküldés
+e-mail-küldési viselkedése változatlan.
+
 Az összes partneroldali szerepkör használhatja, kizárólag az aktuálisan
 hozzáférhető címek kiválasztott szezonú rendeléseire. A teljes kijelölést
 megerősítés előtt ellenőrizzük: idegen cím vagy másik szezon rendelése miatt
