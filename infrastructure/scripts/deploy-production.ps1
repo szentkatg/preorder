@@ -2,6 +2,7 @@
 param(
     [ValidateSet('Check', 'Deploy', 'Resume')][string] $Mode = 'Check',
     [ValidatePattern('^[a-f0-9]{40}$')][string] $Commit,
+    [switch] $PrepareOrderStatusAudit,
     [string] $RunId
 )
 
@@ -23,8 +24,9 @@ $library = [regex]::Replace($common.Substring(0, $boundary), '(?m)^use [^\r\n]+;
 $template = Get-Content -Raw -Encoding utf8 -LiteralPath (Join-Path $PSScriptRoot 'production-release.php')
 
 function Invoke-ProductionPhase {
-    param([ValidateSet('inspect','backup','deploy','verify','smoke')][string] $Phase)
-    $body = $template.Substring(5).Replace('__MODE__', $Phase).Replace('__COMMIT__', $Commit).Replace('__RUN_ID__', $RunId)
+    param([ValidateSet('inspect','backup','deploy','verify','smoke','health')][string] $Phase)
+    $body = $template.Substring(5).Replace('__MODE__', $Phase).Replace('__COMMIT__', $Commit).Replace('__RUN_ID__', $RunId).
+        Replace('__PREPARE_ORDER_STATUS_AUDIT__', $(if ($PrepareOrderStatusAudit) { '1' } else { '0' }))
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($library + $body))
     $command = '/opt/alt/php83/usr/bin/php -d memory_limit=768M -r "eval(substr(base64_decode(''' + $encoded + '''),5));"' + [char]10
     $start = New-Object System.Diagnostics.ProcessStartInfo
@@ -73,6 +75,7 @@ try {
     $null = Invoke-ProductionPhase deploy
     $null = Invoke-ProductionPhase smoke
     $null = Invoke-ProductionPhase verify
+    $null = Invoke-ProductionPhase health
     Write-Host "PRODUCTION DEPLOY OK: $Commit | RunId: $RunId"
 } catch {
     Write-Error $_ -ErrorAction Continue

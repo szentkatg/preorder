@@ -33,6 +33,28 @@ class ProductionDeploymentSafetyTest extends TestCase
         productionReleasePaths(['public/.htaccess']);
     }
 
+    public function test_audit_migration_requires_explicit_preparation(): void
+    {
+        $this->expectException(DomainException::class);
+        productionReleasePaths([preorderAuditMigrationPath()]);
+    }
+
+    public function test_explicit_preparation_only_adds_the_reviewed_audit_migration(): void
+    {
+        self::assertCount(4, productionReleaseMigrations(true));
+        self::assertSame([basename(preorderAuditMigrationPath(), '.php')], array_values(array_diff(productionReleaseMigrations(true), productionReleaseMigrations())));
+        productionReleasePaths([preorderAuditMigrationPath()], true);
+        preorderAuditMigrationValidate(file_get_contents(dirname(__DIR__, 2).'/'.preorderAuditMigrationPath()));
+        $this->expectException(DomainException::class);
+        productionReleasePaths(['database/migrations/unreviewed.php'], true);
+    }
+
+    public function test_audit_preparation_still_rejects_configuration_changes(): void
+    {
+        $this->expectException(DomainException::class);
+        productionReleasePaths([preorderAuditMigrationPath(), '.env.production'], true);
+    }
+
     public function test_dependencies_require_separate_review(): void
     {
         $this->expectException(DomainException::class);

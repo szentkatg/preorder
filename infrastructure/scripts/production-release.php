@@ -12,18 +12,19 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 // Combined with the pure backup helpers by deploy-production.ps1, never routed through the NAS/staging target map.
-function productionReleaseMigrations(): array
+function productionReleaseMigrations(bool $prepareOrderStatusAudit = false): array
 {
     return [
         '2026_11_23_130000_add_partner_visibility_to_products_table',
         '2026_11_23_150000_add_exclusivity_to_products_table',
         '2026_11_23_160000_add_group_code_pattern_to_pricing_parameters',
+        ...($prepareOrderStatusAudit ? [basename(preorderAuditMigrationPath(), '.php')] : []),
     ];
 }
 
-function productionReleasePaths(array $paths): void
+function productionReleasePaths(array $paths, bool $prepareOrderStatusAudit = false): void
 {
-    $approved = array_map(fn ($name) => 'database/migrations/'.$name.'.php', productionReleaseMigrations());
+    $approved = array_map(fn ($name) => 'database/migrations/'.$name.'.php', productionReleaseMigrations($prepareOrderStatusAudit));
     preorderReleaseCheckPaths(array_values(array_diff($paths, $approved)));
 }
 
@@ -36,7 +37,8 @@ try {
     $mode = '__MODE__';
     $expected = '__COMMIT__';
     $runId = '__RUN_ID__';
-    syncGuard(in_array($mode, ['inspect', 'backup', 'deploy', 'verify', 'smoke'], true), 'Invalid production phase');
+    $prepareOrderStatusAudit = '__PREPARE_ORDER_STATUS_AUDIT__' === '1';
+    syncGuard(in_array($mode, ['inspect', 'backup', 'deploy', 'verify', 'smoke', 'health'], true), 'Invalid production phase');
     syncGuard((bool) preg_match('/^[a-f0-9]{40}$/D', $expected), 'Invalid production commit');
     syncGuard((bool) preg_match('/^[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}$/D', $runId), 'Invalid production run identifier');
     $root = '/home/szeganet/preorder-production-git';
@@ -64,15 +66,42 @@ try {
     // Inspect using the already deployed staging repository, without fetching into production.
     syncRead(['git', 'merge-base', '--is-ancestor', $head, $expected], $stage);
     $changes = array_filter(explode("\n", syncRead(['git', 'diff', '--name-only', $head, $expected], $stage)));
-    productionReleasePaths($changes);
+    productionReleasePaths($changes, $prepareOrderStatusAudit);
     $applied = $db->query('SELECT migration FROM migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN);
+    $targetFiles = array_map(fn ($file) => basename($file, '.php'), glob($stage.'/database/migrations/*.php'));
+    $pending = array_values(array_diff($targetFiles, $applied));
+    syncGuard(array_diff($pending, productionReleaseMigrations($prepareOrderStatusAudit)) === [], 'Unapproved pending production migration');
+    $needsAuditMigration = $prepareOrderStatusAudit && in_array(basename(preorderAuditMigrationPath(), '.php'), $pending, true);
+    if ($prepareOrderStatusAudit) {
+        // Pin the actual tested target file, not merely a migration filename.
+        preorderAuditMigrationValidate(file_get_contents($stage.'/'.preorderAuditMigrationPath()));
+    }
+    if ($needsAuditMigration) {
+        syncGuard($pending === [basename(preorderAuditMigrationPath(), '.php')], 'Audit migration must be the only pending production migration');
+        syncGuard(! in_array('order_status_logs', $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN), true), 'Audit table already exists without its migration');
+        syncGuard((int) $db->query("SELECT COUNT(*) FROM permissions WHERE name='View:OrderStatusHistory' AND guard_name='web'")->fetchColumn() === 0, 'Audit permission already exists; inspect before migration');
+    }
     $auditRoot = '/home/szeganet/.preorder-production-releases';
     $audit = $auditRoot.'/production-'.$runId.'-'.substr($expected, 0, 12);
     if ($mode === 'inspect') {
         syncGuard(is_executable('/usr/bin/mariadb-dump'), 'Backup executable missing');
         echo json_encode(['status' => 'checked', 'head' => $head, 'target' => $expected, 'maintenance' => $app->isDownForMaintenance(),
-            'migrations' => count($applied), 'approved_new_migrations' => array_values(array_diff(productionReleaseMigrations(), $applied)),
+            'migrations' => count($applied), 'approved_new_migrations' => $pending,
             'changed_files' => count($changes), 'audit' => $audit, 'php_version' => PHP_VERSION], JSON_THROW_ON_ERROR).PHP_EOL;
+
+        return;
+    }
+    if ($mode === 'health') {
+        syncGuard($head === $expected && ! $app->isDownForMaintenance() && $pending === [], 'Production is not ready');
+        $checks = [];
+        foreach (['/admin/login', '/partner/login'] as $path) {
+            $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 20, 'ignore_errors' => true, 'follow_location' => 0]]);
+            $body = file_get_contents('https://rendeles.szeganet.hu'.$path, false, $context);
+            preg_match('/^HTTP\/\S+\s+(\d+)/', $http_response_header[0] ?? '', $match);
+            syncGuard(($match[1] ?? '') === '200' && $body !== false && strlen($body) > 100, 'Public production login HTTP check failed: '.$path);
+            $checks[] = ['path' => $path, 'status' => 200];
+        }
+        echo json_encode(['status' => 'healthy', 'head' => $head, 'checks' => $checks], JSON_THROW_ON_ERROR).PHP_EOL;
 
         return;
     }
@@ -103,7 +132,14 @@ try {
         $before = ['head' => $head, 'target' => $expected, 'fingerprints' => $fingerprints, 'migrations' => $applied,
             'env_sha256' => hash_file('sha256', $root.'/.env'), 'htaccess_sha256' => hash_file('sha256', $root.'/public/.htaccess'),
             'public_mode' => fileperms($root.'/public') & 0777, 'stage_head' => $expected,
-            'product_ids' => $db->query('SELECT id FROM products ORDER BY id')->fetchAll(PDO::FETCH_COLUMN)];
+            'product_ids' => $db->query('SELECT id FROM products ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+            'tables' => $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN),
+            'audit_preparation' => $needsAuditMigration ? [
+                'permissions' => $db->query('SELECT id FROM permissions ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+                'migrations' => $db->query('SELECT id FROM migrations ORDER BY id')->fetchAll(PDO::FETCH_COLUMN),
+                'migration_fingerprint' => syncFingerprint($db, 'migrations'),
+                'batch' => (int) $db->query('SELECT MAX(batch) FROM migrations')->fetchColumn() + 1,
+            ] : null];
         syncWrite($audit.'/before.json', json_encode($before, JSON_THROW_ON_ERROR));
         syncBackup($cfg, $root, $audit);
         echo json_encode(['status' => 'backup_ready', 'tables' => count($fingerprints), 'audit' => $audit], JSON_THROW_ON_ERROR).PHP_EOL;
@@ -112,6 +148,8 @@ try {
     }
     syncGuard(is_file($audit.'/backup.json') && is_file($audit.'/before.json'), 'Verified production backup required');
     $before = json_decode(file_get_contents($audit.'/before.json'), true, flags: JSON_THROW_ON_ERROR);
+    $auditPreparation = $before['audit_preparation'] ?? null;
+    syncGuard($auditPreparation === null || $prepareOrderStatusAudit, 'Resume requires the explicit audit migration option');
     syncGuard($before['target'] === $expected && ($head === $expected || $head === $before['head']), 'Backup and installed commit mismatch');
     syncGuard(hash_file('sha256', $root.'/.env') === $before['env_sha256'] && hash_file('sha256', $root.'/public/.htaccess') === $before['htaccess_sha256'], 'Runtime configuration changed');
     if ($mode === 'deploy') {
@@ -122,7 +160,10 @@ try {
         $suffix = '-'.bin2hex(random_bytes(3));
         syncRun([$php, 'artisan', 'optimize:clear', '--no-interaction'], 'optimize-clear'.$suffix, $root, $audit);
         $files = array_map(fn ($f) => basename($f, '.php'), glob($root.'/database/migrations/*.php'));
-        syncGuard(array_diff($files, $applied, productionReleaseMigrations()) === [], 'Unapproved pending migration');
+        syncGuard(array_diff($files, $applied, productionReleaseMigrations($prepareOrderStatusAudit)) === [], 'Unapproved pending migration');
+        if ($prepareOrderStatusAudit) {
+            preorderAuditMigrationValidate(file_get_contents($root.'/'.preorderAuditMigrationPath()));
+        }
         syncRun([$php, 'artisan', 'migrate', '--force', '--no-interaction'], 'migrate'.$suffix, $root, $audit);
         syncRun([$php, 'artisan', 'filament:optimize-clear', '--no-interaction'], 'filament-clear'.$suffix, $root, $audit);
         syncRun([$php, 'artisan', 'optimize', '--no-interaction'], 'optimize'.$suffix, $root, $audit);
@@ -165,6 +206,11 @@ try {
             foreach (['/admin/products', '/admin/pricing-parameters', '/admin/pricing-product-overview', '/admin/pricing-huf-retail-calculations'] as $path) {
                 $get($path, $admin);
             }
+            if ($prepareOrderStatusAudit) {
+                $get('/admin/order-status-history', $admin);
+                $db->query('SELECT id, order_id, event, occurred_at, email_status FROM order_status_logs LIMIT 0')->closeCursor();
+                syncGuard((int) $db->query("SELECT COUNT(*) FROM permissions WHERE name='View:OrderStatusHistory' AND guard_name='web'")->fetchColumn() === 1, 'Order status audit permission missing');
+            }
             foreach (['partner_admin', 'address_user', 'sales_rep'] as $role) {
                 $sample = null;
                 $user = null;
@@ -184,6 +230,11 @@ try {
                 syncGuard($group !== null, 'No visible group for sample role '.$role);
                 $html = $get('/partner/orders/'.$sample->id.'/catalog-groups/'.rawurlencode($group), $user, 'partner', (int) $sample->season_id);
                 syncGuard(str_contains($html, 'data-order-reference-number') && str_contains($html, e($sample->reference_number)), 'Missing order reference in rendered sheet');
+                if ($role === 'sales_rep' && $sample->isSubmitted()) {
+                    syncGuard((bool) preg_match('/data-order-header-tools[\s\S]*data-order-reopen[\s\S]*data-partner-language-tools[\s\S]*data-order-navigation/', $html), 'Reopen button is not before language selector');
+                } else {
+                    syncGuard(! str_contains($html, 'data-order-reopen'), 'Unexpected reopen button');
+                }
             }
             DB::rollBack();
             syncWrite($audit.'/smoke-'.bin2hex(random_bytes(3)).'.json', json_encode($checks, JSON_THROW_ON_ERROR));
@@ -197,10 +248,27 @@ try {
         }
     }
     foreach ($before['fingerprints'] as $table => $fingerprint) {
-        syncGuard(syncFingerprint($db, $table, null, $fingerprint['columns']) === $fingerprint, 'Business data changed: '.$table);
+        $ids = $table === 'permissions' ? ($auditPreparation['permissions'] ?? null) : null;
+        $actual = $ids === [] ? ['rows' => 0, 'sha256' => hash('sha256', ''), 'columns' => $fingerprint['columns']]
+            : syncFingerprint($db, $table, $ids, $fingerprint['columns']);
+        syncGuard($actual === $fingerprint, 'Business data changed: '.$table);
+    }
+    if ($auditPreparation !== null) {
+        foreach (['permissions', 'migrations'] as $table) {
+            preorderAuditAddedRows($table, $db->query('SELECT * FROM `'.$table.'` ORDER BY id')->fetchAll(PDO::FETCH_ASSOC), $auditPreparation[$table], $auditPreparation['batch']);
+        }
+        $fingerprint = $auditPreparation['migration_fingerprint'];
+        $actual = $auditPreparation['migrations'] === [] ? ['rows' => 0, 'sha256' => hash('sha256', ''), 'columns' => $fingerprint['columns']]
+            : syncFingerprint($db, 'migrations', $auditPreparation['migrations'], $fingerprint['columns']);
+        syncGuard($actual === $fingerprint, 'Existing migration records changed');
+        $expectedTables = [...$before['tables'], 'order_status_logs'];
+        $actualTables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+        sort($expectedTables);
+        sort($actualTables);
+        syncGuard($expectedTables === $actualTables && (int) $db->query('SELECT COUNT(*) FROM order_status_logs')->fetchColumn() === 0, 'Unexpected audit schema/data changes');
     }
     $nowApplied = $db->query('SELECT migration FROM migrations ORDER BY migration')->fetchAll(PDO::FETCH_COLUMN);
-    syncGuard(array_diff($before['migrations'], $nowApplied) === [] && array_diff($nowApplied, $before['migrations'], productionReleaseMigrations()) === [], 'Unexpected migration history changes');
+    syncGuard(array_diff($before['migrations'], $nowApplied) === [] && array_diff($nowApplied, $before['migrations'], productionReleaseMigrations($prepareOrderStatusAudit)) === [], 'Unexpected migration history changes');
     $files = array_map(fn ($f) => basename($f, '.php'), glob($root.'/database/migrations/*.php'));
     syncGuard(array_diff($files, $nowApplied) === [], 'Pending production migrations remain');
     if (! in_array(productionReleaseMigrations()[0], $before['migrations'], true)) {

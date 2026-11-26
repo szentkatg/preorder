@@ -18,6 +18,23 @@ partneroldali láthatóság, exkluzivitás, főcsoportkód-minta. A láthatósá
 a már meglévő termékek új mezőjét igazra állítja; más meglévő oszlop nem változik.
 Új migrációkhoz a telepítési szabály külön kódellenőrzése szükséges.
 
+A rendelési eseménynapló migrációja külön előkészített kivétel. Csak az alábbi
+kapcsolóval engedélyezett, és a teszten már futó fájl SHA-256 lenyomatát is
+ellenőrizzük (nem elegendő az azonos fájlnév):
+
+```powershell
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-production.ps1 -Mode Check -Commit A_TESZTELT_COMMIT -PrepareOrderStatusAudit
+powershell.exe -NoProfile -File infrastructure/scripts/deploy-production.ps1 -Mode Deploy -Commit A_TESZTELT_COMMIT -PrepareOrderStatusAudit
+```
+
+Ekkor a `2026_11_26_090000_create_order_status_logs_table` lehet az egyetlen
+függő migráció. Az új, kezdetben üres naplótábla mellett kizárólag egy új
+`View:OrderStatusHistory` / `web` jogosultság és egy migrációs sor kerülhet be.
+A meglévő jogosultságok és migrációs rekordok teljes lenyomatát külön is
+ellenőrizzük; szerepkör-hozzárendelést nem módosítunk. A belső HTTP-próba a
+naplóoldalt és a visszanyitó gomb fejlécbeli helyét is ellenőrzi. Megszakadás
+után a Resume-hoz is szükséges a `-PrepareOrderStatusAudit` kapcsoló.
+
 Menet: előellenőrzés, Git-publikálás, kód- és konfigurációmentés, maintenance,
 teljes ellenőrzött adatbázismentés, fast-forward kódfrissítés, a megengedett
 migrációk futtatása, cache-újraépítés, belső HTTP-próba, meglévő üzleti adatok
@@ -33,7 +50,7 @@ célcommittal és az eredeti RunId-val a `-Mode Resume -RunId ...` ismétli az
 idempotens telepítési lépéseket és az ellenőrzéseket. A megállás utáni maintenance
 nem oldható fel vakon; előbb a kód/séma és az üzleti adatok ellenőrzése szükséges.
 
-A siker feltétele a `PRODUCTION DEPLOY OK`, majd a publikus HTTPS-belépőoldalak
-külön ellenőrzése. A helyi HEAD tartalmazhat új telepítési segédprogramokat is;
+A siker feltétele a `PRODUCTION DEPLOY OK`, amely előtt a telepítő a publikus
+HTTPS-belépőoldalakat is ellenőrzi. A helyi HEAD tartalmazhat új telepítési segédprogramokat is;
 ezért a `-Commit` a teszten már futó alkalmazásverzióra mutasson, ne automatikusan
 az új segédprogram commitjára.
