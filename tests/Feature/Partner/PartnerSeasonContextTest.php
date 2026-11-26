@@ -603,7 +603,10 @@ class PartnerSeasonContextTest extends TestCase
         $page = Livewire::test(CatalogGroupOrder::class, ['order' => $order, 'catalogGroupName' => 'Bags'])
             ->assertSee($label)->assertSeeHtml('data-order-reopen')
             ->assertSeeHtml('wire:confirm="'.e(__('partner.confirm_reset_order_to_draft')).'"');
-        $this->assertMatchesRegularExpression('/data-order-navigation[\s\S]*data-order-reopen[\s\S]*data-order-reference-number/', $page->html());
+        $html = $page->html();
+        $this->assertMatchesRegularExpression('/data-order-header-tools[\s\S]*data-order-reopen[\s\S]*data-partner-language-tools[\s\S]*data-order-navigation/', $html);
+        $this->assertSame(1, substr_count($html, 'data-order-reopen'));
+        $this->assertStringNotContainsString('data-order-reopen', substr($html, strpos($html, 'data-order-navigation')));
         $page->call('resetOrderToDraft')->assertSet('order.status', 'draft')->assertDontSeeHtml('data-order-reopen')
             ->assertDispatched('order-summary-changed');
         $this->assertNull($order->fresh()->submitted_at);

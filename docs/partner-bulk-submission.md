@@ -40,7 +40,8 @@ megmaradnak; a még el nem indult rendelések nem küldődnek be. Újbóli kijel
 a már beküldöttek automatikusan kimaradnak. Nincs a háttérben futó tartós feladat.
 
 Beküldött rendelés visszanyitásához a területi képviselő a rendelőlap tetején,
-az **Összesített adatok** mellett találja a **Visszaállítás piszkozatba** gombot.
+közvetlenül a **nyelvválasztó előtt** találja a **Visszaállítás piszkozatba** gombot,
+a kategóriaváltó navigációtól elkülönítve.
 Ez a gomb az összesítőoldalról átkerült a rendelőlapra. Megerősítés után a
 státusz piszkozat lesz, a beküldési idő törlődik; a tételek változatlanok és
 újra szerkeszthetők. Visszanyitáskor nincs e-mail, megosztott linken pedig nem

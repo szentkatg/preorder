@@ -12,6 +12,14 @@
 - Production deployment requires separate explicit authorization and its own
   reviewed workflow. Never extend this NAS/staging helper to production merely
   to reuse an approval.
+- User deployment shorthand (agreed 2026-11-26): a deployment request saying
+  "tesztre" authorizes deployment to BOTH NAS and staging/test. A deployment
+  request saying "élesre" authorizes NAS, staging/test AND production, using
+  the separate reviewed production workflow. No extra target clarification is
+  needed for these requests. Quoted examples, questions and rule-setting messages
+  are not deployment requests. Backups, verification, schema preparation and
+  required tool approvals still apply; report any failed prerequisite before
+  proceeding to production.
 - Do not modify global permission settings or request blanket PowerShell/SSH
   access to avoid prompts. Persistent narrow approvals depend on the user's UI
   and managed policy.

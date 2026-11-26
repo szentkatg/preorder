@@ -370,7 +370,16 @@
             <div class="min-w-0 flex-1">
                 <x-partner-season-banner :season="$order->season" :brand="$order->brand" :order-sheet-type="$order->orderSheetType" :allow-season-change="! $sharedMode" />
             </div>
-            <x-partner-language-selector />
+            <div class="flex flex-wrap items-center gap-2" data-order-header-tools>
+                @if ($this->canReopenOrder)
+                    <button type="button" wire:click="resetOrderToDraft" data-order-reopen
+                        wire:confirm="{{ __('partner.confirm_reset_order_to_draft') }}"
+                        class="rounded bg-yellow-600 px-3 py-2 text-sm font-semibold text-white hover:bg-yellow-500">
+                        {{ __('partner.reset_order_to_draft') }}
+                    </button>
+                @endif
+                <x-partner-language-selector />
+            </div>
         </div>
         @if (session('success'))
             <div class="rounded bg-green-100 p-3 text-green-800">
@@ -383,13 +392,6 @@
             @if (! $sharedMode)
                 <a href="{{ route('partner.orders.select') }}" wire:navigate class="rounded border border-slate-300 bg-slate-50 px-3 py-2 font-semibold">{{ __('partner.back_to_orders') }}</a>
                 <a href="{{ route('partner.orders.overview', $order) }}" wire:navigate class="rounded border border-sky-300 bg-sky-50 px-3 py-2 font-semibold">{{ __('partner.aggregated_data') }}</a>
-                @if ($this->canReopenOrder)
-                    <button type="button" wire:click="resetOrderToDraft" data-order-reopen
-                        wire:confirm="{{ __('partner.confirm_reset_order_to_draft') }}"
-                        class="rounded bg-yellow-600 px-3 py-2 font-semibold text-white hover:bg-yellow-500">
-                        {{ __('partner.reset_order_to_draft') }}
-                    </button>
-                @endif
             @else
                 <span class="font-semibold text-gray-700">
                     {{ __('partner.shared_order_sheet') }}
