@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Partner;
 use App\Models\PartnerUser;
 use App\Services\Partner\ErpOrderExportService;
+use App\Services\Partner\OrderSubmissionService;
 use App\Services\Partner\PartnerSeasonContext;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
@@ -56,6 +57,20 @@ class SalesRepOrderSummary extends Component
 
     #[Locked]
     public array $erpExportOrderIds = [];
+
+    public function openBulkSubmission(): void
+    {
+        $this->resetValidation('selectedSummaryOrderIds');
+        $orders = app(OrderSubmissionService::class)->selectedOrders($this->selectedSummaryOrderIds);
+        $this->dispatch('open-order-bulk-submission', orderIds: $orders->modelKeys())->to(OrderBulkSubmission::class);
+    }
+
+    #[On('orders-bulk-submitted')]
+    public function refreshAfterBulkSubmission(): void
+    {
+        $this->selectedSummaryOrderIds = [];
+        $this->refreshSummary();
+    }
 
     public function getCanExportErpProperty(): bool
     {

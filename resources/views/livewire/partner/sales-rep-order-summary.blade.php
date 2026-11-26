@@ -15,6 +15,11 @@
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
                     <div x-show="open" class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="openBulkSubmission" wire:loading.attr="disabled"
+                            @disabled(count($selectedSummaryOrderIds) === 0)
+                            class="rounded bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50">
+                            {{ __('partner.submit_multiple_orders') }}
+                        </button>
                         <button
                             type="button"
                             wire:click="openSelectedSummaryOrders"

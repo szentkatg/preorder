@@ -9,6 +9,7 @@
         <x-partner-language-selector />
     </div>
     <h1 class="text-2xl font-bold">{{ __('partner.aggregated_data') }}</h1>
+    @error('orderSubmission') <p role="alert" class="rounded bg-amber-100 p-3 text-amber-900">{{ $message }}</p> @enderror
     <x-partner-season-banner :season="$this->selectedSeason" :brand="$this->selectedOrder->brand" :order-sheet-type="$this->selectedOrder->orderSheetType" />
     <p class="font-semibold">{{ $this->selectedOrder->partner?->name }} — {{ $this->selectedOrder->partnerAddress?->name }} — {{ $this->selectedOrder->reference_number }}</p>
     @if ($this->selectedOrder)

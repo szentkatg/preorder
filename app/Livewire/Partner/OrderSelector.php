@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Partner;
 
-use App\Exports\PartnerOrderMatrixExport;
 use App\Exports\SalesRepSummaryExport;
 use App\Livewire\Partner\Concerns\HasPartnerLanguageSelector;
 use App\Livewire\Partner\Concerns\RequiresSelectedPartnerSeason;
@@ -18,14 +17,15 @@ use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\Season;
 use App\Models\Translation;
+use App\Services\Partner\OrderSubmissionService;
 use App\Services\Partner\PartnerSeasonContext;
 use App\Services\Partner\PartnerSeasonVisibility;
 use App\Services\Partner\SalesRepOrderSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -956,62 +956,24 @@ class OrderSelector extends Component
         ]);
     }
 
+    #[On('orders-bulk-submitted')]
+    public function refreshOrdersAfterBulkSubmission(): void
+    {
+        $this->accessibleOrdersCache = null;
+    }
+
     public function submitSelectedOrder(): void
     {
         $order = $this->selectedOrder();
 
         abort_unless($order instanceof Order, 403);
 
-        if ($order->isSubmitted()) {
-            return;
-        }
-
-        $order->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
+        $this->resetValidation('orderSubmission');
+        $result = app(OrderSubmissionService::class)->submit((int) $order->id);
         $order->refresh();
         $this->dispatch('order-summary-changed');
-
-        $partnerUser = auth('partner')->user();
-
-        if ($partnerUser?->email) {
-            $export = new PartnerOrderMatrixExport($order);
-
-            $filename = method_exists($export, 'filename')
-                ? $export->filename()
-                : 'elorendeles-'.$order->id.'.xlsx';
-
-            $excelContent = Excel::raw($export, \Maatwebsite\Excel\Excel::XLSX);
-
-            $subject = implode(' | ', array_filter([
-                $order->partner?->erp_partner_code,
-                $order->partner?->name,
-                $order->partnerAddress?->name,
-                $order->brand?->name,
-                $order->orderSheetType?->translate('name'),
-                $order->reference_number,
-            ]));
-            $subject = __('partner.order_submitted_email_subject').' | '.$subject;
-            Mail::raw(__('partner.order_submitted_email_body'), function ($message) use (
-                $partnerUser,
-                $filename,
-                $excelContent,
-                $subject
-            ) {
-                $message
-                    ->to($partnerUser->email)
-                    ->cc(config('app.order_notification_cc'))
-                    ->subject($subject)
-                    ->attachData(
-                        $excelContent,
-                        $filename,
-                        [
-                            'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        ]
-                    );
-            });
+        if ($result['email_failed']) {
+            $this->addError('orderSubmission', __('partner.submission_email_failed'));
         }
 
         $this->dispatch('$refresh');

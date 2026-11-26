@@ -89,6 +89,7 @@
     </div>
 
     <livewire:partner.sales-rep-order-summary />
+    <livewire:partner.order-bulk-submission />
     <livewire:partner.order-import />
 
 </div>
