@@ -29,17 +29,36 @@ tetszőleges fájlnév nem engedélyezett. A leírások csak mintaadatokat tarta
 
 ## Kézikönyvek
 
-- `resources/help/partner-guide-hu.pdf`: a korábban jóváhagyott, képernyőképes
-  magyar kézikönyv és az aktuális frissítési/importálási kiegészítés.
-- `resources/help/partner-guide-en.pdf`: angol változat, az alkalmazás angol
-  felületéből, kizárólag helyi mintaadatokkal készített képekkel.
+- `resources/help/partner-guide-hu.pdf` és `partner-guide-en.pdf`: teljes magyar
+  és angol kézikönyv, a HTML-súgóval közös tartalomból, helyi mintaadatokkal
+  készült képernyőképekkel. A korábbi magyar PDF-et nem fűzzük hozzá: így a
+  jelenlegi működéssel ellentétes, régi útmutatás nem kerül vissza a fájlba.
 - `resources/help/content/{hu|en}.json`: szerkeszthető tartalmi források.
-- `scripts/build-partner-guide.py`: a PDF-ek előállítója. A korábbi magyar PDF
-  és a mintaadatokkal készített angol képernyőképek megadandók argumentumként;
-  a script nem kapcsolódik éles rendszerhez.
+- `scripts/build-partner-guide.py --updated 2026-11-27`: mindkét PDF előállítója
+  a JSON-források és a publikált JPEG-ek alapján. A `--delivery` alapértelmezett
+  célja `output/pdf`. A script nem kapcsolódik éles rendszerhez, és nem igényel
+  korábbi kézikönyvet. ReportLab, Pillow, pypdf és Arial betűk szükségesek.
+- `tests/Feature/Manual/PartnerGuideScreenshotsTest.php`: a jelenlegi Blade
+  nézeteket rendereli SQLite memóriabeli mintaadatokkal. Csak a
+  `BUILD_PARTNER_GUIDE_DEMO=1` kapcsolóval fut; `GUIDE_LOCALE=hu` és `en` külön
+  futtatandó. A `.tmp/partner-manual-v2/tailwind.js` helyi stílusruntime szükséges.
+- `scripts/render-partner-guide-demo.cjs`: a demó HTML-eket helyi, headless
+  böngészővel képpé rendereli. Playwright és Edge (vagy `GUIDE_BROWSER`) kell
+  hozzá. Külső HTTP-kérést nem enged, élő partnerfiókba nem lép be. A képeken
+  a rögzített mintaállapot látható, nem élő Livewire-műveletek futnak.
 - `scripts/prepare-partner-help-images.py`: a helyi, mintaadatokkal készült
   képernyőképeket optimalizálja a HTML-súgóhoz. Nem ér el élő rendszert.
 
-Telepítéskor a szokásos kódfrissítés mellett migráció szükséges. A két PDF a
+Az eredeti tájékoztató bevezetéséhez migráció kellett; a kézikönyv mostani
+frissítéséhez nem kell migráció. A két PDF a
 verziózott kód része, nincs külön tárhelyre másolandó, figyelmen kívül hagyott fájl.
 Ez a változtatás nem módosít rendelést, árlistát vagy partner-hozzáférést.
+
+## 2026.11.27-i tartalmi frissítés
+
+A leírások a két fület (Rendelés generálása/megnyitása, Rendelések listája),
+a keresők külön hatókörét, az elérhető rendelések szerinti kezdőfület, a
+rendelésből mindig listára visszatérést, valamint a fülváltáskor megmaradó
+szűréseket és kijelöléseket ismertetik. Szerepel a tömeges beküldés külön
+e-mail-választása és folyamatjelzése, a visszanyitó gomb nyelvválasztó előtti
+helye, a hivatkozási szám fejlécbeli kijelzése és az események naplózása is.

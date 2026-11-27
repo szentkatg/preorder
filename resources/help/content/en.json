@@ -11,7 +11,9 @@
       "For a first login or forgotten password, use Forgot password. Request a reset link for your registered email address.",
       "Open the link from the email and enter your new password twice. It must contain at least 8 characters. Return to the login page afterwards."
     ],
-    "notes": ["Check your spam folder if the reset email does not arrive. Contact your sales representative if your address is not registered. Never forward passwords or password-reset links. Sign out when using a shared computer."]
+    "notes": [
+      "Check your spam folder if the reset email does not arrive. Contact your sales representative if your address is not registered. Never forward passwords or password-reset links. Sign out when using a shared computer."
+    ]
   },
   {
     "title": "Choosing a season, language and Help",
@@ -25,35 +27,60 @@
       "Use Language in the header to change the interface language. This does not change the order's price list, currency or quantities.",
       "The Help link at the top of every portal page opens this guide in the selected language in a new tab. Help is also available in the update notice and season dialog."
     ],
-    "notes": ["If a season is missing, ask your sales representative to check its availability. Removing list filters cannot reveal a season that has not been made available."]
+    "notes": [
+      "If a season is missing, ask your sales representative to check its availability. Removing list filters cannot reveal a season that has not been made available."
+    ]
   },
   {
-    "title": "Opening an order or creating a new one",
-    "intro": "Several orders can exist for the same season, partner, address, brand and order sheet. Their reference numbers distinguish them.",
+    "title": "Generate/open order",
+    "intro": "The Orders page has two side-by-side tabs: Generate/open order and Order list. Only one tab's contents are visible at a time; there are no separate collapse buttons. Several orders can exist for the same season, partner, address, brand and order sheet, each with its own reference.",
     "image": "04-selector-panel.png",
-    "caption": "Address and order selection, followed by the fields for a new order.",
+    "caption": "The Generate/open order tab, including the address-search explanation and new-order fields.",
     "steps": [
-      "Search addresses by partner name or code, address code, address name, city or street.",
+      "Choose Generate/open order to create an order or find an existing order by address.",
+      "Address search only filters the address selector below it by partner name or code, address code or name, postcode, city or street. It does not filter the orders on the Order list tab.",
       "Choose the address, brand and order sheet. Available choices depend on your access and the address settings.",
       "To continue an existing order, click Open order sheet beside its reference number.",
       "For a new order, enter a unique reference, choose an allowed order type if there is a choice, and click Create new order."
     ],
-    "paragraphs": ["An order sheet type, such as Textile, is different from an order type, such as VRELO (normal preorder). Only active order types allowed for the selected address are offered. A single available choice may be selected automatically.", "A reference can contain up to 100 characters, for example PRE-S27-005. It must be unique within the same season, partner, address, brand and order sheet combination. Changing the order type does not allow you to reuse the same reference.", "References have already been added to older orders. Find the actual reference in the order list rather than assuming it matches an older Excel file."],
-    "notes": ["If no order type is available, an administrator must configure the address before you can create an order."]
+    "paragraphs": [
+      "If you have an accessible order in the selected season, Order list is active initially. Otherwise Generate/open order opens. Orders in other seasons or outside your access scope do not count. Previously saved list filters do not change this initial choice.",
+      "An order sheet type, such as Textile, is different from an order type, such as VRELO (normal preorder). Only active order types allowed for the selected address are offered. A single available choice may be selected automatically.",
+      "A reference can contain up to 100 characters, for example PRE-S27-005. It must be unique within the same season, partner, address, brand and order sheet combination. Changing the order type does not allow you to reuse the same reference.",
+      "References have already been added to older orders. Find the actual reference in the order list rather than assuming it matches an older Excel file."
+    ],
+    "notes": [
+      "If no order type is available, an administrator must configure the address before you can create an order."
+    ]
   },
   {
-    "title": "Filtering and selecting orders",
-    "intro": "Below the selection panel, the list contains the orders you may access in the selected season. It can include several addresses and references.",
-    "image": "05-rendeleslista.png",
-    "caption": "Order-list detail: filters, selection checkboxes and identifying information.",
+    "title": "Order list: searching, filtering and selecting",
+    "intro": "Open the Order list tab to work with orders you can access in the selected season. The list is not beneath the creation panel: click the tab to switch. Searches, filters and selected orders are retained when switching tabs.",
     "steps": [
-      "Filter by sales representative, brand, order sheet, currency, whether the order contains quantities, or order status. Partner search also accepts an address code.",
+      "Filter by sales representative, brand, order sheet, currency, whether the order contains quantities, or order status. Search the order list accepts partner codes and names, address codes and details, reference numbers and order types. These controls only affect the order list on this tab.",
       "Select orders with the checkboxes at the start of their rows. The header checkbox toggles selection for the filtered orders.",
       "Click an order row to open it. Check the address code and reference, not only the partner name.",
       "Export to Excel exports the filtered order-list overview. It is not the size-by-size order sheet."
     ],
-    "paragraphs": ["Draft orders are editable. Submitted orders are read-only. Zero quantity means the order exists but does not contain ordered quantities."],
-    "notes": ["The checkboxes in this list control combined summaries and ERP exports. The address and brand selections in the new-order panel above do not choose the orders for these actions."]
+    "paragraphs": [
+      "The list loads when first opened. Switching away and back does not reload the whole list or clear its filters and selection. Applying a new filter or search clears the old selection: select again from the new results.",
+      "To submit several orders, select their rows and click Submit multiple orders. The confirmation shows how many are selected and how many have already been submitted; already submitted orders are skipped.",
+      "The confirmation offers email confirmations or status changes only. Email is selected by default. Clear its checkbox to set orders to Submitted without generating confirmation emails or Excel attachments. This option applies to bulk submission.",
+      "After confirmation, orders are processed one at a time; keep the page open until processing finishes. Cancel makes no changes. The result distinguishes order failures from email failures. An email failure does not undo a successful submission."
+    ],
+    "notes": [
+      "The address and brand choices on Generate/open order do not select orders for list actions. Use the Order list checkboxes for bulk submission, combined summaries and ERP exports."
+    ],
+    "images": [
+      [
+        "05-rendeleslista.png",
+        "The Order list tab with its own filters, search, selection checkboxes and actions."
+      ],
+      [
+        "17-tomeges-bekuldes.png",
+        "Bulk submission confirmation, with a separate email checkbox for status-only submission."
+      ]
+    ]
   },
   {
     "title": "Understanding the order sheet",
@@ -61,13 +88,15 @@
     "image": "06-szezon-fejlec.png",
     "caption": "The header identifies the selected season, brand and order sheet type.",
     "steps": [
-      "Check the season, brand and order sheet type at the top, then the partner and address beneath them.",
-      "Back to orders returns to order selection. Aggregated data opens this order's catalogue-group summary.",
+      "Check the season, brand, order sheet, partner, address and order reference at the top.",
+      "Back to orders always opens the Order list tab. Aggregated data opens the catalogue-group summary for this individual order only.",
       "The links labelled with the previous and next catalogue group names move between groups.",
       "Current catalogue group and Full order show quantities, net wholesale value and gross retail value.",
       "Show all catalogue groups displays every group on one page. Return to the current-group view when you no longer need the long list."
     ],
-    "notes": ["A wide sheet may need horizontal scrolling. Displaying all groups in a large textile order uses more browser memory and may take longer than viewing one group at a time."]
+    "notes": [
+      "A wide sheet may need horizontal scrolling. Displaying all groups in a large textile order uses more browser memory and may take longer than viewing one group at a time."
+    ]
   },
   {
     "title": "Saving quantities and ordering assortments",
@@ -80,8 +109,13 @@
       "Enter 0 and leave the cell to remove an existing quantity.",
       "You can copy a rectangular quantity range from Excel with Ctrl+C and paste into its starting size cell with Ctrl+V. Check the starting cell, size order and resulting quantities."
     ],
-    "paragraphs": ["An Assortment order column appears only when the address permits assortment ordering and an assortment exists for the colour. Enter the number of assortments, not the number of individual pieces inside them.", "For example, two assortments containing six pieces each add 12 pieces to the size totals. Individual and assortment quantities are added together."],
-    "notes": ["Submitted orders have no editable quantity cells. Saving is not submitting: a saved draft can still be changed."]
+    "paragraphs": [
+      "An Assortment order column appears only when the address permits assortment ordering and an assortment exists for the colour. Enter the number of assortments, not the number of individual pieces inside them.",
+      "For example, two assortments containing six pieces each add 12 pieces to the size totals. Individual and assortment quantities are added together."
+    ],
+    "notes": [
+      "Submitted orders have no editable quantity cells. Saving is not submitting: a saved draft can still be changed."
+    ]
   },
   {
     "title": "Finding models and viewing product images",
@@ -96,8 +130,12 @@
       "Click a model name to open its images. Available colour and catalogue pictures appear in the image window.",
       "You can open an image in another browser tab. Close the image window to return to the sheet."
     ],
-    "paragraphs": ["Viewing images does not change the order. Enter quantities on the required colour's row, not simply the row with the correct model name. In the all-groups view, catalogue-group links help you jump within the long page."],
-    "notes": ["A missing image does not necessarily mean a colour is unavailable. The enabled size cells indicate what can be ordered."]
+    "paragraphs": [
+      "Viewing images does not change the order. Enter quantities on the required colour's row, not simply the row with the correct model name. In the all-groups view, catalogue-group links help you jump within the long page."
+    ],
+    "notes": [
+      "A missing image does not necessarily mean a colour is unavailable. The enabled size cells indicate what can be ordered."
+    ]
   },
   {
     "title": "Exporting a sheet and working in Excel",
@@ -110,8 +148,13 @@
       "Change only the quantities in orderable size cells. Sheet protection helps identify the fields intended for input.",
       "Save the completed file in Excel format, then upload it using the import process."
     ],
-    "paragraphs": ["Important cells: C3 contains the ERP address code; C5, C6 and C7 identify the season, brand and order sheet. E1 is the reference label; F1 contains the reference value. Hidden identifiers are needed to import products, SKUs and sizes."],
-    "notes": ["Do not delete or rename technical identifiers, insert rows or move columns. Removing protection does not make unavailable sizes orderable.", "Before reusing an older export, check the reference in the portal. Enter it in F1. If F1 is empty, you can instead supply the missing reference in the import preview. Import does not create a new target order."]
+    "paragraphs": [
+      "Important cells: C3 contains the ERP address code; C5, C6 and C7 identify the season, brand and order sheet. E1 is the reference label; F1 contains the reference value. Hidden identifiers are needed to import products, SKUs and sizes."
+    ],
+    "notes": [
+      "Do not delete or rename technical identifiers, insert rows or move columns. Removing protection does not make unavailable sizes orderable.",
+      "Before reusing an older export, check the reference in the portal. Enter it in F1. If F1 is empty, you can instead supply the missing reference in the import preview. Import does not create a new target order."
+    ]
   },
   {
     "title": "Previewing and importing Excel files",
@@ -126,8 +169,12 @@
       "Compare existing and new quantities and values, and the changed-row count. Deselect files individually or use Select all and Clear selection.",
       "Click Import selected, then review the result and warnings."
     ],
-    "paragraphs": ["The target must already exist, be accessible to you, be editable and belong to the selected season. The file's address, brand and order sheet must also match. The reference field repairs an empty F1; it does not override a non-empty but incorrect F1."],
-    "notes": ["Blank Excel cells leave existing quantities unchanged. A numeric 0 removes the corresponding quantity. Submitted orders and inaccessible addresses cannot be imported."]
+    "paragraphs": [
+      "The target must already exist, be accessible to you, be editable and belong to the selected season. The file's address, brand and order sheet must also match. The reference field repairs an empty F1; it does not override a non-empty but incorrect F1."
+    ],
+    "notes": [
+      "Blank Excel cells leave existing quantities unchanged. A numeric 0 removes the corresponding quantity. Submitted orders and inaccessible addresses cannot be imported."
+    ]
   },
   {
     "title": "Reviewing totals and submitting an order",
@@ -140,8 +187,13 @@
       "When finished, click Submit order sheet and read the confirmation before approving it.",
       "The status changes to Submitted. You can still view the order, but you cannot edit quantities or import changes."
     ],
-    "paragraphs": ["The system also emails the submitting user an Excel copy of the order. If the email does not arrive, first check the status in the portal; do not create a duplicate order simply because a message is missing."],
-    "notes": ["A sales representative can reopen an accessible submitted order as a draft. Deleting an entire draft order requires confirmation and is different from setting its quantities to zero."]
+    "paragraphs": [
+      "The system also emails the submitting user an Excel copy of the order. If the email does not arrive, first check the status in the portal; do not create a duplicate order simply because a message is missing."
+    ],
+    "notes": [
+      "To reopen a submitted order, a sales representative uses Reset to draft at the top of the order sheet, immediately before the language selector. It is not on Aggregated data or among the catalogue-group links. Confirmation keeps order lines unchanged, clears the submission time and makes the order editable again. Reopening sends no email.",
+      "Deleting an entire draft order requires confirmation and is different from setting quantities to zero. After deletion, Order list opens even if the deleted order was the last one."
+    ]
   },
   {
     "title": "Combining several orders in a summary",
@@ -154,7 +206,10 @@
       "Click Summarize selected orders to open the combined matrix.",
       "Export to Excel in that summary downloads the combined size-level quantities. Make corrections in the original orders."
     ],
-    "notes": ["For financial checks, summarize orders with different price lists separately. The combined matrix uses one common price list; it is not simply the sum of each order's values at its own prices.", "The order-list export, individual-sheet export, combined-matrix export and ERP export are different files. Use the button for the task you intend."]
+    "notes": [
+      "For financial checks, summarize orders with different price lists separately. The combined matrix uses one common price list; it is not simply the sum of each order's values at its own prices.",
+      "The order-list export, individual-sheet export, combined-matrix export and ERP export are different files. Use the button for the task you intend."
+    ]
   },
   {
     "title": "Sharing an order sheet",
@@ -168,8 +223,13 @@
       "Generate the share link, copy the entire link and send it only to the intended person.",
       "Revoke the link and confirm when access is no longer required."
     ],
-    "paragraphs": ["Partner administrators and representatives may choose active wholesale or distributor lists assigned to active addresses of the order's partner. Address users see only lists assigned to their own accessible active addresses.", "Gross retail prices come from the retail list linked to the selected wholesale or distributor list, for the order's season. The shared view does not change the original order's price list."],
-    "notes": ["Anyone holding the link can edit the order without signing in. The link stops working after expiry, revocation, submission or loss of the relevant price-list permission. Treat it as confidential."]
+    "paragraphs": [
+      "Partner administrators and representatives may choose active wholesale or distributor lists assigned to active addresses of the order's partner. Address users see only lists assigned to their own accessible active addresses.",
+      "Gross retail prices come from the retail list linked to the selected wholesale or distributor list, for the order's season. The shared view does not change the original order's price list."
+    ],
+    "notes": [
+      "Anyone holding the link can edit the order without signing in. The link stops working after expiry, revocation, submission or loss of the relevant price-list permission. Treat it as confidential."
+    ]
   },
   {
     "title": "Completing a shared order sheet",
@@ -182,22 +242,40 @@
       "Use catalogue-group navigation when available. Click Save before leaving.",
       "Tell the person who sent the link when you have finished. They submit the order from their signed-in account."
     ],
-    "paragraphs": ["The shared page has no submission, order deletion, additional sharing, Excel import or Excel export. Recipients cannot choose another price list.", "Edits go directly into the original order. If several people edit the same cell, the last saved value may replace an earlier one. Agree in advance who will complete which products."],
-    "notes": ["If a link no longer opens, do not alter the URL manually. Ask its sender for a new link. The sender can revoke access at any time."]
+    "paragraphs": [
+      "The shared page has no submission, order deletion, additional sharing, Excel import or Excel export. Recipients cannot choose another price list.",
+      "Edits go directly into the original order. If several people edit the same cell, the last saved value may replace an earlier one. Agree in advance who will complete which products."
+    ],
+    "notes": [
+      "If a link no longer opens, do not alter the URL manually. Ask its sender for a new link. The sender can revoke access at any time."
+    ]
   },
   {
     "title": "Tools for sales representatives",
     "intro": "Representatives work with partners and addresses in their access scope. Representative-only actions are not shown to ordinary partner or address users.",
-    "image": "15-lefedettseg.png",
-    "caption": "Order coverage for the selected season.",
     "steps": [
-      "Use the sales-representative filter and partner search to narrow the list. The representative column shows both code and name.",
+      "Use the representative filter and search on Order list. The representative column shows both code and name.",
       "Open Partner order coverage to review addresses, brands and order sheets. You can export this view to Excel.",
-      "To correct a submitted order, open its Aggregated data page, use Reopen as draft and confirm.",
+      "Open the submitted order sheet and use Reset to draft immediately before the language selector. The button is available only to sales representatives for accessible submitted orders and asks for confirmation. It is not available through a shared link.",
       "Submit the order again after corrections. Check that its status really is Submitted."
     ],
-    "paragraphs": ["Access may come from direct partner assignments or from a representative's partner portfolio. Portfolio access follows the sales representative stored on partner records, so newly assigned partners can become available automatically. Administrators manage these settings."],
-    "notes": ["Report missing partners or addresses as an access issue. The version documented here has no separate portal action for directly changing an existing order's partner or address."]
+    "paragraphs": [
+      "Access may come from direct partner assignments or from a representative's partner portfolio. Portfolio access follows the sales representative stored on partner records, so newly assigned partners can become available automatically. Administrators manage these settings.",
+      "Submissions and reopenings are logged with the actor, time, IP address and status transition. The audit is an administrator-only, permission-protected page, not an editable partner tool."
+    ],
+    "notes": [
+      "Report missing partners or addresses as an access issue. The version documented here has no separate portal action for directly changing an existing order's partner or address."
+    ],
+    "images": [
+      [
+        "15-lefedettseg.png",
+        "Order coverage for the selected season."
+      ],
+      [
+        "16-visszanyitas.png",
+        "Reset to draft sits in the order-sheet header before the language selector."
+      ]
+    ]
   },
   {
     "title": "Exporting selected orders for the ERP",
@@ -211,8 +289,12 @@
       "Download the ERP Excel file. The ERP reads the worksheet named Munka1; do not rename it.",
       "On Ellenőrzés (Check), review unchanged, replaced and deleted quantities per order. Their sum is TOTAL and must match the original order quantity."
     ],
-    "paragraphs": ["Company is HUPS. Document is the order-type code; customer reference is the order reference; BOLT is the address name. The order date is the export date."],
-    "notes": ["Season-specific SKU replacement rules are maintained by administrators. A target of TÖRÖLT omits the item from Munka1. Assortments are exported with their own SKU and assortment quantity; they are not split into individual SKUs. Replacements affect the export only, not the original order."]
+    "paragraphs": [
+      "Company is HUPS. Document is the order-type code; customer reference is the order reference; BOLT is the address name. The order date is the export date."
+    ],
+    "notes": [
+      "Season-specific SKU replacement rules are maintained by administrators. A target of TÖRÖLT omits the item from Munka1. Assortments are exported with their own SKU and assortment quantity; they are not split into individual SKUs. Replacements affect the export only, not the original order."
+    ]
   },
   {
     "title": "Troubleshooting and final checklist",
@@ -226,6 +308,15 @@
       "419 or expired session: reopen the correct login URL and sign in again. A test site's directory-protection password is separate. Report repeated errors with the URL, browser and device.",
       "Maintenance message: read it and try later. A maintenance closure does not require a password reset."
     ],
-    "notes": ["Before submitting: correct season, partner, address and reference; checked quantities and values; last edited cell saved.", "At the end: verify the status and use Sign out. On shared computers, closing a tab alone is not signing out. Help remains available at the top of portal pages."]
+    "notes": [
+      "Before submitting: correct season, partner, address and reference; checked quantities and values; last edited cell saved.",
+      "At the end: verify the status and use Sign out. On shared computers, closing a tab alone is not signing out. Help remains available at the top of portal pages."
+    ],
+    "faqs": [
+      [
+        "Where is the order list, and what does search filter?",
+        "Open Order list. Its search and filters affect that list only. Address search on Generate/open order only filters the address selector. Returning from an order always opens Order list."
+      ]
+    ]
   }
 ]

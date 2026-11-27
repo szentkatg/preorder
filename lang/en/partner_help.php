@@ -13,6 +13,6 @@ return [
     'note' => 'Important',
     'checklist' => 'Checklist',
     'top' => 'Back to contents',
-    'updated' => 'Updated: 22 November 2026',
+    'updated' => 'Updated: 27 November 2026',
     'back' => 'Return to the portal in your original browser tab. Opening Help does not change your order.',
 ];

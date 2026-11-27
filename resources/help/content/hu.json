@@ -49,23 +49,25 @@
     ]
   },
   {
-    "title": "Új rendelés és meglévő rendelés megnyitása",
-    "intro": "Ugyanahhoz a szezonhoz, címhez, márkához és rendelőlaphoz több külön rendelés is létrehozható. A rendeléseket a hivatkozási szám különbözteti meg egymástól.",
+    "title": "Rendelés generálása/megnyitása",
+    "intro": "A Rendelések oldal két, egymás melletti fülre oszlik: Rendelés generálása/megnyitása és Rendelések listája. Egyszerre csak az egyik tartalma látszik, külön összecsukó gomb nincs. Ugyanahhoz a szezonhoz, címhez, márkához és rendelőlaphoz több rendelést is létrehozhatsz, külön hivatkozási számmal.",
     "images": [
       [
         "04-selector-panel.png",
-        "Az elkülönített rendelésválasztó panel meglévő rendelésekkel és új hivatkozási számmal.",
+        "A Rendelés generálása/megnyitása fül, a címkereső magyarázatával és új rendelés adataival.",
         7.05,
         2.7
       ]
     ],
     "steps": [
-      "A Keresés a címben mezővel szűkítheted a címlistát partnernév, partnerkód, címkód, címnév, város vagy utca alapján.",
+      "Új rendeléshez vagy cím szerinti megnyitáshoz válaszd a Rendelés generálása/megnyitása fület.",
+      "A Keresés a címben mező partnernév, partnerkód, címkód, címnév, irányítószám, város vagy utca alapján kizárólag az alatta lévő címválasztó lehetőségeit szűri. A Rendelések listája fül listáját nem módosítja.",
       "Válaszd ki a címet, majd a márkát és a rendelőlapot. Csak a jogosultságod és a cím beállításai alapján elérhető elemek közül választhatsz.",
       "Meglévő rendeléshez kattints a megfelelő hivatkozási szám sorában a Rendelőlap megnyitása gombra.",
       "Új rendeléshez írj be új hivatkozási számot, válassz rendeléstípust, majd kattints az Új rendelés létrehozása gombra."
     ],
     "paragraphs": [
+      "Ha a kiválasztott szezonban már van számodra elérhető rendelés, belépéskor a Rendelések listája fül lesz aktív. Ha nincs ilyen rendelés, a Rendelés generálása/megnyitása fül nyílik meg. Más szezon vagy másik, nem elérhető partner rendelése nem számít bele. A korábban beállított listaszűrő nem változtatja meg ezt az alapértelmezést.",
       "A rendeléstípus nem ugyanaz, mint a rendelőlap típusa. Például a Textil egy rendelőlap, a VRELO pedig normál előrendelést jelent. Csak a kiválasztott címhez engedélyezett aktív rendeléstípusok jelennek meg.",
       "Példa hivatkozásra: ELŐ-S27-005. Az azonos szezon, partner, cím, márka és rendelőlap kombináción belül a hivatkozási számnak egyedinek kell lennie. Az új szám legfeljebb 100 karakter hosszú lehet.",
       "A régebbi rendelések hivatkozási számát már kitöltöttük. Az aktuális hivatkozást mindig a rendeléslistában ellenőrizd."
@@ -75,18 +77,24 @@
     ]
   },
   {
-    "title": "A rendeléslista szűrése és kijelölése",
-    "intro": "A rendelésválasztó alatt a kiválasztott szezonhoz tartozó, számodra elérhető rendelések listáját találod. A lista több címet és több hivatkozási számot is tartalmazhat.",
+    "title": "Rendelések listája: keresés, szűrés és kijelölés",
+    "intro": "A Rendelések listája fülön a kiválasztott szezon számodra elérhető rendeléseit kezelheted. Nem a másik fül alatt találod: a fül nevére kattintva válthatsz át. A fülek váltásakor a keresések, szűrők és kijelölések megmaradnak.",
     "images": [
       [
         "05-rendeleslista.png",
-        "A rendeléslista a szűrőkkel, állapotjelzésekkel és összesítő gombokkal.",
+        "A Rendelések listája fül: csak ehhez a listához tartozó szűrők, kereső, jelölőnégyzetek és műveletek.",
         7.05,
+        3
+      ],
+      [
+        "17-tomeges-bekuldes.png",
+        "Tömeges beküldés megerősítése: a külön e-mail-jelölőnégyzettel csak státuszváltás is választható.",
+        5.2,
         3
       ]
     ],
     "steps": [
-      "A szűrők között választhatsz területi képviselőt, márkát, rendelőlapot, pénznemet, kitöltöttséget és rendelésstátuszt. A partner kereső külön mezőben található.",
+      "A listát területi képviselő, márka, rendelőlap, pénznem, kitöltöttség és státusz szerint szűrheted. A Keresés a rendeléslistában mező partnerkód, partnernév, címkód, címadatok, hivatkozási szám vagy rendeléstípus alapján keres. Ezek a beállítások csak az ezen a fülön látható rendeléslistára vonatkoznak.",
       "A sor elején lévő jelölőnégyzettel válaszd ki a kívánt rendeléseket. A fejléc jelölőnégyzete a szűrésnek megfelelő rendelések kijelölését kapcsolja.",
       "Egy rendelés megnyitásához kattints a listában a sorára. Ellenőrizd a címet és a hivatkozási számot, ne csak a partner nevét.",
       "Az Exportálás Excel-be gomb a szűrt rendeléslistát exportálja, nem az egyedi rendelőlap méretenkénti mátrixát."
@@ -112,7 +120,13 @@
       ]
     ],
     "notes": [
-      "A sorok kijelölése és a felső, új rendelést létrehozó panel választásai két külön funkciót vezérelnek. Az ERP-exporthoz és a több rendelés összesítéséhez mindig a lista jelölőnégyzetei számítanak."
+      "A Rendelés generálása/megnyitása fül cím- és márkaválasztói nem jelölik ki a listában a rendeléseket. Tömeges beküldéshez, több rendelés összesítéséhez és ERP-exporthoz mindig a Rendelések listája fül jelölőnégyzeteit használd."
+    ],
+    "paragraphs": [
+      "A lista első megnyitásakor az adatok betöltődnek. Az ismételt fülváltás nem tölti újra a teljes listát, és nem törli a szűréseket vagy kijelöléseket. Ha egy új szűrőt vagy keresést alkalmazol, a korábbi kijelölés kiürül: az új találatokból jelölj ki újra.",
+      "Több rendelés beküldése: jelöld ki a kívánt sorokat, majd kattints a Több rendelés beküldése gombra. A megerősítő ablak mutatja a kijelöltek és a már beküldöttek számát; utóbbiakat a program kihagyja.",
+      "A megerősítésnél választhatsz e-mailes visszaigazolást vagy csak státuszváltást. Alapból az e-mail-küldés be van jelölve. A jelölést kivéve a rendelések Beküldve állapotba kerülnek, de nem készül hozzájuk visszaigazoló levél és Excel-csatolmány. Ez a választó a tömeges beküldésre vonatkozik.",
+      "Megerősítés után a program rendelésenként halad; a folyamat végéig hagyd nyitva az oldalt. Mégsem esetén nem történik beküldés. Az eredmény külön jelzi a sikertelen rendeléseket és az e-mail-küldési hibákat. A levél hibája nem vonja vissza a sikeres státuszváltást."
     ]
   },
   {
@@ -127,8 +141,8 @@
       ]
     ],
     "steps": [
-      "A lap tetején ellenőrizd a szezont, a márkát és a rendelőlap típusát, valamint az alatta látható partner- és címadatokat.",
-      "A Vissza a rendelésekhez gomb a rendelésválasztóra visz. Az Összesített adatok gomb az adott rendelés katalóguscsoportonkénti áttekintését nyitja meg.",
+      "A lap tetején ellenőrizd a szezont, márkát, rendelőlaptípust, partner- és címadatokat, valamint a rendelés hivatkozási számát.",
+      "A Vissza a rendelésekhez gomb mindig a Rendelések listája fülre visz. Az Összesített adatok gomb kizárólag az éppen megnyitott rendelés katalóguscsoportonkénti áttekintését nyitja meg.",
       "Az előző és következő katalóguscsoport nevét mutató hivatkozásokkal léphetsz tovább a csoportok között.",
       "Az Aktuális katalóguscsoport és a Teljes rendelés blokkok az összesített mennyiséget, nettó nagyker értéket és bruttó kisker értéket mutatják."
     ],
@@ -286,7 +300,8 @@
       "A rendszer a beküldő felhasználó e-mail-címére is küld egy üzenetet, a rendelőlap Excel-példányával. Ha a levél nem érkezik meg, először a rendelés felületen látható státuszát ellenőrizd; ne hozz létre emiatt automatikusan újabb rendelést."
     ],
     "notes": [
-      "Téves beküldéskor a területi képviselő tudja piszkozatra visszaállítani a hozzáférhető rendelést. Piszkozat rendelés teljes törlése a rendelőlapon, a megerősítés jóváhagyása után lehetséges; ez nem ugyanaz, mint a mennyiségek nullázása."
+      "Téves beküldéskor a területi képviselő a rendelőlap tetején, közvetlenül a nyelvválasztó előtt találja a Visszaállítás piszkozatba gombot. Nem az Összesített adatok oldalon és nem a kategóriaváltó linkek között van. Megerősítés után a tételek változatlanok maradnak, a beküldési idő törlődik, a rendelés újra szerkeszthető. Visszanyitáskor nincs e-mail-küldés.",
+      "Piszkozat rendelés teljes törlése a rendelőlapon, megerősítés után lehetséges; ez nem mennyiségek nullázása. Törlés után a Rendelések listája fül nyílik meg akkor is, ha az utolsó rendelést törölted."
     ]
   },
   {
@@ -371,16 +386,23 @@
         "A partner rendelés-lefedettségi nézet a kiválasztott szezonra.",
         7.05,
         2.9
+      ],
+      [
+        "16-visszanyitas.png",
+        "A visszanyitó gomb a rendelőlap fejlécében, a nyelvválasztó előtt helyezkedik el.",
+        7.05,
+        2.5
       ]
     ],
     "steps": [
-      "A rendeléslista területi képviselő szűrőjével és partnerkeresőjével szűkítsd a listát. A Területi képviselő oszlopban a képviselő kódja és neve is látható.",
+      "A Rendelések listája fül területi képviselő szűrőjével és keresőjével szűkítsd a listát. A képviselő oszlopban a kód és a név is látható.",
       "A Partner rendelés lefedettség gombbal nyisd meg a címek, márkák és rendelőlapok szerinti áttekintést. A nézetből Excel-export is készíthető.",
-      "Beküldött rendelés javításához nyisd meg annak Összesített adatok oldalát, és válaszd a Visszaállítás piszkozatba műveletet. A visszaállítást meg kell erősíteni.",
+      "Beküldött rendelés javításához nyisd meg a rendelőlapot, majd kattints a fejlécben, a nyelvválasztó előtti Visszaállítás piszkozatba gombra. A művelet csak területi képviselőnek, saját elérhető rendelésénél látható, és megerősítést kér. Megosztott linken nem érhető el.",
       "Javítás után a rendelést ismét be kell küldeni. Ellenőrizd, hogy a lista státusza valóban Beküldve lett."
     ],
     "paragraphs": [
-      "A hozzáférési kör közvetlen partner-hozzárendelésből és képviselői partnerkörből is származhat. A képviselői partnerkör a partnertörzsben megadott képviselő alapján követi az új partnereket; a beállítást adminisztrátor végzi."
+      "A hozzáférési kör közvetlen partner-hozzárendelésből és képviselői partnerkörből is származhat. A képviselői partnerkör a partnertörzsben megadott képviselő alapján követi az új partnereket; a beállítást adminisztrátor végzi.",
+      "A beküldés és visszanyitás naplózva van: ki, mikor, milyen IP-címről és milyen státuszváltást végzett. A napló adminisztrátori, külön jogosultsághoz kötött felületen érhető el; a partner nem szerkeszti."
     ],
     "notes": [
       "Ha hiányzik egy partner vagy cím, ezt jogosultsági kérdésként jelezd az adminisztrátornak. A portálon egy meglévő rendelés címének vagy partnerének közvetlen átírására a bemutatott verzióban nincs külön művelet."
@@ -412,6 +434,10 @@
   {
     "title": "Gyakori kérdések és ellenőrzőlista",
     "faqs": [
+      [
+        "Nem találom a rendeléslistát vagy nem tudom, mit szűr a kereső",
+        "A Rendelések listája fülre kattints. Az ottani keresés és szűrők ezt a listát szűkítik; a Rendelés generálása/megnyitása fül címkeresője csak a címválasztó lehetőségeit. A rendelőlapról visszatérve mindig a lista fül nyílik meg."
+      ],
       [
         "Nem látom a szezont vagy a címemet",
         "A szezont láthatóvá kell tenni, a címhez pedig jogosultság szükséges. Először ellenőrizd a fejlécben az aktuális szezont, majd jelezd a hiányt a területi képviselődnek."

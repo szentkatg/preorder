@@ -13,6 +13,6 @@ return [
     'note' => 'Fontos',
     'checklist' => 'Ellenőrzőlista',
     'top' => 'Vissza a tartalomjegyzékhez',
-    'updated' => 'Frissítve: 2026. november 22.',
+    'updated' => 'Frissítve: 2026. november 27.',
     'back' => 'A portálhoz az eredeti böngészőlapon térhetsz vissza. A súgó megnyitása nem változtatja meg a rendelésedet.',
 ];

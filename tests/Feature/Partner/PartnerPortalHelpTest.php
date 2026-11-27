@@ -146,4 +146,21 @@ class PartnerPortalHelpTest extends TestCase
         $this->assertSame(1, substr_count($orders, 'data-partner-help'));
         $this->assertMatchesRegularExpression('/data-partner-language-tools[^>]*>.*?<select.*?<\/select>.*?data-partner-help/s', $orders);
     }
+
+    public function test_both_guides_describe_current_tabs_bulk_email_choice_and_sheet_header_reopening(): void
+    {
+        foreach (['hu', 'en'] as $locale) {
+            $chapters = json_decode(file_get_contents(resource_path('help/content/'.$locale.'.json')), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertCount(16, $chapters);
+            $this->assertSame($locale === 'hu' ? 'Rendelés generálása/megnyitása' : 'Generate/open order', $chapters[2]['title']);
+            $this->assertStringContainsString($locale === 'hu' ? 'Rendelések listája' : 'Order list', $chapters[2]['intro']);
+            $this->assertStringContainsString($locale === 'hu' ? 'megerősítés' : 'confirmation', implode(' ', $chapters[3]['paragraphs']));
+            $this->assertStringContainsString($locale === 'hu' ? 'e-mail' : 'email', implode(' ', $chapters[3]['paragraphs']));
+            $this->assertStringContainsString($locale === 'hu' ? 'nyelvválasztó' : 'language selector', $chapters[13]['steps'][2]);
+            $html = $this->get(route('partner.help', ['locale' => $locale]))->assertOk()
+                ->assertSee($locale === 'hu' ? '2026. november 27.' : '27 November 2026')
+                ->assertSeeHtml('17-tomeges-bekuldes.jpg')->assertSeeHtml('16-visszanyitas.jpg')->getContent();
+            $this->assertStringNotContainsString($locale === 'hu' ? 'A rendelésválasztó alatt' : 'Below the selection panel', $html);
+        }
+    }
 }
